@@ -48,8 +48,12 @@ coverage/
 junit.xml
 *.lcov
 
-# Supabase config (only at root, not source code)
-/supabase/
+# Supabase - ignore temp files but keep migrations and config
+.branches/
+.temp/
+supabase/.branches/
+supabase/.temp/
+supabase/.env.local
 
 # SQLite database files
 *.db

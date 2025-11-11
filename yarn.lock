@@ -7382,15 +7382,15 @@ sucrase@3.35.0:
     pirates "^4.0.1"
     ts-interface-checker "^0.1.9"
 
-supabase@^2.54.11:
-  version "2.54.11"
-  resolved "https://registry.npmjs.org/supabase/-/supabase-2.54.11.tgz"
-  integrity sha512-KuDDVi1s2fhfun81LNPaCLpW4/LFsP3G2LKUQimzEoj64sP1DtZ/d97uw6GFYbNMPW9JC2Ruuei53qHInOwJLA==
+supabase@^2.58.5:
+  version "2.58.5"
+  resolved "https://registry.yarnpkg.com/supabase/-/supabase-2.58.5.tgz#2e8c8a78b8586ca53b9f16d179ec424e84abc71a"
+  integrity sha512-mYZSkUIePTdmwlHd26Pff8wpmjfre8gcuWzrc5QqhZgZvCXugVzAQQhcjaQisw5kusbPQWNIjUwcHYEKmejhPw==
   dependencies:
     bin-links "^6.0.0"
     https-proxy-agent "^7.0.2"
     node-fetch "^3.3.2"
-    tar "7.5.1"
+    tar "7.5.2"
 
 supports-color@^5.3.0:
   version "5.5.0"
@@ -7459,18 +7459,7 @@ tar-stream@^2.1.4:
     inherits "^2.0.3"
     readable-stream "^3.1.1"
 
-tar@7.5.1:
-  version "7.5.1"
-  resolved "https://registry.npmjs.org/tar/-/tar-7.5.1.tgz"
-  integrity sha512-nlGpxf+hv0v7GkWBK2V9spgactGOp0qvfWRxUMjqHyzrt3SgwE48DIv/FhqPHJYLHpgW1opq3nERbz5Anq7n1g==
-  dependencies:
-    "@isaacs/fs-minipass" "^4.0.0"
-    chownr "^3.0.0"
-    minipass "^7.1.2"
-    minizlib "^3.1.0"
-    yallist "^5.0.0"
-
-tar@^7.4.3:
+tar@7.5.2, tar@^7.4.3:
   version "7.5.2"
   resolved "https://registry.npmjs.org/tar/-/tar-7.5.2.tgz"
   integrity sha512-7NyxrTE4Anh8km8iEy7o0QYPs+0JKBTj5ZaqHg6B39erLg0qYXN3BijtShwbsNSvQ+LN75+KV+C4QR/f6Gwnpg==
