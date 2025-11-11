@@ -1,0 +1,21 @@
+{
+  "name": "@waterways/shared",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "generate-db": "node src/database/generate-db.js",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^12.4.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.81.0",
+    "dotenv": "^17.2.3"
+  }
+}
