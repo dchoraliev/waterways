@@ -1,93 +1,257 @@
-# Waterways
+# Waterways App
 
+A cross-platform application for water quality monitoring and environmental data collection, built with React Native, Expo, and Supabase.
 
+## 📋 Project Overview
 
-## Getting started
+Waterways is a mobile-first application that enables users to:
+- Record observations during field trips along waterways
+- Capture photos and location data for environmental monitoring
+- Sync data with cloud storage via Supabase
+- Access data offline with local SQLite storage
+- View and analyze observation data on web and mobile platforms
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 🚀 Tech Stack
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Frontend
+- **React Native** - Cross-platform mobile framework
+- **Expo** - Development platform and tooling
+- **React Native Web** - Web compatibility layer
+- **TypeScript** - Type-safe JavaScript
 
-## Add your files
+### Backend & Database
+- **Supabase** - Backend-as-a-Service (PostgreSQL, Auth, Storage)
+- **expo-sqlite** - Local SQLite database for offline support
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### Development Tools
+- **Yarn Workspaces** - Monorepo management
+- **ESLint & Prettier** - Code quality and formatting
+- **Jest** - Testing framework
+- **TypeScript** - Static type checking
+
+## 🏗️ Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/uwplatt1/courseprojects/fall2025/se4330-f25-waterways/waterways.git
-git branch -M main
-git push -uf origin main
+waterways/
+├── apps/
+│   ├── mobile/          # React Native mobile app (iOS/Android)
+│   └── web/             # React Native Web app
+├── packages/
+│   └── shared/          # Shared code, types, and utilities
+├── tests/
+│   ├── mobile/          # Mobile app tests
+│   ├── web/             # Web app tests
+│   └── shared/          # Shared package tests
+└── docs/                # Documentation
 ```
 
-## Integrate with your tools
+## ⚡ Quick Start
 
-- [ ] [Set up project integrations](https://gitlab.com/uwplatt1/courseprojects/fall2025/se4330-f25-waterways/waterways/-/settings/integrations)
+### Prerequisites
 
-## Collaborate with your team
+Before you begin, ensure you have the following installed:
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- **Node.js** (v18 or higher) - [Download](https://nodejs.org/)
+- **Yarn** (v1.22+) or **npm** (v8+)
+- **Expo CLI** - `npm install -g expo-cli`
+- **Supabase CLI** (optional) - For database management
 
-## Test and Deploy
+For mobile development:
+- **iOS**: macOS with Xcode installed
+- **Android**: Android Studio with SDK installed
+- Or use **Expo Go** app on your physical device
 
-Use the built-in continuous integration in GitLab.
+### Installation
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd waterways
+   ```
 
-***
+2. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-# Editing this README
+3. **Environment Setup:**
+   
+   Copy the example environment file and fill in your Supabase credentials:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Edit `.env` and add your values:
+   ```env
+   SUPABASE_URL=your_supabase_project_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+   
+   You can find these values in your [Supabase Dashboard](https://supabase.com/dashboard) under Project Settings > API.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+4. **Build shared package:**
+   ```bash
+   npm run build:shared
+   ```
 
-## Suggestions for a good README
+### Running the Apps
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+#### Mobile App
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+# Start Expo development server
+npm run mobile
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+# Then choose:
+# - Press 'i' for iOS simulator
+# - Press 'a' for Android emulator
+# - Scan QR code with Expo Go app on your device
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Or run directly:
+```bash
+npm run mobile -- --ios
+npm run mobile -- --android
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+#### Web App
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+npm run web
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+The web app will open at `http://localhost:19006`
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### Running Tests
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+# Run all tests
+npm test
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# Run tests for specific workspace
+npm run test:mobile
+npm run test:web
+npm run test:shared
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+# Run tests in watch mode
+npm run test:watch
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+# Generate coverage report
+npm run test:coverage
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+### Code Quality
 
-## License
-For open source projects, say how it is licensed.
+```bash
+# Run linter
+npm run lint
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+# Fix linting issues
+npm run lint:fix
+
+# Check formatting
+npm run format:check
+
+# Format all files
+npm run format
+
+# Type checking
+npm run type-check
+```
+
+## 🗄️ Database
+
+### Local SQLite Database
+
+The mobile app uses SQLite for offline data storage. The database schema is defined in `packages/shared/src/database/schema.ts` and includes:
+
+- **trips** - Field trip sessions
+- **observations** - Environmental observations
+- **observation_media** - Photos and media files
+- **observation_categories** - Category definitions
+
+To generate a SQLite database file for inspection:
+```bash
+cd packages/shared
+npm run generate-db
+```
+
+This creates `packages/shared/src/database/waterways.db` that you can open with any SQLite viewer.
+
+### Supabase (Cloud Database)
+
+The project uses Supabase for cloud data sync. To regenerate TypeScript types after schema changes:
+
+```bash
+npm run types:generate
+```
+
+This updates `packages/shared/src/models/database-types.ts` with the latest database schema.
+
+## 📱 Development Workflow
+
+### Using Shared Code
+
+Import from the shared package using the `@waterways/shared` alias:
+
+```typescript
+import { ALL_TABLES } from '@waterways/shared/src/database/schema';
+import { supabase } from '@waterways/shared/src/supabase/client';
+import type { Database, Tables } from '@waterways/shared/src/models/database-types';
+```
+
+### Workspace Commands
+
+Each workspace can be targeted individually:
+
+```bash
+# Mobile workspace
+npm run mobile
+yarn workspace @waterways/mobile start
+
+# Web workspace
+npm run web
+yarn workspace @waterways/web start
+
+# Shared workspace
+npm run build:shared
+yarn workspace @waterways/shared build
+```
+
+## 🤝 Contributing
+
+1. Create a feature branch: `git checkout -b feature/my-feature`
+2. Make your changes
+3. Run tests: `npm test`
+4. Run linter: `npm run lint:fix`
+5. Format code: `npm run format`
+6. Type check: `npm run type-check`
+7. Commit your changes: `git commit -m "Add my feature"`
+8. Push to the branch: `git push origin feature/my-feature`
+9. Create a Pull Request
+
+## 🐛 Troubleshooting
+
+### Metro bundler issues
+```bash
+# Clear Metro cache
+npx expo start --clear
+```
+
+### TypeScript errors
+```bash
+# Rebuild shared package
+npm run build:shared
+
+# Check for type errors
+npm run type-check
+```
+
+## 🔗 Links
+
+- [Supabase Dashboard](https://supabase.com/dashboard)
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Native Documentation](https://reactnative.dev/)
+

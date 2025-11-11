@@ -1,0 +1,26 @@
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../models/database-types';
+
+// Environment variables should be set in .env file at project root
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error(
+    'Missing Supabase environment variables. Please check your .env file contains SUPABASE_URL and SUPABASE_ANON_KEY.'
+  );
+}
+
+/**
+ * Shared Supabase client instance with typed database schema.
+ * Can be used across mobile and web apps.
+ */
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
+
+// Export types for convenience
+export type { Database, Tables, TablesInsert, TablesUpdate } from '../models/database-types';
