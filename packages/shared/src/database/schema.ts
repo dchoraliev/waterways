@@ -46,7 +46,6 @@ CREATE TABLE observation_media (
   local_file_path TEXT NOT NULL,
   media_type TEXT DEFAULT 'image',
   file_size INTEGER,
-  display_order INTEGER DEFAULT 0,
   created_at INTEGER NOT NULL,
   FOREIGN KEY (observation_id) REFERENCES observations(id) ON DELETE CASCADE
 );
