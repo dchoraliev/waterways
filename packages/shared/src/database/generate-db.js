@@ -1,5 +1,5 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+import Database from 'better-sqlite3';
+import { join } from 'path';
 
 // Define schema directly here
 const CREATE_TRIPS_TABLE = `
@@ -61,7 +61,7 @@ const ALL_TABLES = [
 ];
 
 // Create database in current directory
-const dbPath = path.join(__dirname, 'waterways.db');
+const dbPath = join(__dirname, 'waterways.db');
 
 console.log(`Creating database at: ${dbPath}\n`);
 
@@ -77,28 +77,35 @@ try {
   console.log('✓ Database created successfully!\n');
 
   // Verify tables were created
-  const tables = db.prepare(`
+  const tables = db
+    .prepare(
+      `
     SELECT name FROM sqlite_master 
     WHERE type='table' 
     ORDER BY name
-  `).all();
+  `
+    )
+    .all();
 
   console.log('Tables created:');
-  tables.forEach(table => console.log(`  - ${table.name}`));
+  tables.forEach((table) => console.log(`  - ${table.name}`));
 
   // Verify indexes were created
-  const indexes = db.prepare(`
+  const indexes = db
+    .prepare(
+      `
     SELECT name FROM sqlite_master 
     WHERE type='index' AND name LIKE 'idx_%'
     ORDER BY name
-  `).all();
+  `
+    )
+    .all();
 
   console.log('\nIndexes created:');
-  indexes.forEach(index => console.log(`  - ${index.name}`));
+  indexes.forEach((index) => console.log(`  - ${index.name}`));
 
   console.log(`\n✓ Database file ready at: ${dbPath}`);
   console.log('You can now open this file with your SQLite viewer!');
-
 } catch (error) {
   console.error('✗ Error creating database:', error);
   process.exit(1);
