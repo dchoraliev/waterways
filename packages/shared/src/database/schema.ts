@@ -3,7 +3,7 @@
 // ============================================
 
 export const CREATE_TRIPS_TABLE = `
-CREATE TABLE trips (
+CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   project_id TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE trips (
 // ============================================
 
 export const CREATE_OBSERVATIONS_TABLE = `
-CREATE TABLE observations (
+CREATE TABLE IF NOT EXISTS observations (
   id TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE observations (
 // ============================================
 
 export const CREATE_OBSERVATION_MEDIA_TABLE = `
-CREATE TABLE observation_media (
+CREATE TABLE IF NOT EXISTS observation_media (
   id TEXT PRIMARY KEY,
   observation_id TEXT NOT NULL,
   local_file_path TEXT NOT NULL,
@@ -56,11 +56,11 @@ CREATE TABLE observation_media (
 // ============================================
 
 export const CREATE_OBSERVATIONS_TRIP_ID_INDEX = `
-CREATE INDEX idx_observations_trip_id ON observations(trip_id);
+CREATE INDEX IF NOT EXISTS idx_observations_trip_id ON observations(trip_id);
 `;
 
 export const CREATE_OBSERVATION_MEDIA_OBSERVATION_ID_INDEX = `
-CREATE INDEX idx_observation_media_observation_id ON observation_media(observation_id);
+CREATE INDEX IF NOT EXISTS idx_observation_media_observation_id ON observation_media(observation_id);
 `;
 
 // ============================================
