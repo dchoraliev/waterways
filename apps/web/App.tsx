@@ -1,12 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import { AuthProvider } from './src/services/AuthContext';
+import { Dashboard } from './src/pages/Dashboard';
+import { Toaster } from './src/components/ui/sonner';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <div className="size-full">
+        <Toaster />
+        <Dashboard />
+      </div>
+    </AuthProvider>
   );
 }
 
