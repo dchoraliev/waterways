@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Map, Marker } from 'pigeon-maps';
-import { Observation } from '../types/observation';
+import type { Observation } from '../types/observation';
 import { X, MapPin } from 'lucide-react';
-import { clusterObservations, Cluster } from '../utils/clustering';
+import { clusterObservations, type Cluster } from '../utils/clustering';
 
 interface MapViewProps {
   observations: Observation[];

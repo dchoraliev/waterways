@@ -154,7 +154,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="size-full flex flex-col">
+    <div className="flex flex-col h-screen bg-gray-50">
       <Header
         filters={filters}
         onFilterChange={setFilters}
