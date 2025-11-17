@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../services/AuthContext';
 import { toast } from 'sonner';
 import { Home } from 'lucide-react';
-import imgImageWithFallback from '../../assets/images/background.png';
+import imgImageWithFallback from '../assets/images/background.png';
 
 interface LoginPageProps {
   onSuccess: () => void;

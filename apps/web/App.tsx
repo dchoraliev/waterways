@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AuthProvider } from './src/services/AuthContext';
 import { Dashboard } from './src/pages/Dashboard';
 import { Toaster } from './src/components/ui/sonner';
+/*import './src/styles/globals.css' */
 
 export default function App() {
   return (
