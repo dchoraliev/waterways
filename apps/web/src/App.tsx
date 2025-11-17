@@ -1,8 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
-import { AuthProvider } from './src/services/AuthContext';
-import { Dashboard } from './src/pages/Dashboard';
-import { Toaster } from './src/components/ui/sonner';
+import { AuthProvider } from './contexts/AuthContext';
+import { Dashboard } from './pages/Dashboard';
+import { Toaster } from './components/ui/sonner';
 /*import './src/styles/globals.css' */
 
 export default function App() {

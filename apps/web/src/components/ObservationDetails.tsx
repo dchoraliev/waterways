@@ -4,7 +4,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Calendar, Clock, MapPin, User, X, UserX, Trash2, Filter, Trash } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
-import { useAuth } from '../services/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface ObservationDetailsProps {

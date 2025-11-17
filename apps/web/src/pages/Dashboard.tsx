@@ -7,7 +7,7 @@ import { mockObservations } from '../utils/mockData';
 import { exportToCSV } from '../utils/csvExport';
 import { Observation } from '../types/observation';
 import { toast } from 'sonner';
-import { useAuth } from '../services/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { LoginPage } from './LoginPage';
 
 export function Dashboard() {

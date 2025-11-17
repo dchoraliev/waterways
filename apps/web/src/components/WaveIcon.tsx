@@ -1,4 +1,4 @@
-import svgPaths from './svg-8yiw8arkc7';
+import svgPaths from '../imports/svg-8yiw8arkc7';
 
 export function WaveIcon({ className = 'size-6' }: { className?: string }) {
   return (
