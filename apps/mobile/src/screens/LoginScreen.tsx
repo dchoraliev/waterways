@@ -1,21 +1,21 @@
-// apps/mobile/src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/LoginScreen.styles';
+import TextInputField from '../components/form/TextInputField';
+import PrimaryButton from '../components/form/PrimaryButton';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
+  onForgotPassword: () => void;
+  onSignUp: () => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLoginSuccess,
+  onForgotPassword,
+  onSignUp,
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -25,16 +25,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     if (!canSubmit) return;
     // TODO: integrate real auth; for now just go to home
     onLoginSuccess();
-  };
-
-  const handleForgotPassword = () => {
-    // TODO: navigate to forgot-password screen
-    console.log('Forgot password pressed');
-  };
-
-  const handleSignUp = () => {
-    // TODO: navigate to sign-up screen
-    console.log('Sign up pressed');
   };
 
   const handleSkipOffline = () => {
@@ -52,7 +42,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <View style={styles.logoCircle}>
-              {/* simple emoji placeholder for waves icon */}
+              {/* placeholder for actual logo icon */}
               <Text style={styles.logoIcon}>🌊</Text>
             </View>
           </View>
@@ -69,54 +59,44 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </Text>
 
             {/* Email */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor="#6C727F"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-            </View>
+            <TextInputField
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
 
             {/* Password */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#6C727F"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
+            <TextInputField
+              label="Password"
+              placeholder="••••••••"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
 
             {/* Forgot password */}
             <View style={styles.forgotRow}>
-              <TouchableOpacity onPress={handleForgotPassword}>
+              <TouchableOpacity onPress={onForgotPassword}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
 
             {/* Sign In */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[styles.signInButton, !canSubmit && styles.signInButtonDisabled]}
+            <PrimaryButton
+              label="Sign In"
               onPress={handleSignIn}
               disabled={!canSubmit}
-            >
-              <Text style={styles.signInText}>Sign In</Text>
-            </TouchableOpacity>
+              style={styles.signInButton}
+            />
 
             {/* Bottom links */}
             <View style={styles.bottomLinksWrapper}>
               <View style={styles.signUpRow}>
                 <Text style={styles.signUpText}>Don&apos;t have an account?</Text>
-                <TouchableOpacity onPress={handleSignUp}>
+                <TouchableOpacity onPress={onSignUp}>
                   <Text style={styles.signUpLink}>Sign Up</Text>
                 </TouchableOpacity>
               </View>
