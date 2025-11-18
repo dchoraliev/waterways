@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import TagPill from './TagPill';
+import audioIcon from '../assets/icons/audio.png';
+import locationIcon from '../assets/icons/location-pin.png';
+import editIcon from '../assets/icons/edit.png';
 
 export type ObservationStatus = 'Offline' | 'Synced';
 
@@ -13,11 +16,6 @@ export interface Observation {
   hasAudio?: boolean;
   status?: ObservationStatus;
 }
-
-// adjust path if you put the icon somewhere else
-const audioIcon = require('../assets/icons/audio.png');
-const locationIcon = require('../assets/icons/location-pin.png');
-const editIcon = require('../assets/icons/edit.png');
 
 interface ObservationCardProps {
   observation: Observation;
@@ -42,12 +40,7 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation }) => {
 
         <View style={styles.headerRight}>
           {status ? (
-            <View
-              style={[
-                styles.statusBadge,
-                status === 'Offline' && styles.statusOffline,
-              ]}
-            >
+            <View style={[styles.statusBadge, status === 'Offline' && styles.statusOffline]}>
               <Text style={styles.statusText}>{status}</Text>
             </View>
           ) : null}

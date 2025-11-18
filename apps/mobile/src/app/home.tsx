@@ -55,9 +55,7 @@ export default function HomeRoute() {
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: '#F9FAFB' }}>
-              Instructions coming soon
-            </Text>
+            <Text style={{ color: '#F9FAFB' }}>Instructions coming soon</Text>
           </View>
         );
       case 'settings':
@@ -83,11 +81,7 @@ export default function HomeRoute() {
       <View style={{ flex: 1 }}>
         <TopAppBar />
         {renderContent()}
-        <BottomNav
-          currentTab={currentTab}
-          onTabPress={handleTabPress}
-          routes={ROUTES}
-        />
+        <BottomNav currentTab={currentTab} onTabPress={handleTabPress} routes={ROUTES} />
       </View>
     </SafeAreaView>
   );

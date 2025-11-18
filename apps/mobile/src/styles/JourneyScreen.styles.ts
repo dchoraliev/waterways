@@ -1,71 +1,35 @@
 import { StyleSheet } from 'react-native';
+import { colors } from './colors';
+import { typography } from './typography';
+import { spacing } from './spacing';
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: colors.primaryDark,
   },
-  endCard: {
-    marginTop: 12,
-    marginHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: '#111827',
-  },
-  endCardInner: {
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#E5E7EB',
-    marginBottom: 6,
-  },
-  endLabel: {
-    fontSize: 13,
-    color: '#E5E7EB',
-  },
-  recentSection: {
+  content: {
     flex: 1,
-    marginTop: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
-  recentTitle: {
-    fontSize: 14,
-    color: '#E5E7EB',
-    marginBottom: 10,
+  title: {
+    ...typography.headingLg,
+    color: colors.surface,
+    marginBottom: spacing.xs,
   },
-  recentPlaceholderCard: {
-    flex: 1,
-    borderRadius: 16,
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#111827',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.xl,
   },
-  recentPlaceholderCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#111827',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+  primaryButton: {
+    marginTop: spacing.md,
   },
-  recentPlaceholderIcon: {
-    fontSize: 26,
-  },
-  recentPlaceholderTitle: {
-    fontSize: 14,
-    color: '#E5E7EB',
-    marginBottom: 4,
-  },
-  recentPlaceholderSubtitle: {
-    fontSize: 12,
-    color: '#9CA3AF',
+  secondaryButton: {
+    marginTop: spacing.md,
+    // PrimaryButton itself has base styling; if you want a different look,
+    // you can override colors here later.
   },
 });
 

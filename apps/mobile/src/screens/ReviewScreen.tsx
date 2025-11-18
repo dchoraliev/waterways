@@ -1,16 +1,10 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+
 import styles from '../styles/ReviewScreen.styles';
-import ObservationCard, {
-  Observation,
-} from '../components/ObservationCard';
+import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
 import { ROUTES } from '../constants/routes';
@@ -19,7 +13,7 @@ export interface ReviewScreenProps {
   tripId: string;
 }
 
-// Default sample observations (used if no draft exists yet)
+// Sample observations for placeholder journeys
 const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
   {
     id: 'obs-1',
@@ -50,77 +44,65 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   const effectiveTripId = tripId || 'sample-trip';
 
   const existingJourney = getDraftById(effectiveTripId);
-  const observations =
-    existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+
+  // keep createdAt stable without calling Date.now in render/handlers
+  const baseCreatedAt = existingJourney?.createdAt ?? 0;
 
   const handleSaveDraft = () => {
     saveDraft({
       id: effectiveTripId,
-      createdAt: existingJourney?.createdAt ?? Date.now(),
+      createdAt: baseCreatedAt,
       status: 'draft',
       observations,
     });
 
+    // stay on review or go home; for now go home
     router.replace(ROUTES.home);
   };
 
   const handleSubmitJourney = () => {
-    // For now, "submit" still just stores locally but marks it as submitted.
     saveDraft({
       id: effectiveTripId,
-      createdAt: existingJourney?.createdAt ?? Date.now(),
+      createdAt: baseCreatedAt,
       status: 'submitted',
       observations,
     });
 
+    // later this will also upload to the backend; for now just go home
     router.replace(ROUTES.home);
   };
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journey review</Text>
           <Text style={styles.subtitle}>Trip ID: {effectiveTripId}</Text>
         </View>
 
-        {/* Observations */}
+        {/* Observations list */}
         {observations.map((obs) => (
           <ObservationCard key={obs.id} observation={obs} />
         ))}
 
         {/* Project assignment card */}
-        <View className="project-card" style={styles.projectCard}>
+        <View style={styles.projectCard}>
           <Text style={styles.projectTitle}>Project Assignment</Text>
-          <Text style={styles.projectSubtitle}>
-            Research Project (Optional)
-          </Text>
+          <Text style={styles.projectSubtitle}>Research Project (Optional)</Text>
 
           <View style={styles.projectDropdown}>
             <Text style={styles.projectDropdownText}>No project selected</Text>
           </View>
 
           <View style={styles.projectButtonsRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>
-                + Create Project
-              </Text>
+            <TouchableOpacity activeOpacity={0.85} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>+ Create Project</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>
-                + Join Project
-              </Text>
+            <TouchableOpacity activeOpacity={0.85} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>+ Join Project</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -128,8 +110,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
         {/* Offline info banner */}
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineBannerText}>
-            You have {observations.length} observations that will be
-            uploaded automatically when internet connection is restored.
+            You have {observations.length} observations that will be uploaded automatically when
+            internet connection is restored.
           </Text>
         </View>
 

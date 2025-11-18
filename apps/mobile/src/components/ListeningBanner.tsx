@@ -1,61 +1,35 @@
+// apps/mobile/src/components/ListeningBanner.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import styles from '../styles/ListeningBanner.styles';
+import micIcon from '../assets/icons/mic.png';
+import moreIcon from '../assets/icons/more-vertical.png';
 
-// adjust the path if you put the icons elsewhere
-const micIcon = require('../assets/icons/mic.png');
-const moreIcon = require('../assets/icons/more-vertical.png');
-
-export interface ListeningBannerProps {
-  label?: string;
+interface ListeningBannerProps {
+  isListening: boolean;
+  onStopListening: () => void;
 }
 
-const ListeningBanner: React.FC<ListeningBannerProps> = ({
-  label = 'Listening for "Hey WaDE"',
-}) => {
+const ListeningBanner: React.FC<ListeningBannerProps> = ({ isListening, onStopListening }) => {
+  if (!isListening) {
+    return null;
+  }
+
   return (
     <View style={styles.root}>
       <View style={styles.leftRow}>
-        <Image source={micIcon} style={styles.micIcon} />
-        <Text style={styles.label}>{label}</Text>
+        <Image source={micIcon} style={styles.icon} />
+        <View>
+          <Text style={styles.title}>Listening...</Text>
+          <Text style={styles.subtitle}>Say &quot;Hey WaDE&quot; to add an observation</Text>
+        </View>
       </View>
-      <TouchableOpacity hitSlop={8}>
+
+      <TouchableOpacity activeOpacity={0.85} style={styles.moreButton} onPress={onStopListening}>
         <Image source={moreIcon} style={styles.moreIcon} />
       </TouchableOpacity>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: {
-    marginHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: '#047857',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  leftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  micIcon: {
-    width: 18,
-    height: 18,
-    tintColor: '#ECFEFF',
-    marginRight: 8,
-  },
-  label: {
-    fontSize: 13,
-    color: '#ECFEFF',
-  },
-  moreIcon: {
-    width: 16,
-    height: 16,
-    tintColor: '#ECFEFF',
-  },
-});
 
 export default ListeningBanner;

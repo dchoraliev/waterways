@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
@@ -20,9 +15,7 @@ const DraftsScreen: React.FC = () => {
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Saved drafts</Text>
-        <Text style={styles.subtitle}>
-          Review and submit journeys you&apos;ve saved.
-        </Text>
+        <Text style={styles.subtitle}>Review and submit journeys you&apos;ve saved.</Text>
       </View>
 
       {draftJourneys.length === 0 ? (

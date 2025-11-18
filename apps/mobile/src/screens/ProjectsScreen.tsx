@@ -12,8 +12,7 @@ const ProjectsScreen: React.FC = () => {
           This page will be implemented in a future version of WaDE.
         </Text>
         <Text style={styles.note}>
-          You&apos;ll be able to create, join and manage research projects
-          here.
+          You&apos;ll be able to create, join and manage research projects here.
         </Text>
       </View>
     </SafeAreaView>

@@ -17,58 +17,38 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     <View style={styles.root}>
       <View style={styles.contentWrapper}>
         <Text style={styles.title}>Welcome to WaDE</Text>
-        <Text style={styles.subtitle}>
-          Track and explore waterway deltas
-        </Text>
+        <Text style={styles.subtitle}>Track and explore waterway deltas</Text>
 
         {/* Start Journey */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.card}
-          onPress={onStartJourney}
-        >
+        <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={onStartJourney}>
           <View style={styles.cardIconCircle}>
             <Text style={styles.cardIcon}>▶</Text>
           </View>
           <View style={styles.cardTextCol}>
             <Text style={styles.cardTitle}>Start a Journey</Text>
-            <Text style={styles.cardSubtitle}>
-              Begin tracking a new journey
-            </Text>
+            <Text style={styles.cardSubtitle}>Begin tracking a new journey</Text>
           </View>
         </TouchableOpacity>
 
         {/* View previous recordings */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.card}
-          onPress={onViewRecordings}
-        >
+        <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={onViewRecordings}>
           <View style={styles.cardIconCircle}>
             <Text style={styles.cardIcon}>⏱</Text>
           </View>
           <View style={styles.cardTextCol}>
             <Text style={styles.cardTitle}>View Previous Recordings</Text>
-            <Text style={styles.cardSubtitle}>
-              Browse your journey history
-            </Text>
+            <Text style={styles.cardSubtitle}>Browse your journey history</Text>
           </View>
         </TouchableOpacity>
 
         {/* View draft journeys */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.card}
-          onPress={onViewDrafts}
-        >
+        <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={onViewDrafts}>
           <View style={styles.cardIconCircle}>
             <Text style={styles.cardIcon}>📄</Text>
           </View>
           <View style={styles.cardTextCol}>
             <Text style={styles.cardTitle}>View Draft Journeys</Text>
-            <Text style={styles.cardSubtitle}>
-              Review and submit saved journeys
-            </Text>
+            <Text style={styles.cardSubtitle}>Review and submit saved journeys</Text>
           </View>
         </TouchableOpacity>
       </View>
