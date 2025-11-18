@@ -1,13 +1,20 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 import LoginScreen from '../screens/LoginScreen';
+import { ROUTES } from '../constants/routes';
 
 export default function IndexRoute() {
   const router = useRouter();
 
   const handleLoginSuccess = () => {
-    router.replace('/home');
+    router.replace(ROUTES.home);
   };
 
-  return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  return (
+    <LoginScreen
+      onLoginSuccess={handleLoginSuccess}
+      onForgotPassword={() => router.push(ROUTES.resetPassword)}
+      onSignUp={() => router.push(ROUTES.signup)}
+    />
+  );
 }
