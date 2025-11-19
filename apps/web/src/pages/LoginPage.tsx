@@ -68,12 +68,12 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
   // Forgot Password View
   if (isForgotPassword) {
     return (
-      <div className="bg-white relative size-full">
+      <div className="bg-white relative min-h-screen">
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
             alt=""
-            className="absolute inset-0 max-w-none object-center object-cover pointer-events-none size-full"
+            className="absolute inset-0 w-full h-full object-cover"
             src={imgImageWithFallback}
           />
         </div>
@@ -180,12 +180,12 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
 
   if (isSignUp) {
     return (
-      <div className="bg-white relative size-full">
+      <div className="bg-white relative min-h-screen">
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
             alt=""
-            className="absolute inset-0 max-w-none object-center object-cover pointer-events-none size-full"
+            className="absolute inset-0 max-w-none object-center object-cover pointer-events-none w-full h-full"
             src={imgImageWithFallback}
           />
         </div>
@@ -321,12 +321,12 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
   }
 
   return (
-    <div className="bg-white relative size-full">
+    <div className="bg-white relative min-h-screen">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
           alt=""
-          className="absolute inset-0 max-w-none object-center object-cover pointer-events-none size-full"
+          className="absolute inset-0 max-w-none object-center object-cover pointer-events-none w-full h-full"
           src={imgImageWithFallback}
         />
       </div>
