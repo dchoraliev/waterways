@@ -8,6 +8,7 @@ export interface JourneyDraft {
   createdAt: number;
   status: JourneyStatus;
   observations: Observation[];
+  projectId: string | null;
 }
 
 interface DraftJourneysContextValue {

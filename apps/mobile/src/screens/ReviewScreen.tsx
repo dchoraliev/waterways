@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,9 @@ import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
 import { ROUTES } from '../constants/routes';
+
+// Import the new functional component
+import ProjectSelector from '../components/ProjectSelector';
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -42,9 +45,17 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   const { getDraftById, saveDraft } = useDraftJourneys();
 
   const effectiveTripId = tripId || 'sample-trip';
+  
+  // NOTE: This placeholder should be replaced with actual user authentication logic
+  const USER_ID = 'user-123-demo'; 
 
   const existingJourney = getDraftById(effectiveTripId);
   const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+
+  // 1. Initialize state for the selected project, retrieving it from the draft if available
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    existingJourney?.projectId || null
+  );
 
   // keep createdAt stable without calling Date.now in render/handlers
   const baseCreatedAt = existingJourney?.createdAt ?? 0;
@@ -55,6 +66,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       createdAt: baseCreatedAt,
       status: 'draft',
       observations,
+      projectId: selectedProjectId, // <-- SAVE THE SELECTED PROJECT ID
     });
 
     // stay on review or go home; for now go home
@@ -67,6 +79,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       createdAt: baseCreatedAt,
       status: 'submitted',
       observations,
+      projectId: selectedProjectId, // <-- INCLUDE PROJECT ID IN SUBMISSION SAVE
     });
 
     // later this will also upload to the backend; for now just go home
@@ -87,25 +100,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
           <ObservationCard key={obs.id} observation={obs} />
         ))}
 
-        {/* Project assignment card */}
-        <View style={styles.projectCard}>
-          <Text style={styles.projectTitle}>Project Assignment</Text>
-          <Text style={styles.projectSubtitle}>Research Project (Optional)</Text>
-
-          <View style={styles.projectDropdown}>
-            <Text style={styles.projectDropdownText}>No project selected</Text>
-          </View>
-
-          <View style={styles.projectButtonsRow}>
-            <TouchableOpacity activeOpacity={0.85} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>+ Create Project</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity activeOpacity={0.85} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>+ Join Project</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* PROJECT ASSIGNMENT: Replaced the static card with the functional component */}
+        <ProjectSelector
+          selectedProjectId={selectedProjectId}
+          onSelectProject={setSelectedProjectId}
+          userId={USER_ID} // Pass the user ID for fetching/creating projects
+        />
 
         {/* Offline info banner */}
         <View style={styles.offlineBanner}>

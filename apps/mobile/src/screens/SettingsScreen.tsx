@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SettingsScreen.styles';
 
 const SettingsScreen: React.FC = () => {
-  const handleCreateProject = () => {
-    Alert.alert('Coming soon', 'Project creation will be implemented on this screen.', [
-      { text: 'OK' },
-    ]);
+  // TODO: Add navigation prop when you're ready to hook it up
+  const handleMyProjects = () => {
+    // navigation.navigate('MyProjects'); // Uncomment when navigation is connected
+    console.log('Navigate to My Projects');
   };
 
   return (
@@ -18,12 +18,12 @@ const SettingsScreen: React.FC = () => {
         <Text style={styles.subtitle}>Manage your WaDE preferences and data.</Text>
       </View>
 
-      {/* Create Project entry */}
-      <TouchableOpacity activeOpacity={0.85} style={styles.row} onPress={handleCreateProject}>
+      {/* My Projects entry */}
+      <TouchableOpacity activeOpacity={0.85} style={styles.row} onPress={handleMyProjects}>
         <View style={styles.rowTextCol}>
-          <Text style={styles.rowTitle}>Create a Project</Text>
+          <Text style={styles.rowTitle}>My Projects</Text>
           <Text style={styles.rowSubtitle}>
-            Start organizing journeys under a research project.
+            View and manage your research projects.
           </Text>
         </View>
         <Text style={styles.chevron}>›</Text>
