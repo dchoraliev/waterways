@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../models/database-types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Environment variables should be set in .env file at project root
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -19,6 +20,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    storage: AsyncStorage,
   },
 });
 
