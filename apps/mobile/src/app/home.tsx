@@ -60,7 +60,7 @@ export default function HomeRoute() {
           </View>
         );
       case 'settings':
-          return <SettingsScreen onNavigateToProjects={() => router.push('/projects')} />;
+          return <SettingsScreen onNavigateToProjects={() => router.push(ROUTES.projects)} />;
       default:
         return null;
     }
