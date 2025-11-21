@@ -13,61 +13,56 @@ const generateJoinCode = (): string => {
 
 // Create a new project
 export const createProject = async (
-  name: string,
-  userId: string
+  name: string,
+  userId: string
 ): Promise<{ data: Project | null; error: Error | null }> => {
-  try {
-    let joinCode = generateJoinCode();
-    let codeExists = true;
-    
-    // ... (while loop to check/generate joinCode remains the same)
+  try {
+    let joinCode = generateJoinCode();
+    let codeExists = true; // ... (while loop to check/generate joinCode remains the same)
+    while (codeExists) {
+      const { data: existing } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('join_code', joinCode)
+        .single();
+      if (!existing) {
+        codeExists = false;
+      } else {
+        joinCode = generateJoinCode();
+      }
+    }
 
-    while (codeExists) {
-      const { data: existing } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('join_code', joinCode)
-        .single();
-      
-      if (!existing) {
-        codeExists = false;
-      } else {
-        joinCode = generateJoinCode();
-      }
-    }
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([
+        {
+          name,
+          created_by: userId,
+          join_code: joinCode,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert([
-        {
-          name,
-          created_by: userId,
-          join_code: joinCode,
-          created_at: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single();
+    if (error) throw error;
 
-    if (error) throw error;
     
-    // 💡 FIX APPLIED HERE: Cast the result (data) to the expected Project type.
-    const createdProject = data as Project; 
+    const createdProject = data as Project;
 
-    await supabase.from('project_membership').insert([
-      {
-        user_id: userId,
-        project_id: createdProject.id, // Use the correctly typed object
-        joined_at: new Date().toISOString()
-      }
-    ]);
+    await supabase.from('project_membership').insert([
+      {
+        user_id: userId,
+        project_id: createdProject.id, // Use the correctly typed object
+        joined_at: new Date().toISOString(),
+      },
+    ]); // Return the correctly typed object
 
-    // Return the correctly typed object
-    return { data: createdProject, error: null };
-  } catch (error) {
-    console.error('Error creating project:', error);
-    return { data: null, error: error as Error };
-  }
+    return { data: createdProject, error: null };
+  } catch (error) {
+    console.error('Error creating project:', error);
+    return { data: null, error: error as Error };
+  }
 };
 
 // Get user's projects
@@ -78,7 +73,14 @@ export const getUserProjects = async (
     const { data, error } = await supabase
       .from('project_membership')
       .select(`
-        project:projects(*)
+        project:projects(
+          id,
+          name,
+          description,
+          created_by,
+          created_at,
+          join_code
+        )
       `)
       .eq('user_id', userId)
       .order('joined_at', { ascending: false });
@@ -119,15 +121,13 @@ export const joinProjectWithCode = async (
       return { success: false, error: 'Already a member of this project' };
     }
 
-    const { error: insertError } = await supabase
-      .from('project_membership')
-      .insert([
-        {
-          user_id: userId,
-          project_id: project.id,
-          joined_at: new Date().toISOString()
-        }
-      ]);
+    const { error: insertError } = await supabase.from('project_membership').insert([
+      {
+        user_id: userId,
+        project_id: project.id,
+        joined_at: new Date().toISOString(),
+      },
+    ]);
 
     if (insertError) throw insertError;
 

@@ -45,9 +45,9 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   const { getDraftById, saveDraft } = useDraftJourneys();
 
   const effectiveTripId = tripId || 'sample-trip';
-  
+
   // NOTE: This placeholder should be replaced with actual user authentication logic
-  const USER_ID = 'user-123-demo'; 
+  const USER_ID = 'user-123-demo';
 
   const existingJourney = getDraftById(effectiveTripId);
   const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;

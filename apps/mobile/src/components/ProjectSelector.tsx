@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,11 +33,18 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
 
-  useEffect(() => {
-    if (modalVisible) {
-      loadProjects();
-    }
-  }, [modalVisible]);
+  const loadProjects = useCallback(async () => {
+  setLoading(true);
+  const { data } = await getUserProjects(userId);
+  setProjects(data || []);
+  setLoading(false);
+}, [userId]);
+
+useEffect(() => {
+  if (modalVisible) {
+    loadProjects();
+  }
+}, [modalVisible, loadProjects]);
 
   useEffect(() => {
     if (selectedProjectId && projects.length > 0) {
@@ -45,13 +52,6 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
       setSelectedProject(project || null);
     }
   }, [selectedProjectId, projects]);
-
-  const loadProjects = async () => {
-    setLoading(true);
-    const { data } = await getUserProjects(userId);
-    setProjects(data || []);
-    setLoading(false);
-  };
 
   const handleSelectProject = (project: Project) => {
     setSelectedProject(project);

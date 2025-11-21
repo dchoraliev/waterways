@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   Alert,
   Share
 } from 'react-native';
-import { getUserProjects, leaveProject } from '../services/projectService';
+// Note: Ensure projectService and project.types are correctly imported
+import { getUserProjects, leaveProject } from '../services/projectService'; 
 import type { Project } from '../types/project.types';
 
 interface Props {
@@ -21,16 +22,36 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = async () => {
+  // 💡 FIX: Use useCallback to stabilize the loadProjects function
+  const loadProjects = useCallback(async () => {
+    console.log('loadProjects called');
     setLoading(true);
-    const { data } = await getUserProjects(userId);
-    setProjects(data || []);
-    setLoading(false);
-  };
+    try {
+      console.log('Fetching projects for userId:', userId);
+      const { data, error } = await getUserProjects(userId);
+      console.log('Projects fetched:', { data, error });
+      
+      if (error) {
+        console.error('Error loading projects:', error);
+      }
+      setProjects(data || []);
+    } catch (err) {
+      console.error('Exception loading projects:', err);
+    } finally {
+      setLoading(false);
+      console.log('Loading set to false');
+    }
+  }, [userId]); // Dependency: loadProjects only changes when userId changes
+
+  useEffect(() => {
+    // 💡 FIX: This is now safe because loadProjects is wrapped in useCallback
+    if (userId) {
+      loadProjects();
+    } else {
+      setLoading(false);
+    }
+  }, [loadProjects, userId]);
+
 
   const handleRefresh = async () => {
     setRefreshing(true);

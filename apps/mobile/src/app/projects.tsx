@@ -1,14 +1,11 @@
-// apps/mobile/src/app/projects.tsx (Corrected)
 import React from 'react';
-import { useRouter } from 'expo-router';
-import MyProjectScreen from '../screens/MyProjectScreen'; // <-- Changed import
+import MyProjectScreen from '../screens/MyProjectScreen'; 
 
 export default function MyProjectsRoute() {
-  const router = useRouter();
-  
+
   // TODO: Replace with actual userId from your auth context
-  const userId = 'temp-user-id';
-  
+  const userId = '00000000-0000-0000-0000-000000000000';
+
   // The ProjectsScreen doesn't take props, but if you want to pass them later...
-  return <MyProjectScreen  userId={userId} />; 
+  return <MyProjectScreen userId={userId} />;
 }

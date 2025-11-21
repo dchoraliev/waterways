@@ -9,5 +9,5 @@ export interface Journey {
   createdAt: number;
   status: 'draft' | 'submitted';
   observations: Observation[];
-  projectId: string | null; 
+  projectId: string | null;
 }
