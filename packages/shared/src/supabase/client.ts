@@ -7,7 +7,7 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    'Missing Supabase environment variables. Please check your .env file contains SUPABASE_URL and SUPABASE_ANON_KEY.'
+    'Missing Supabase environment variables. Please check your .env file contains SUPABASE_URL and SUPABASE_ANON_KEY. For mobile, ensure babel.config.js is configured to inline these variables.'
   );
 }
 
