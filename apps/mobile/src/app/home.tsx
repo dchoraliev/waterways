@@ -9,6 +9,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import { ROUTES } from '../constants/routes';
 
+
 export default function HomeRoute() {
   const [currentTab, setCurrentTab] = useState<BottomTabKey>('home');
   const router = useRouter();
@@ -59,18 +60,7 @@ export default function HomeRoute() {
           </View>
         );
       case 'settings':
-        return (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#020617',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#F9FAFB' }}>Settings coming soon</Text>
-          </View>
-        );
+          return <SettingsScreen onNavigateToProjects={() => router.push('/projects')} />;
       default:
         return null;
     }

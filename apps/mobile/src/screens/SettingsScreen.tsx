@@ -3,11 +3,14 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SettingsScreen.styles';
 
-const SettingsScreen: React.FC = () => {
-  // TODO: Add navigation prop when you're ready to hook it up
+
+interface SettingsScreenProps {
+  onNavigateToProjects?: () => void;
+}
+
+const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigateToProjects }) => {
   const handleMyProjects = () => {
-    // navigation.navigate('MyProjects'); // Uncomment when navigation is connected
-    console.log('Navigate to My Projects');
+    onNavigateToProjects?.();
   };
 
   return (
