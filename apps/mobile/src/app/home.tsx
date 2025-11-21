@@ -59,18 +59,7 @@ export default function HomeRoute() {
           </View>
         );
       case 'settings':
-        return (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#020617',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#F9FAFB' }}>Settings coming soon</Text>
-          </View>
-        );
+        return <SettingsScreen onNavigateToProjects={() => router.push(ROUTES.projects)} />;
       default:
         return null;
     }
