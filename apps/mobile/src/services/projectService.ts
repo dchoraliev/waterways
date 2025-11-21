@@ -18,7 +18,7 @@ export const createProject = async (
 ): Promise<{ data: Project | null; error: Error | null }> => {
   try {
     let joinCode = generateJoinCode();
-    let codeExists = true; // ... (while loop to check/generate joinCode remains the same)
+    let codeExists = true;
     while (codeExists) {
       const { data: existing } = await supabase
         .from('projects')
@@ -47,19 +47,19 @@ export const createProject = async (
 
     if (error) throw error;
 
-    
     const createdProject = data as Project;
 
     await supabase.from('project_membership').insert([
       {
         user_id: userId,
-        project_id: createdProject.id, // Use the correctly typed object
+        project_id: createdProject.id,
         joined_at: new Date().toISOString(),
       },
-    ]); // Return the correctly typed object
+    ]);
 
     return { data: createdProject, error: null };
-  } catch (error) {
+  } catch (error: unknown) {
+    // FIX: Use unknown for catch block
     console.error('Error creating project:', error);
     return { data: null, error: error as Error };
   }
@@ -72,7 +72,8 @@ export const getUserProjects = async (
   try {
     const { data, error } = await supabase
       .from('project_membership')
-      .select(`
+      .select(
+        `
         project:projects(
           id,
           name,
@@ -81,14 +82,22 @@ export const getUserProjects = async (
           created_at,
           join_code
         )
-      `)
+      `
+      )
       .eq('user_id', userId)
       .order('joined_at', { ascending: false });
 
     if (error) throw error;
-    const projects = data?.map((item: any) => item.project).filter(Boolean) || [];
+
+    // FIX for Conversion Error: Use (item as unknown as { project: Project })
+    // to bypass the strict structural check on the nested Supabase type.
+    const projects =
+      (data
+        ?.map((item) => (item as unknown as { project: Project }).project)
+        .filter(Boolean) as Project[]) || [];
     return { data: projects, error: null };
-  } catch (error) {
+  } catch (error: unknown) {
+    // FIX: Use unknown for catch block
     console.error('Error fetching user projects:', error);
     return { data: null, error: error as Error };
   }
@@ -132,7 +141,8 @@ export const joinProjectWithCode = async (
     if (insertError) throw insertError;
 
     return { success: true, error: null };
-  } catch (error) {
+  } catch (error: unknown) {
+    // FIX: Use unknown for catch block
     console.error('Error joining project:', error);
     return { success: false, error: 'Failed to join project' };
   }
@@ -152,7 +162,8 @@ export const leaveProject = async (
 
     if (error) throw error;
     return { error: null };
-  } catch (error) {
+  } catch (error: unknown) {
+    // FIX: Use unknown for catch block
     console.error('Error leaving project:', error);
     return { error: error as Error };
   }

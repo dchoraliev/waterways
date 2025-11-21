@@ -7,10 +7,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Share
+  Share,
 } from 'react-native';
-// Note: Ensure projectService and project.types are correctly imported
-import { getUserProjects, leaveProject } from '../services/projectService'; 
+import { getUserProjects, leaveProject } from '../services/projectService';
 import type { Project } from '../types/project.types';
 
 interface Props {
@@ -22,7 +21,6 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 💡 FIX: Use useCallback to stabilize the loadProjects function
   const loadProjects = useCallback(async () => {
     console.log('loadProjects called');
     setLoading(true);
@@ -30,7 +28,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
       console.log('Fetching projects for userId:', userId);
       const { data, error } = await getUserProjects(userId);
       console.log('Projects fetched:', { data, error });
-      
+
       if (error) {
         console.error('Error loading projects:', error);
       }
@@ -41,17 +39,14 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
       setLoading(false);
       console.log('Loading set to false');
     }
-  }, [userId]); // Dependency: loadProjects only changes when userId changes
+  }, [userId]);
 
+  // FIX: Added useEffect to call loadProjects on mount or when userId changes
   useEffect(() => {
-    // 💡 FIX: This is now safe because loadProjects is wrapped in useCallback
     if (userId) {
       loadProjects();
-    } else {
-      setLoading(false);
     }
   }, [loadProjects, userId]);
-
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -71,26 +66,22 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
   };
 
   const handleLeaveProject = (project: Project) => {
-    Alert.alert(
-      'Leave Project',
-      `Are you sure you want to leave "${project.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await leaveProject(userId, project.id);
-            if (error) {
-              Alert.alert('Error', 'Failed to leave project');
-            } else {
-              Alert.alert('Success', 'Left project successfully');
-              loadProjects();
-            }
+    Alert.alert('Leave Project', `Are you sure you want to leave "${project.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await leaveProject(userId, project.id);
+          if (error) {
+            Alert.alert('Error', 'Failed to leave project');
+          } else {
+            Alert.alert('Success', 'Left project successfully');
+            loadProjects();
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   if (loading) {
@@ -104,7 +95,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>My Projects</Text>
-      
+
       <FlatList
         data={projects}
         keyExtractor={(item) => item.id}
@@ -113,7 +104,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
             <View style={styles.projectHeader}>
               <Text style={styles.projectName}>{item.name}</Text>
             </View>
-            
+
             <View style={styles.codeContainer}>
               <Text style={styles.codeLabel}>Join Code:</Text>
               <Text style={styles.code}>{item.join_code}</Text>
@@ -140,9 +131,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No projects yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create or join a project to get started
-            </Text>
+            <Text style={styles.emptySubtext}>Create or join a project to get started</Text>
           </View>
         }
         contentContainerStyle={styles.listContent}
@@ -174,9 +163,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   projectHeader: { marginBottom: 12 },
-  projectName: { 
-    fontSize: 15, 
-    fontWeight: '600', 
+  projectName: {
+    fontSize: 15,
+    fontWeight: '600',
     color: '#F9FAFB',
     marginBottom: 8,
   },
@@ -190,24 +179,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   codeLabel: { fontSize: 12, color: '#9CA3AF' },
-  code: { 
-    fontSize: 18, 
-    fontWeight: '600', 
-    letterSpacing: 2, 
+  code: {
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 2,
     color: '#60A5FA',
   },
   buttonRow: { flexDirection: 'row', gap: 8 },
-  button: { 
-    flex: 1, 
-    padding: 12, 
-    borderRadius: 8, 
+  button: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  shareButton: { 
+  shareButton: {
     backgroundColor: '#1D4ED8',
   },
   shareButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
-  leaveButton: { 
+  leaveButton: {
     backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#374151',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   TextInput,
-  Alert
+  Alert,
 } from 'react-native';
 import { getUserProjects, createProject, joinProjectWithCode } from '../services/projectService';
 import type { Project } from '../types/project.types';
@@ -23,38 +23,40 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
   const [modalVisible, setModalVisible] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  
+
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creating, setCreating] = useState(false);
-  
+
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
 
   const loadProjects = useCallback(async () => {
-  setLoading(true);
-  const { data } = await getUserProjects(userId);
-  setProjects(data || []);
-  setLoading(false);
-}, [userId]);
+    setLoading(true);
+    const { data } = await getUserProjects(userId);
+    setProjects(data || []);
+    setLoading(false);
+  }, [userId]);
 
-useEffect(() => {
-  if (modalVisible) {
-    loadProjects();
-  }
-}, [modalVisible, loadProjects]);
-
+  // FIX 1: Wrapped loadProjects in an IIFE to avoid the setState warning
   useEffect(() => {
-    if (selectedProjectId && projects.length > 0) {
-      const project = projects.find(p => p.id === selectedProjectId);
-      setSelectedProject(project || null);
+    if (modalVisible) {
+      (async () => {
+        await loadProjects();
+      })();
     }
+  }, [modalVisible, loadProjects]);
+
+  // FIX 2: Replaced useEffect/useState with useMemo to handle derived state (selectedProject)
+  const selectedProject = useMemo<Project | null>(() => {
+    if (selectedProjectId && projects.length > 0) {
+      return projects.find((p) => p.id === selectedProjectId) || null;
+    }
+    return null;
   }, [selectedProjectId, projects]);
 
   const handleSelectProject = (project: Project) => {
-    setSelectedProject(project);
     onSelectProject(project.id);
     setModalVisible(false);
   };
@@ -156,7 +158,7 @@ useEffect(() => {
                   <TouchableOpacity
                     style={[
                       styles.projectItem,
-                      selectedProjectId === item.id && styles.selectedProjectItem
+                      selectedProjectId === item.id && styles.selectedProjectItem,
                     ]}
                     onPress={() => handleSelectProject(item)}
                   >
@@ -174,7 +176,6 @@ useEffect(() => {
             <TouchableOpacity
               style={styles.noneButton}
               onPress={() => {
-                setSelectedProject(null);
                 onSelectProject(null);
                 setModalVisible(false);
               }}
@@ -217,9 +218,7 @@ useEffect(() => {
                 onPress={handleCreateProject}
                 disabled={creating}
               >
-                <Text style={styles.createButtonText}>
-                  {creating ? 'Creating...' : 'Create'}
-                </Text>
+                <Text style={styles.createButtonText}>{creating ? 'Creating...' : 'Create'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -259,9 +258,7 @@ useEffect(() => {
                 onPress={handleJoinWithCode}
                 disabled={joining}
               >
-                <Text style={styles.createButtonText}>
-                  {joining ? 'Joining...' : 'Join'}
-                </Text>
+                <Text style={styles.createButtonText}>{joining ? 'Joining...' : 'Join'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -329,9 +326,9 @@ const styles = StyleSheet.create({
   joinButton: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#1D4ED8' },
   actionButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
   loader: { marginVertical: 32 },
-  projectItem: { 
-    padding: 16, 
-    borderBottomWidth: 1, 
+  projectItem: {
+    padding: 16,
+    borderBottomWidth: 1,
     borderBottomColor: '#1D4ED8',
   },
   selectedProjectItem: { backgroundColor: '#1D4ED8' },
@@ -359,7 +356,7 @@ const styles = StyleSheet.create({
   },
   buttonRow: { flexDirection: 'row', gap: 8 },
   button: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  cancelButton: { 
+  cancelButton: {
     backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#374151',
