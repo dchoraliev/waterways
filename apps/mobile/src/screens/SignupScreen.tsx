@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import {signUp} from '../../../../packages/shared/supabase/auth'
+import { signUp } from '../../../../packages/shared/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';
@@ -25,10 +25,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    
+
     const { data, error } = await signUp(email, password);
     if (error) {
-      console.log("Error singing up:", error);
+      console.log('Error singing up:', error);
       return;
     }
     onSignupSuccess();

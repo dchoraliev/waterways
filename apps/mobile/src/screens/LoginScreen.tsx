@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {signIn} from '../../../../packages/shared/supabase/auth'
+import { signIn } from '../../../../packages/shared/supabase/auth';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/LoginScreen.styles';
@@ -24,10 +24,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleSignIn = async () => {
     if (!canSubmit) return;
-    
-    const {data, error} = await signIn(email, password);
-    if(error){
-      console.log("Error signing in:", error);
+
+    const { data, error } = await signIn(email, password);
+    if (error) {
+      console.log('Error signing in:', error);
       return;
     }
     onLoginSuccess();
