@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { signUp } from '../../../../packages/shared/supabase/auth';
+import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';

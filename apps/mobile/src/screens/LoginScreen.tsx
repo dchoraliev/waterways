@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signIn } from '../../../../packages/shared/supabase/auth';
+import { signIn } from '@waterways/shared/src/supabase/auth';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/LoginScreen.styles';
