@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { signIn } from '../../../../packages/shared/supabase/auth';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
+import { error } from 'console';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -18,12 +20,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!canSubmit) return;
-    // TODO: integrate real auth; for now just go to home
+
+    const { data, error } = await signIn(email, password);
+    if (error) {
+      console.log('Error signing in:', error);
+      return;
+    }
     onLoginSuccess();
   };
 

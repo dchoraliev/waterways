@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { signUp } from '../../../../packages/shared/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';
@@ -22,9 +23,14 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
     password.trim().length >= 4 &&
     password === confirm;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
-    // TODO: call real signup API
+
+    const { data, error } = await signUp(email, password);
+    if (error) {
+      console.log('Error singing up:', error);
+      return;
+    }
     onSignupSuccess();
   };
 
