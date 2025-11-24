@@ -9,14 +9,16 @@ import {
   Alert,
   Share,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getUserProjects, leaveProject } from '../services/projectService';
 import type { Project } from '../types/project.types';
 
 interface Props {
-  userId: string; // Pass this from your auth context or navigation params
+  userId: string;
 }
 
 const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,12 +43,11 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
     }
   }, [userId]);
 
-  // FIX: Added useEffect to call loadProjects on mount or when userId changes
   useEffect(() => {
     if (userId) {
       loadProjects();
     }
-  }, [loadProjects, userId]);
+  }, [loadProjects]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -94,6 +95,14 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
 
   return (
     <View style={styles.container}>
+      {/* Back button */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.backButton}
+      >
+        <Text style={styles.backButtonText}>‹ Back</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>My Projects</Text>
 
       <FlatList
@@ -143,12 +152,22 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#020617' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  backButton: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  backButtonText: {
+    color: '#60A5FA',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   title: {
     fontSize: 20,
     fontWeight: '600',
     color: '#F9FAFB',
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 10,
     paddingBottom: 24,
     textAlign: 'center',
   },
