@@ -7,13 +7,15 @@ CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   project_id TEXT,
+  created_at INTEGER NOT NULL,
   start_time INTEGER,
   end_time INTEGER,
   start_latitude REAL,
   start_longitude REAL,
   end_latitude REAL,
   end_longitude REAL,
-  created_at INTEGER NOT NULL
+  sync_status TEXT,
+  last_synced_at INTEGER NOT NULL DEFAULT 0
 );
 `;
 
@@ -24,13 +26,20 @@ CREATE TABLE IF NOT EXISTS trips (
 export const CREATE_OBSERVATIONS_TABLE = `
 CREATE TABLE IF NOT EXISTS observations (
   id TEXT PRIMARY KEY,
-  trip_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
+  trip_id TEXT NOT NULL,
   latitude REAL,
   longitude REAL,
+  created_at INTEGER NOT NULL,
+  audio_media_id TEXT,
+  audio_transcribed INTEGER DEFAULT 0,
   observation TEXT,
   category_id TEXT,
-  created_at INTEGER NOT NULL,
+  direction TEXT,
+  local_media_id TEXT,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
+  multimedia_url TEXT,
+  last_synced_at INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
 );
 `;
@@ -42,11 +51,13 @@ CREATE TABLE IF NOT EXISTS observations (
 export const CREATE_OBSERVATION_MEDIA_TABLE = `
 CREATE TABLE IF NOT EXISTS observation_media (
   id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
   observation_id TEXT NOT NULL,
   local_file_path TEXT NOT NULL,
   media_type TEXT DEFAULT 'image',
   file_size INTEGER,
-  created_at INTEGER NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
+  last_synced_at INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (observation_id) REFERENCES observations(id) ON DELETE CASCADE
 );
 `;
