@@ -45,5 +45,5 @@ export default function MyProjectsRoute() {
     );
   }
 
-  return <MyProjectScreen userId={userId} />;
+  return <MyProjectScreen/>;
 }
