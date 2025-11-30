@@ -10,7 +10,9 @@ export default function MyProjectsRoute() {
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user?.id) {
           setUserId(user.id);
         } else {
@@ -30,7 +32,14 @@ export default function MyProjectsRoute() {
 
   if (loading || !userId) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#020617',
+        }}
+      >
         <ActivityIndicator size="large" color="#1D4ED8" />
       </View>
     );

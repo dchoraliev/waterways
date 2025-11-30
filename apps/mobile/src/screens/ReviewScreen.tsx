@@ -51,7 +51,9 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user?.id) {
           setUserId(user.id);
         }

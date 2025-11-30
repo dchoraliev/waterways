@@ -47,7 +47,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
     if (userId) {
       loadProjects();
     }
-  }, [loadProjects]);
+  }, [loadProjects, userId]); // FIX: Added 'userId' to satisfy react-hooks/exhaustive-deps
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -96,10 +96,7 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
   return (
     <View style={styles.container}>
       {/* Back button */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={styles.backButton}
-      >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backButtonText}>‹ Back</Text>
       </TouchableOpacity>
 

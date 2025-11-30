@@ -25,7 +25,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleSignIn = async () => {
     if (!canSubmit) return;
-    
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -105,7 +105,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
             {/* Sign In */}
             <PrimaryButton
-              label={loading ? "Signing in..." : "Sign In"}
+              label={loading ? 'Signing in...' : 'Sign In'}
               onPress={handleSignIn}
               disabled={!canSubmit || loading}
               style={styles.signInButton}

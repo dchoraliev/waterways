@@ -39,7 +39,6 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
     setLoading(false);
   }, [userId]);
 
-  
   useEffect(() => {
     if (modalVisible) {
       (async () => {
@@ -48,7 +47,6 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
     }
   }, [modalVisible, loadProjects]);
 
-  
   const selectedProject = useMemo<Project | null>(() => {
     if (selectedProjectId && projects.length > 0) {
       return projects.find((p) => p.id === selectedProjectId) || null;
