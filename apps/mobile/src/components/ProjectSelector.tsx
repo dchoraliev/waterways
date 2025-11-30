@@ -39,7 +39,6 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
     setLoading(false);
   }, [userId]);
 
-  // FIX 1: Wrapped loadProjects in an IIFE to avoid the setState warning
   useEffect(() => {
     if (modalVisible) {
       (async () => {
@@ -48,7 +47,6 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
     }
   }, [modalVisible, loadProjects]);
 
-  // FIX 2: Replaced useEffect/useState with useMemo to handle derived state (selectedProject)
   const selectedProject = useMemo<Project | null>(() => {
     if (selectedProjectId && projects.length > 0) {
       return projects.find((p) => p.id === selectedProjectId) || null;
