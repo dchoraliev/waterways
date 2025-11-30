@@ -85,8 +85,8 @@ For mobile development:
    
    Edit `.env` and add your values:
    ```env
-   SUPABASE_URL=your_supabase_project_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
    
    You can find these values in your [Supabase Dashboard](https://supabase.com/dashboard) under Project Settings > API.

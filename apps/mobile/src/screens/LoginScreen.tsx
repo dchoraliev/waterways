@@ -5,6 +5,7 @@ import { signIn } from 'packages/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
+import { error } from 'console';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
