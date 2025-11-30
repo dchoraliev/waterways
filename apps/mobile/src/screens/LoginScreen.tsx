@@ -5,7 +5,6 @@ import { signIn } from 'packages/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
-import { error } from 'console';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -37,8 +36,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
         console.log('Login successful! User ID:', data.user?.id);
         onLoginSuccess();
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (_error) {
+      // FIX: Renamed 'error' to '_error'
+      console.error('Login error:', _error);
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);
