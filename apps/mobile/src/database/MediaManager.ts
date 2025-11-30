@@ -10,8 +10,8 @@
  * All functions use parameterized queries for SQL injection prevention.
  */
 
-import { getDatabase } from "./db";
-import { ObservationMedia } from "@waterways/shared/src/models/local-db-rows";
+import { getDatabase } from './db';
+import { ObservationMedia } from '@waterways/shared/src/models/local-db-rows';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -93,7 +93,16 @@ export async function addMedia(params: {
     `INSERT OR REPLACE INTO observation_media (
       id, created_at, observation_id, local_file_path, media_type, file_size, sync_status, last_synced_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [item.id, item.created_at, item.observation_id, item.local_file_path, item.media_type, item.file_size, item.sync_status, item.last_synced_at]
+    [
+      item.id,
+      item.created_at,
+      item.observation_id,
+      item.local_file_path,
+      item.media_type,
+      item.file_size,
+      item.sync_status,
+      item.last_synced_at,
+    ]
   );
 
   return item;
@@ -114,7 +123,10 @@ export async function addMedia(params: {
  */
 export async function getMediaById(id: string): Promise<ObservationMedia | null> {
   const db = await getDatabase();
-  const rows = await db!.getAllAsync<ObservationMedia>(`SELECT * FROM observation_media WHERE id = ? LIMIT 1`, [id]);
+  const rows = await db!.getAllAsync<ObservationMedia>(
+    `SELECT * FROM observation_media WHERE id = ? LIMIT 1`,
+    [id]
+  );
   return rows && rows.length ? rows[0] : null;
 }
 
@@ -146,10 +158,21 @@ export async function getMediaById(id: string): Promise<ObservationMedia | null>
  */
 export async function updateMediaById(
   id: string,
-  updates: Partial<Pick<ObservationMedia, 'local_file_path' | 'media_type' | 'file_size' | 'sync_status' | 'last_synced_at'>>
+  updates: Partial<
+    Pick<
+      ObservationMedia,
+      'local_file_path' | 'media_type' | 'file_size' | 'sync_status' | 'last_synced_at'
+    >
+  >
 ): Promise<void> {
   const db = await getDatabase();
-  const allowedKeys: Array<keyof ObservationMedia> = ['local_file_path', 'media_type', 'file_size', 'sync_status', 'last_synced_at'];
+  const allowedKeys: Array<keyof ObservationMedia> = [
+    'local_file_path',
+    'media_type',
+    'file_size',
+    'sync_status',
+    'last_synced_at',
+  ];
   const setParts: string[] = [];
   const params: any[] = [];
 

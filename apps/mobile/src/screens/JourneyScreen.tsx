@@ -7,24 +7,28 @@ import ListeningBanner from '../components/ListeningBanner';
 import PrimaryButton from '../components/form/PrimaryButton';
 import styles from '../styles/JourneyScreen.styles';
 
-const JourneyScreen: React.FC = () => {
+export interface JourneyScreenProps {
+  tripId: string;
+}
+
+const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
   const router = useRouter();
   const [isListening, setIsListening] = useState(false);
 
   const handleStartListening = () => {
     setIsListening(true);
-    // TODO: start GPS/audio tracking here
+    console.log('Start listening for trip:', tripId);
+    // TODO: start GPS/audio tracking here and associate with tripId
   };
 
   const handleStopListening = () => {
     setIsListening(false);
+    console.log('Stop listening for trip:', tripId);
     // TODO: stop GPS/audio tracking here
   };
 
   const handleEndJourney = () => {
     setIsListening(false);
-    // TODO: use real trip id from DB/context
-    const tripId = 'sample-trip';
     router.push(`/review/${tripId}`);
   };
 

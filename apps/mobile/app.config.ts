@@ -4,24 +4,24 @@ import dotenv from 'dotenv';
 
 // Load your .env from the root (you uploaded it at repo root)
 dotenv.config({
-  path: path.resolve(__dirname, '../../.env')
+  path: path.resolve(__dirname, '../../.env'),
 });
 
-export default ({
+export default {
   expo: {
-    name: "mobile",
-    scheme: "waterways",
-    slug: "mobile",
-    version: "1.0.0",
-    orientation: "portrait",
-    icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    name: 'mobile',
+    scheme: 'waterways',
+    slug: 'mobile',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/icon.png',
+    userInterfaceStyle: 'light',
     newArchEnabled: true,
 
     splash: {
-      image: "./assets/splash-icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      image: './assets/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#ffffff',
     },
 
     ios: {
@@ -30,18 +30,18 @@ export default ({
 
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#ffffff',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
     },
 
     web: {
-      favicon: "./assets/favicon.png",
+      favicon: './assets/favicon.png',
     },
 
-    plugins: ["expo-router"],
+    plugins: ['expo-router'],
 
     experiments: {
       typedRoutes: true,
@@ -53,4 +53,4 @@ export default ({
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     },
   },
-});
+};

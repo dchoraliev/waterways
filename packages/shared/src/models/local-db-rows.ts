@@ -34,7 +34,7 @@ export interface Observation {
   id: string;
   user_id: string;
   trip_id: string;
-  latitude:  | null;
+  latitude: null;
   longitude: number | null;
   created_at: number;
   audio_media_id: string | null;

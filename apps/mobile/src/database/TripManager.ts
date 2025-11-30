@@ -10,8 +10,8 @@
  * All functions use async/await with parameterized queries for SQL injection prevention.
  */
 
-import { getDatabase } from "./db";
-import { Trip } from "@waterways/shared/src/models/local-db-rows";
+import { getDatabase } from './db';
+import { Trip } from '@waterways/shared/src/models/local-db-rows';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -128,9 +128,37 @@ export async function createTrip(params: {
  *     sync_status: 'pending'
  *   });
  */
-export async function updateTripById(id: string, updates: Partial<Pick<Trip, 'user_id' | 'project_id' | 'start_time' | 'end_time' | 'start_latitude' | 'start_longitude' | 'end_latitude' | 'end_longitude' | 'sync_status' | 'last_synced_at'>>): Promise<void> {
+export async function updateTripById(
+  id: string,
+  updates: Partial<
+    Pick<
+      Trip,
+      | 'user_id'
+      | 'project_id'
+      | 'start_time'
+      | 'end_time'
+      | 'start_latitude'
+      | 'start_longitude'
+      | 'end_latitude'
+      | 'end_longitude'
+      | 'sync_status'
+      | 'last_synced_at'
+    >
+  >
+): Promise<void> {
   const db = await getDatabase();
-  const allowedKeys: Array<keyof Trip> = ['user_id','project_id','start_time','end_time','start_latitude','start_longitude','end_latitude','end_longitude','sync_status','last_synced_at'];
+  const allowedKeys: Array<keyof Trip> = [
+    'user_id',
+    'project_id',
+    'start_time',
+    'end_time',
+    'start_latitude',
+    'start_longitude',
+    'end_latitude',
+    'end_longitude',
+    'sync_status',
+    'last_synced_at',
+  ];
   const setParts: string[] = [];
   const params: any[] = [];
 
@@ -164,10 +192,7 @@ export async function updateTripById(id: string, updates: Partial<Pick<Trip, 'us
  */
 export async function getTripById(id: string): Promise<Trip | null> {
   const db = await getDatabase();
-  const rows = await db!.getAllAsync<Trip>(
-    `SELECT * FROM trips WHERE id = ? LIMIT 1`,
-    [id]
-  );
+  const rows = await db!.getAllAsync<Trip>(`SELECT * FROM trips WHERE id = ? LIMIT 1`, [id]);
   return rows && rows.length ? rows[0] : null;
 }
 
@@ -187,6 +212,6 @@ export async function getTripById(id: string): Promise<Trip | null> {
  *   await removeTripById('trip-uuid-123');
  */
 export async function removeTripById(id: string): Promise<void> {
-    const db = await getDatabase();
-    await db!.runAsync(`DELETE FROM trips WHERE id = ?`, [id]);
+  const db = await getDatabase();
+  await db!.runAsync(`DELETE FROM trips WHERE id = ?`, [id]);
 }

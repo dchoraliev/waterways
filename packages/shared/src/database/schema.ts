@@ -85,3 +85,41 @@ export const ALL_TABLES = [
   CREATE_OBSERVATIONS_TRIP_ID_INDEX,
   CREATE_OBSERVATION_MEDIA_OBSERVATION_ID_INDEX,
 ];
+
+// ============================================
+// MIGRATIONS
+// ============================================
+// A mapping of table -> columns to ensure exist on older databases.
+// Each entry contains the column `name` and the SQL `addStmt` to run
+// when the column is missing. These are intentionally simple ALTER
+// statements; the runtime will check PRAGMA table_info(...) before
+// executing them to avoid errors on up-to-date databases.
+export const TABLE_MIGRATIONS: Record<string, Array<{ name: string; addStmt: string }>> = {
+  trips: [
+    { name: 'sync_status', addStmt: `ALTER TABLE trips ADD COLUMN sync_status TEXT;` },
+    {
+      name: 'last_synced_at',
+      addStmt: `ALTER TABLE trips ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
+    },
+  ],
+  observations: [
+    {
+      name: 'sync_status',
+      addStmt: `ALTER TABLE observations ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending';`,
+    },
+    {
+      name: 'last_synced_at',
+      addStmt: `ALTER TABLE observations ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
+    },
+  ],
+  observation_media: [
+    {
+      name: 'sync_status',
+      addStmt: `ALTER TABLE observation_media ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending';`,
+    },
+    {
+      name: 'last_synced_at',
+      addStmt: `ALTER TABLE observation_media ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
+    },
+  ],
+};

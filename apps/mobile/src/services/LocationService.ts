@@ -23,7 +23,9 @@ export async function getCurrentLocation(_opts?: { timeout?: number }): Promise<
   throw new Error('TODO: implement getCurrentLocation in LocationService');
 }
 
-export async function getCoordsOrNull(_timeoutMs = 10000): Promise<{ latitude: number; longitude: number } | null> {
+export async function getCoordsOrNull(
+  _timeoutMs = 10000
+): Promise<{ latitude: number; longitude: number } | null> {
   // TODO: implement safe coords retrieval that returns null on failure
   throw new Error('TODO: implement getCoordsOrNull in LocationService');
 }

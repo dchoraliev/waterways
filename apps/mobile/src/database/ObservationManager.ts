@@ -13,8 +13,8 @@
  * Boolean values (audio_transcribed) are stored as 0/1 integers in SQLite.
  */
 
-import { getDatabase } from "./db";
-import { Observation } from "@waterways/shared/src/models/local-db-rows";
+import { getDatabase } from './db';
+import { Observation } from '@waterways/shared/src/models/local-db-rows';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -178,13 +178,36 @@ export async function getObservationById(id: string): Promise<Observation | null
  */
 export async function updateObservationById(
   id: string,
-  updates: Partial<Pick<Observation, 'latitude' | 'longitude' | 'observation' | 'category_id' | 'direction' | 'audio_media_id' | 'audio_transcribed' | 'local_media_id' | 'multimedia_url' | 'sync_status' | 'last_synced_at'>>
+  updates: Partial<
+    Pick<
+      Observation,
+      | 'latitude'
+      | 'longitude'
+      | 'observation'
+      | 'category_id'
+      | 'direction'
+      | 'audio_media_id'
+      | 'audio_transcribed'
+      | 'local_media_id'
+      | 'multimedia_url'
+      | 'sync_status'
+      | 'last_synced_at'
+    >
+  >
 ): Promise<void> {
   const db = await getDatabase();
   const allowedKeys: Array<keyof Observation> = [
-    'latitude', 'longitude', 'observation', 'category_id', 'direction',
-    'audio_media_id', 'audio_transcribed', 'local_media_id', 'multimedia_url',
-    'sync_status', 'last_synced_at'
+    'latitude',
+    'longitude',
+    'observation',
+    'category_id',
+    'direction',
+    'audio_media_id',
+    'audio_transcribed',
+    'local_media_id',
+    'multimedia_url',
+    'sync_status',
+    'last_synced_at',
   ];
   const setParts: string[] = [];
   const params: any[] = [];
