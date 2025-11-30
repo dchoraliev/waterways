@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react'; // Removed useState, useCallback
 import {
   View,
   Text,
@@ -10,49 +10,45 @@ import {
   Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getUserProjects, leaveProject } from '../services/projectService';
+import { leaveProject } from '../services/projectService';
 import type { Project } from '../types/project.types';
 
-interface Props {
-  userId: string;
-}
+// ADDED: Import the new reusable hooks
+import { useAuth } from '../hooks/useAuth';
+import { useUserProjects } from '../hooks/useUserProjects';
 
-const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
+// REMOVED: interface Props { userId: string; }
+// REMOVED: const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
+
+const MyProjectsScreen: React.FC = () => {
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const loadProjects = useCallback(async () => {
-    console.log('loadProjects called');
-    setLoading(true);
-    try {
-      console.log('Fetching projects for userId:', userId);
-      const { data, error } = await getUserProjects(userId);
-      console.log('Projects fetched:', { data, error });
+  // MODIFIED: Use the new useAuth hook to get userId and auth loading state
+  const { userId, loading: authLoading } = useAuth();
 
-      if (error) {
-        console.error('Error loading projects:', error);
-      }
-      setProjects(data || []);
-    } catch (err) {
-      console.error('Exception loading projects:', err);
-    } finally {
-      setLoading(false);
-      console.log('Loading set to false');
-    }
-  }, [userId]);
+  // MODIFIED: Use the new useUserProjects hook for all project data logic
+  const {
+    projects,
+    loading: projectsLoading,
+    refreshing,
+    loadProjects,
+    handleRefresh: handleProjectsRefresh,
+  } = useUserProjects();
 
+  const loading = authLoading || projectsLoading;
+
+  // MODIFIED: Trigger data load whenever the userId changes
   useEffect(() => {
     if (userId) {
-      loadProjects();
+      loadProjects(userId);
     }
-  }, [loadProjects, userId]); // FIX: Added 'userId' to satisfy react-hooks/exhaustive-deps
+  }, [userId, loadProjects]);
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadProjects();
-    setRefreshing(false);
+    if (userId) {
+      // Use the hook's refresh method
+      await handleProjectsRefresh(userId);
+    }
   };
 
   const handleShareCode = async (project: Project) => {
@@ -73,19 +69,25 @@ const MyProjectsScreen: React.FC<Props> = ({ userId }) => {
         text: 'Leave',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await leaveProject(userId, project.id);
-          if (error) {
-            Alert.alert('Error', 'Failed to leave project');
+          if (userId) {
+            const { error } = await leaveProject(userId, project.id);
+            if (error) {
+              Alert.alert('Error', 'Failed to leave project');
+            } else {
+              Alert.alert('Success', 'Left project successfully');
+              // Use the hook's load method to refresh data
+              loadProjects(userId);
+            }
           } else {
-            Alert.alert('Success', 'Left project successfully');
-            loadProjects();
+            Alert.alert('Error', 'User not authenticated.');
           }
         },
       },
     ]);
   };
 
-  if (loading) {
+  // Check for loading or missing userId before rendering content
+  if (loading || !userId) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#1D4ED8" />

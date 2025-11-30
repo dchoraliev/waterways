@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removed useEffect
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,7 +9,8 @@ import PrimaryButton from '../components/form/PrimaryButton';
 import ProjectSelector from '../components/ProjectSelector';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
 import { ROUTES } from '../constants/routes';
-import { supabase } from '../../../../packages/shared/src/supabase/client';
+// REMOVED: import { supabase } from '../../../../packages/shared/src/supabase/client';
+import { useAuth } from '../hooks/useAuth'; // ADDED: Import the new reusable hook
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -17,6 +18,7 @@ export interface ReviewScreenProps {
 
 // Sample observations for placeholder journeys
 const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
+  // ... observations remain unchanged
   {
     id: 'obs-1',
     time: '04:08 AM',
@@ -45,24 +47,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
 
   const effectiveTripId = tripId || 'sample-trip';
 
-  // Get user ID from Supabase auth
-  const [userId, setUserId] = useState<string>('00000000-0000-0000-0000-000000000000');
+  // MODIFIED: Replaced duplicated state and effect with hook call
+  const { userId, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user?.id) {
-          setUserId(user.id);
-        }
-      } catch (error) {
-        console.error('Error getting user:', error);
-      }
-    };
-    getUser();
-  }, []);
+  // REMOVED: const [userId, setUserId] = useState<string>('00000000-0000-0000-0000-000000000000');
+  // REMOVED: useEffect(() => { ... fetching logic ... }, []);
 
   const existingJourney = getDraftById(effectiveTripId);
   const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
@@ -100,6 +89,17 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     router.replace(ROUTES.home);
   };
 
+  // Guard against rendering if auth status is still loading
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Text style={{ color: '#F9FAFB', textAlign: 'center', marginTop: 50 }}>
+          Loading user data...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -118,7 +118,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
         <ProjectSelector
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          userId={userId}
+          // Pass the live userId from the hook
+          userId={userId || '00000000-0000-0000-0000-000000000000'}
         />
 
         {/* Offline info banner */}
