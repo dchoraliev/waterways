@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../../../packages/shared/src/supabase/client';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
@@ -18,17 +19,36 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!canSubmit) return;
-    // TODO: integrate real auth; for now just go to home
-    onLoginSuccess();
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (error) {
+        Alert.alert('Login Failed', error.message);
+      } else if (data.session) {
+        console.log('Login successful! User ID:', data.user?.id);
+        onLoginSuccess();
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSkipOffline = () => {
-    // For offline mode we likely still want to go to Home
+    // For offline mode we go to home without auth
     onLoginSuccess();
   };
 
@@ -42,7 +62,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <View style={styles.logoCircle}>
-              {/* placeholder for actual logo icon */}
               <Text style={styles.logoIcon}>🌊</Text>
             </View>
           </View>
@@ -86,9 +105,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
             {/* Sign In */}
             <PrimaryButton
-              label="Sign In"
+              label={loading ? "Signing in..." : "Sign In"}
               onPress={handleSignIn}
-              disabled={!canSubmit}
+              disabled={!canSubmit || loading}
               style={styles.signInButton}
             />
 
