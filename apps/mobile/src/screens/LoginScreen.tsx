@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../../../packages/shared/src/supabase/client';
+import { signIn } from 'packages/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
@@ -28,10 +28,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password.trim(),
-      });
+      const { data, error } = await signIn(email.trim(), password.trim());
 
       if (error) {
         Alert.alert('Login Failed', error.message);
