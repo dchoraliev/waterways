@@ -221,7 +221,7 @@ export function Header({
                       key={type}
                       checked={filters.types.includes(type)}
                       onCheckedChange={() => handleTypeToggle(type)}
-                      onSelect={(e: Event) => e.preventDefault()}
+                      onSelect={(e: globalThis.Event) => e.preventDefault()}
                     >
                       {type}
                     </DropdownMenuCheckboxItem>
