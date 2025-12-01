@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FilterOptions } from './FilterPanel';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -221,7 +221,7 @@ export function Header({
                       key={type}
                       checked={filters.types.includes(type)}
                       onCheckedChange={() => handleTypeToggle(type)}
-                      onSelect={(e: React.SyntheticEvent) => e.preventDefault()}
+                      onSelect={(e: Event) => e.preventDefault()}
                     >
                       {type}
                     </DropdownMenuCheckboxItem>
