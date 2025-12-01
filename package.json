@@ -12,7 +12,7 @@
   },
   "scripts": {
     "mobile": "yarn workspace @waterways/mobile start",
-    "web": "yarn workspace @waterways/web dev",
+    "web": "cross-env VITE_CJS_IGNORE_WARNING=true yarn workspace @waterways/web dev",
     "build:shared": "yarn workspace @waterways/shared build",
     "types:generate": "npx supabase gen types typescript --project-id gvitbturpeirneatzagn > packages/shared/src/models/database-types.ts",
     "db:link": "npx supabase link --project-ref gvitbturpeirneatzagn",
@@ -43,6 +43,7 @@
     "@types/node": "^24.10.0",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
+    "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",

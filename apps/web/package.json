@@ -1,12 +1,16 @@
 {
   "name": "@waterways/web",
   "version": "1.0.0",
-  "type": "module",
+  "main": "index.ts",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.0",
@@ -30,6 +34,7 @@
     "@types/react": "~19.1.0",
     "@types/react-dom": "^18.2.18",
     "@vitejs/plugin-react": "^4.2.1",
+    "babel-plugin-transform-inline-environment-variables": "^0.4.4",
     "tailwindcss": "^4.1.17",
     "typescript": "~5.9.2",
     "vite": "^5.0.11"

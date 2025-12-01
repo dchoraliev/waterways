@@ -48,6 +48,5 @@ export interface ObservationMedia {
   local_file_path: string;
   media_type: string | null;
   file_size: number | null;
-  display_order: number | null;
   created_at: number;
 }
