@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { FilterOptions } from './FilterPanel';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -221,7 +221,7 @@ export function Header({
                       key={type}
                       checked={filters.types.includes(type)}
                       onCheckedChange={() => handleTypeToggle(type)}
-                      onSelect={(e: { preventDefault: () => any }) => e.preventDefault()}
+                      onSelect={(e: React.SyntheticEvent) => e.preventDefault()}
                     >
                       {type}
                     </DropdownMenuCheckboxItem>
@@ -278,7 +278,9 @@ export function Header({
       {/* Auth Dialogs */}
       <Dialog
         open={authDialog === 'signin'}
-        onOpenChange={(open: any) => !open && setAuthDialog(null)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setAuthDialog(null);
+        }}
       >
         <DialogContent className="max-w-md">
           <DialogTitle className="sr-only">Sign In</DialogTitle>
@@ -294,7 +296,9 @@ export function Header({
 
       <Dialog
         open={authDialog === 'signup'}
-        onOpenChange={(open: any) => !open && setAuthDialog(null)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setAuthDialog(null);
+        }}
       >
         <DialogContent className="max-w-md">
           <DialogTitle className="sr-only">Sign Up</DialogTitle>

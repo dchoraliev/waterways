@@ -29,7 +29,8 @@ export function Dashboard() {
   // Reset showLogin when user state changes
   useEffect(() => {
     if (user) {
-      setShowLogin(false);
+      // schedule async to avoid synchronous setState inside effect
+      globalThis.setTimeout(() => setShowLogin(false), 0);
     }
   }, [user]);
 

@@ -26,7 +26,7 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       await signIn(email, password);
       toast.success('Successfully signed in!');
       onSuccess();
-    } catch (error) {
+    } catch {
       toast.error('Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       await signUp(name, email, password);
       toast.success('Account created successfully!');
       onSuccess();
-    } catch (error) {
+    } catch {
       toast.error('Failed to create account. Please try again.');
     } finally {
       setLoading(false);
@@ -54,11 +54,11 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
 
     try {
       // Mock forgot password functionality
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 1000));
       toast.success('Password reset link sent to your email!');
       setIsForgotPassword(false);
       setEmail('');
-    } catch (error) {
+    } catch {
       toast.error('Failed to send reset link. Please try again.');
     } finally {
       setLoading(false);

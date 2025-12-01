@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -33,7 +33,7 @@ export function SignUp({ onNavigateToSignIn, onSuccess }: SignUpProps) {
       await signUp(name, email, password);
       toast.success('Account created successfully!');
       onSuccess?.();
-    } catch (error) {
+    } catch {
       toast.error('Failed to create account. Please try again.');
     } finally {
       setLoading(false);

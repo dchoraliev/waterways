@@ -21,7 +21,8 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
         observations.reduce((sum, obs) => sum + obs.location.lat, 0) / observations.length;
       const avgLng =
         observations.reduce((sum, obs) => sum + obs.location.lng, 0) / observations.length;
-      setCenter([avgLat, avgLng]);
+      // Schedule center update asynchronously to avoid calling setState synchronously inside the effect
+      globalThis.setTimeout(() => setCenter([avgLat, avgLng]), 0);
     }
   }, [observations]);
 

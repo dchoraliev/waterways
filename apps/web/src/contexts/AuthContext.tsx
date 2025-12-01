@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, _password: string) => {
     // Mock authentication
     // Admin accounts: admin@waterways.com
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
     setUser({
       id: '1',
       name: email.split('@')[0],
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (name: string, email: string, _password: string) => {
     // Mock registration
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
     setUser({
       id: '1',
       name: name,
