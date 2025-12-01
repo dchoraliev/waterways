@@ -21,7 +21,11 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { ALL_TABLES, TABLE_MIGRATIONS } from '@waterways/shared/src/database/schema';
+import {
+  EXPECTED_SCHEMA,
+  CREATE_ALL_TABLES,
+  DROP_ALL_TABLES,
+} from '@waterways/mobile/src/database/schema';
 
 const DB_NAME = 'waterways.db';
 
@@ -54,6 +58,68 @@ export async function getDatabase() {
     await initializeDatabase();
   }
   return db;
+}
+
+/**
+ * Read all existing columns from a table.
+ */
+async function getTableColumns(tableName: string): Promise<string[]> {
+  const result = await db!.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName});`);
+  return result.map((r) => r.name);
+}
+
+/**
+ * Check if a table exists.
+ */
+async function tableExists(tableName: string): Promise<boolean> {
+  const rows = await db!.getAllAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`,
+    [tableName]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Validate the schema of all tables.
+ * Returns TRUE if everything matches, otherwise FALSE.
+ *
+ * Rules:
+ * - Missing column → INVALID
+ * - Extra column → INVALID
+ * - Table missing → INVALID
+ */
+async function validateSchema(): Promise<boolean> {
+  console.log('Validating SQLite schema...');
+
+  for (const [tableName, expectedColumns] of Object.entries(EXPECTED_SCHEMA)) {
+    // Table missing = invalid schema
+    const exists = await tableExists(tableName);
+    if (!exists) {
+      console.warn(`Table missing: ${tableName}`);
+      return false;
+    }
+
+    // Compare columns
+    const actualColumns = await getTableColumns(tableName);
+
+    // Missing required column
+    for (const col of expectedColumns) {
+      if (!actualColumns.includes(col)) {
+        console.warn(`Missing column '${col}' in '${tableName}'`);
+        return false;
+      }
+    }
+
+    // Extra leftover column
+    for (const col of actualColumns) {
+      if (!expectedColumns.includes(col)) {
+        console.warn(`Extra column '${col}' found in '${tableName}'`);
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -91,80 +157,33 @@ export async function initializeDatabase(): Promise<void> {
     // Create all tables and indexes from the shared schema. Each
     // statement is executed individually so we can surface which
     // statement fails (if any) during initialization.
-    for (const statement of ALL_TABLES) {
+    for (const statement of CREATE_ALL_TABLES) {
       if (statement.trim()) {
         await db.execAsync(statement);
       }
     }
 
-    // --------------------------
-    // Migration helpers
-    // --------------------------
-    /**
-     * Check whether a table exists in sqlite_master.
-     * Using sqlite_master avoids calling PRAGMA on missing tables.
-     */
-    async function tableExists(tableName: string): Promise<boolean> {
-      const rows = await db!.getAllAsync<{ name: string }>(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`,
-        [tableName]
-      );
-      return rows && rows.length > 0;
-    }
+    // Validate the schema after applying all CREATE statements.
+    const isValid = await validateSchema();
+    if (!isValid) {
+      console.warn('Incorrect Database Schema detected.');
 
-    /**
-     * Return a Set of existing column names for a table using PRAGMA table_info.
-     * The result is used to determine which ALTERs to run.
-     */
-    async function getExistingColumns(tableName: string): Promise<Set<string>> {
-      const rows = await db!.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName});`);
-      return new Set(rows.map((r) => r.name));
-    }
+      // Drop all tables to reset the schema
+      console.log('Dropping all tables to reset schema...');
+      for (const dropStmt of DROP_ALL_TABLES) {
+        if (dropStmt.trim()) {
+          await db.execAsync(dropStmt);
+        }
+      }
 
-    /**
-     * Run migrations from `TABLE_MIGRATIONS`.
-     * For each table we:
-     *  - verify table exists
-     *  - compute missing columns
-     *  - execute ALTER TABLE ADD COLUMN for missing ones
-     *
-     * This function is idempotent and safe to call on every startup.
-     */
-    async function runMigrations() {
-      for (const [tableName, cols] of Object.entries(TABLE_MIGRATIONS)) {
-        try {
-          const exists = await tableExists(tableName);
-          if (!exists) {
-            console.warn(`Table '${tableName}' does not exist yet; skipping migrations for it.`);
-            continue;
-          }
-
-          const existing = await getExistingColumns(tableName);
-          const missing = cols.filter((c) => !existing.has(c.name));
-          if (missing.length === 0) continue;
-
-          console.log(`Applying ${missing.length} migrations for table '${tableName}'`);
-          for (const col of missing) {
-            try {
-              console.log(` - Adding column '${col.name}' to '${tableName}'`);
-              await db!.execAsync(col.addStmt);
-              console.log(`   ✓ Added ${col.name}`);
-            } catch (innerErr) {
-              // Fail fast: a migration failing usually indicates an unexpected
-              // environment or schema state that should be investigated.
-              console.error(`Failed to apply migration for ${tableName}.${col.name}:`, innerErr);
-              throw innerErr;
-            }
-          }
-        } catch (err) {
-          console.error(`Migration failed for table '${tableName}':`, err);
-          throw err;
+      // Re-create all tables and indexes
+      console.log('Re-creating all tables...');
+      for (const statement of CREATE_ALL_TABLES) {
+        if (statement.trim()) {
+          await db.execAsync(statement);
         }
       }
     }
-
-    // Execute migrations after tables are ensured
-    await runMigrations();
 
     console.log('Database initialized successfully');
   } catch (error) {

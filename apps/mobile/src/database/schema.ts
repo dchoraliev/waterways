@@ -1,4 +1,52 @@
 // ============================================
+// EXPECTED SCHEMA
+// ============================================
+
+export const EXPECTED_SCHEMA: Record<string, string[]> = {
+  trips: [
+    'id',
+    'user_id',
+    'project_id',
+    'created_at',
+    'start_time',
+    'end_time',
+    'start_latitude',
+    'start_longitude',
+    'end_latitude',
+    'end_longitude',
+    'sync_status',
+    'last_synced_at',
+  ],
+  observations: [
+    'id',
+    'user_id',
+    'trip_id',
+    'latitude',
+    'longitude',
+    'created_at',
+    'audio_media_id',
+    'audio_transcribed',
+    'observation',
+    'category_id',
+    'direction',
+    'local_media_id',
+    'multimedia_url',
+    'sync_status',
+    'last_synced_at',
+  ],
+  observation_media: [
+    'id',
+    'created_at',
+    'observation_id',
+    'local_file_path',
+    'media_type',
+    'file_size',
+    'sync_status',
+    'last_synced_at',
+  ],
+};
+
+// ============================================
 // LOCAL TRIPS TABLE
 // ============================================
 
@@ -14,7 +62,7 @@ CREATE TABLE IF NOT EXISTS trips (
   start_longitude REAL,
   end_latitude REAL,
   end_longitude REAL,
-  sync_status TEXT,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
   last_synced_at INTEGER NOT NULL DEFAULT 0
 );
 `;
@@ -37,8 +85,8 @@ CREATE TABLE IF NOT EXISTS observations (
   category_id TEXT,
   direction TEXT,
   local_media_id TEXT,
-  sync_status TEXT NOT NULL DEFAULT 'pending',
   multimedia_url TEXT,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
   last_synced_at INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
 );
@@ -78,7 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_observation_media_observation_id ON observation_m
 // ALL TABLES ARRAY
 // ============================================
 
-export const ALL_TABLES = [
+export const CREATE_ALL_TABLES = [
   CREATE_TRIPS_TABLE,
   CREATE_OBSERVATIONS_TABLE,
   CREATE_OBSERVATION_MEDIA_TABLE,
@@ -87,39 +135,10 @@ export const ALL_TABLES = [
 ];
 
 // ============================================
-// MIGRATIONS
+// DROP ALL TABLES ARRAY
 // ============================================
-// A mapping of table -> columns to ensure exist on older databases.
-// Each entry contains the column `name` and the SQL `addStmt` to run
-// when the column is missing. These are intentionally simple ALTER
-// statements; the runtime will check PRAGMA table_info(...) before
-// executing them to avoid errors on up-to-date databases.
-export const TABLE_MIGRATIONS: Record<string, Array<{ name: string; addStmt: string }>> = {
-  trips: [
-    { name: 'sync_status', addStmt: `ALTER TABLE trips ADD COLUMN sync_status TEXT;` },
-    {
-      name: 'last_synced_at',
-      addStmt: `ALTER TABLE trips ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
-    },
-  ],
-  observations: [
-    {
-      name: 'sync_status',
-      addStmt: `ALTER TABLE observations ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending';`,
-    },
-    {
-      name: 'last_synced_at',
-      addStmt: `ALTER TABLE observations ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
-    },
-  ],
-  observation_media: [
-    {
-      name: 'sync_status',
-      addStmt: `ALTER TABLE observation_media ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending';`,
-    },
-    {
-      name: 'last_synced_at',
-      addStmt: `ALTER TABLE observation_media ADD COLUMN last_synced_at INTEGER NOT NULL DEFAULT 0;`,
-    },
-  ],
-};
+export const DROP_ALL_TABLES = [
+  `DROP TABLE IF EXISTS observation_media;`,
+  `DROP TABLE IF EXISTS observations;`,
+  `DROP TABLE IF EXISTS trips;`,
+];

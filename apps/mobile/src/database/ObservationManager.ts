@@ -14,7 +14,8 @@
  */
 
 import { getDatabase } from './db';
-import { Observation } from '@waterways/shared/src/models/local-db-rows';
+import { Observation } from '@waterways/mobile/src/database/local-db-rows';
+import { SyncStatus } from './SyncManager';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -25,12 +26,30 @@ import { Observation } from '@waterways/shared/src/models/local-db-rows';
  * @returns string - A valid UUID v4 identifier
  * @private Internal use only
  */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+async function generateUUID(): Promise<string> {
+  const db = await getDatabase();
+
+  // Loop until a unique UUID is found for the trips table
+  while (true) {
+    // Generate standard random UUID v4
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+
+    // Check for uniqueness in the trips table
+    const rows = await db!.getAllAsync<{ id: string }>('SELECT id FROM observations WHERE id = ?', [
+      uuid,
+    ]);
+
+    if (rows.length === 0) {
+      // Unique this is unique UUID
+      return uuid;
+    }
+
+    console.warn(`Observations UUID collision detected: ${uuid}, regenerating...`);
+  }
 }
 
 /**
@@ -83,12 +102,12 @@ export async function createObservation(params: {
   audio_transcribed?: boolean;
   local_media_id?: string | null;
   multimedia_url?: string | null;
-  sync_status?: string;
+  sync_status?: SyncStatus;
 }): Promise<string> {
   const db = await getDatabase();
-  const id = generateUUID();
+  const id = await generateUUID();
   const now = Date.now();
-  const sync_status = params.sync_status ?? 'pending';
+  const sync_status = params.sync_status ?? SyncStatus.PENDING;
   const last_synced_at = 0;
 
   await db!.runAsync(
@@ -139,6 +158,26 @@ export async function getObservationById(id: string): Promise<Observation | null
     [id]
   );
   return rows && rows.length ? rows[0] : null;
+}
+
+/**
+ * Retrieve all observation records for a given tripId.
+ *
+ * @param tripId - UUID of the trip whose observations should be fetched
+ *
+ * @returns Promise<Observation[]> - Array of observations (empty if none found)
+ *
+ * Usage:
+ *   const list = await getObservationsByTripId('trip-uuid-123');
+ *   console.log(`Found ${list.length} observations`);
+ */
+export async function getObservationsByTripId(tripId: string): Promise<Observation[]> {
+  const db = await getDatabase();
+  const rows = await db!.getAllAsync<Observation>(
+    `SELECT * FROM observations WHERE trip_id = ? ORDER BY created_at ASC`,
+    [tripId]
+  );
+  return rows ?? [];
 }
 
 /**

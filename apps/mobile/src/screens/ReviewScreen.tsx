@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -6,11 +6,12 @@ import { useRouter } from 'expo-router';
 import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
-import { useDraftJourneys } from '../hooks/useDraftJourneys';
+import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
 import { ROUTES } from '../constants/routes';
 
 // Import the new functional component
 import ProjectSelector from '../components/ProjectSelector';
+import { get } from 'http';
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -42,23 +43,60 @@ const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
 
 const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   const router = useRouter();
-  const { getDraftById, saveDraft } = useDraftJourneys();
+  const { getDraftByTripId, saveDraft } = useDraftJourneys();
 
   const effectiveTripId = tripId || 'sample-trip';
 
   // NOTE: This placeholder should be replaced with actual user authentication logic
   const USER_ID = 'user-123-demo';
 
-  const existingJourney = getDraftById(effectiveTripId);
-  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
-
-  // 1. Initialize state for the selected project, retrieving it from the draft if available
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    existingJourney?.projectId || null
+  // ⬇️ NEW STATE to hold the loaded journey
+  const [existingJourney, setExistingJourney] = useState<JourneyDraft | null | undefined>(
+    undefined
   );
 
+  // 1. Initialize state for the selected project, retrieving it from the draft if available
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
   // keep createdAt stable without calling Date.now in render/handlers
-  const baseCreatedAt = existingJourney?.createdAt ?? 0;
+  const [baseCreatedAt, setBaseCreatedAt] = useState(0);
+
+  // NEW: load the draft using useEffect instead of awaiting in render
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const journey = await getDraftByTripId(effectiveTripId);
+
+      if (!mounted) return;
+
+      setExistingJourney(journey);
+
+      if (journey) {
+        setSelectedProjectId(journey.projectId || null);
+        setBaseCreatedAt(journey.createdAt ?? 0);
+      } else {
+        // fallback if no draft exists
+        setBaseCreatedAt(0);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveTripId]);
+
+  // While loading the draft
+  if (existingJourney === null) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Text style={{ padding: 20 }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Original logic preserved exactly
+  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
 
   const handleSaveDraft = () => {
     saveDraft({
@@ -66,7 +104,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       createdAt: baseCreatedAt,
       status: 'draft',
       observations,
-      projectId: selectedProjectId, // <-- SAVE THE SELECTED PROJECT ID
+      projectId: selectedProjectId,
     });
 
     // stay on review or go home; for now go home
@@ -79,7 +117,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       createdAt: baseCreatedAt,
       status: 'submitted',
       observations,
-      projectId: selectedProjectId, // <-- INCLUDE PROJECT ID IN SUBMISSION SAVE
+      projectId: selectedProjectId,
     });
 
     // later this will also upload to the backend; for now just go home
@@ -104,7 +142,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
         <ProjectSelector
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          userId={USER_ID} // Pass the user ID for fetching/creating projects
+          userId={USER_ID}
         />
 
         {/* Offline info banner */}

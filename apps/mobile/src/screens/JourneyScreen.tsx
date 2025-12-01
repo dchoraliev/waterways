@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { createObservation } from '../database/ObservationManager';
+import { updateTripById } from '../database/TripManager';
 
 import ListeningBanner from '../components/ListeningBanner';
 import PrimaryButton from '../components/form/PrimaryButton';
@@ -27,7 +29,18 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
     // TODO: stop GPS/audio tracking here
   };
 
+  const handleAddObservation = () => {
+    // Temporary placeholder implementation
+    const userId = 'local-user';
+    const tempObservation = 'Test observation ' + Date.now();
+    createObservation({ user_id: userId, trip_id: tripId, observation: tempObservation });
+    console.log('Add observation for trip:', tripId, 'observation:', tempObservation);
+  };
+
   const handleEndJourney = () => {
+    // End the journey and navigate to review screen
+    updateTripById(tripId, { end_time: Date.now() });
+    console.log('Ended journey for trip:', tripId);
     setIsListening(false);
     router.push(`/review/${tripId}`);
   };
@@ -55,6 +68,13 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
             style={styles.primaryButton}
           />
         )}
+
+        {/* Temporary placeholder buttons for observation addition action */}
+        <PrimaryButton
+          label="Add Observation (TEMP)"
+          onPress={handleAddObservation}
+          style={styles.primaryButton}
+        />
 
         {/* Secondary action: end journey and go to review */}
         <PrimaryButton

@@ -11,7 +11,8 @@
  */
 
 import { getDatabase } from './db';
-import { ObservationMedia } from '@waterways/shared/src/models/local-db-rows';
+import { ObservationMedia } from '@waterways/mobile/src/database/local-db-rows';
+import { SyncStatus } from './SyncManager';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -22,12 +23,31 @@ import { ObservationMedia } from '@waterways/shared/src/models/local-db-rows';
  * @returns string - A valid UUID v4 identifier
  * @private Internal use only
  */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+async function generateUUID(): Promise<string> {
+  const db = await getDatabase();
+
+  // Loop until a unique UUID is found for the trips table
+  while (true) {
+    // Generate standard random UUID v4
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+
+    // Check for uniqueness in the trips table
+    const rows = await db!.getAllAsync<{ id: string }>(
+      'SELECT id FROM observation_media WHERE id = ?',
+      [uuid]
+    );
+
+    if (rows.length === 0) {
+      // Unique this is unique UUID
+      return uuid;
+    }
+
+    console.warn(`ObservationMedia UUID collision detected: ${uuid}, regenerating...`);
+  }
 }
 
 /**
@@ -67,15 +87,15 @@ export async function addMedia(params: {
   local_file_path: string;
   media_type?: string | null;
   file_size?: number | null;
-  sync_status?: string;
+  sync_status?: SyncStatus;
   id?: string;
   created_at?: number;
   last_synced_at?: number;
 }): Promise<ObservationMedia> {
   const db = await getDatabase();
-  const id = params.id ?? generateUUID();
+  const id = params.id ?? (await generateUUID());
   const created_at = params.created_at ?? Date.now();
-  const sync_status = params.sync_status ?? 'pending';
+  const sync_status = params.sync_status ?? SyncStatus.PENDING;
   const last_synced_at = params.last_synced_at ?? 0;
 
   const item: ObservationMedia = {

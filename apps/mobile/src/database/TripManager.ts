@@ -11,7 +11,8 @@
  */
 
 import { getDatabase } from './db';
-import { Trip } from '@waterways/shared/src/models/local-db-rows';
+import { Trip } from '@waterways/mobile/src/database/local-db-rows';
+import { SyncStatus } from './SyncManager';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -22,12 +23,28 @@ import { Trip } from '@waterways/shared/src/models/local-db-rows';
  * @returns string - A valid UUID v4 identifier
  * @private Internal use only
  */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+async function generateUUID(): Promise<string> {
+  const db = await getDatabase();
+
+  // Loop until a unique UUID is found for the trips table
+  while (true) {
+    // Generate standard random UUID v4
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+
+    // Check for uniqueness in the trips table
+    const rows = await db!.getAllAsync<{ id: string }>('SELECT id FROM trips WHERE id = ?', [uuid]);
+
+    if (rows.length === 0) {
+      // Unique this is unique UUID
+      return uuid;
+    }
+
+    console.warn(`Trip UUID collision detected: ${uuid}, regenerating...`);
+  }
 }
 
 /**
@@ -66,15 +83,15 @@ export async function createTrip(params: {
   start_time?: number | null;
   start_latitude?: number | null;
   start_longitude?: number | null;
-  sync_status?: string | null;
+  sync_status?: SyncStatus;
 }): Promise<string> {
   const db = await getDatabase();
-  const id = generateUUID();
+  const id = await generateUUID();
   const now = Date.now();
   const start_time = params.start_time ?? null;
   const start_latitude = params.start_latitude ?? null;
   const start_longitude = params.start_longitude ?? null;
-  const sync_status = params.sync_status ?? null;
+  const sync_status = params.sync_status ?? SyncStatus.PENDING;
   const last_synced_at = 0;
 
   await db!.runAsync(
