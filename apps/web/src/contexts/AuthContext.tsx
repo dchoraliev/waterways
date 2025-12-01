@@ -9,8 +9,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  signIn: (email: string, _password: string) => Promise<void>;
+  signUp: (name: string, email: string, _password: string) => Promise<void>;
   signOut: () => void;
 }
 
@@ -19,7 +19,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, _password: string) => {
     // Mock authentication
     // Admin accounts: admin@waterways.com
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const signUp = async (name: string, email: string, password: string) => {
+  const signUp = async (name: string, email: string, _password: string) => {
     // Mock registration
     await new Promise((resolve) => setTimeout(resolve, 500));
     setUser({

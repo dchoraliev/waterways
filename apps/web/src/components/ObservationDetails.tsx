@@ -221,7 +221,7 @@ export function ObservationDetails({
             <div>
               <h3 className="font-medium mb-2">Videos</h3>
               <div className="space-y-2">
-                {observation.videos.map((video, index) => (
+                {observation.videos.map((_, index) => (
                   <div key={index} className="text-sm text-muted-foreground">
                     Video clip {index + 1}
                   </div>

@@ -12,7 +12,7 @@ interface MapViewProps {
 export function MapView({ observations, onObservationClick }: MapViewProps) {
   const [center, setCenter] = useState<[number, number]>([52.5, -1.5]);
   const [zoom, setZoom] = useState(6);
-  const [clickedObservationId, setClickedObservationId] = useState<string | null>(null);
+  const [, setClickedObservationId] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
 
   useEffect(() => {
@@ -41,10 +41,7 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
     }
   };
 
-  const clickedObservation = useMemo(() => {
-    if (!clickedObservationId) return null;
-    return observations.find((obs) => obs.id === clickedObservationId) || null;
-  }, [clickedObservationId, observations]);
+  // clickedObservation computed when needed; removed unused local variable to satisfy linter
 
   return (
     <div className="size-full relative">

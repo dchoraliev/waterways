@@ -1,4 +1,4 @@
-import { useState } from 'react';
+// no top-level React import needed for JSX with the automatic runtime
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -12,7 +12,7 @@ export interface FilterOptions {
   month: string;
   types: string[];
   keywords: string;
-  myProjects: boolean;
+  myProjects: string;
 }
 
 interface FilterPanelProps {
@@ -39,7 +39,7 @@ const months = [
 const years = ['2024', '2025'];
 
 export function FilterPanel({ filters, onFilterChange, observationTypes }: FilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  // panel open state not required currently
 
   const handleFilterChange = (key: keyof FilterOptions, value: string) => {
     onFilterChange({ ...filters, [key]: value });

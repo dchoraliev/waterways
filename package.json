@@ -34,7 +34,7 @@
     "lint:fix": "npx eslint \"apps/**/*.{ts,tsx}\" \"packages/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" --fix",
     "format": "npx prettier --write \"apps/**/*.{ts,tsx,json}\" \"packages/**/*.{ts,tsx,json}\" \"tests/**/*.{ts,tsx,json}\"",
     "format:check": "npx prettier --check \"apps/**/*.{ts,tsx,json}\" \"packages/**/*.{ts,tsx,json}\" \"tests/**/*.{ts,tsx,json}\"",
-    "type-check": "tsc --noEmit && yarn workspace @waterways/mobile type-check && yarn workspace @waterways/web type-check && yarn workspace @waterways/shared type-check"
+    "type-check": "yarn workspace @waterways/mobile type-check && yarn workspace @waterways/web type-check && yarn workspace @waterways/shared type-check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

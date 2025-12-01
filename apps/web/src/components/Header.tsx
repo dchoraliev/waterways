@@ -13,7 +13,7 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
-import { Download, User, LogOut, LogIn, UserPlus, ChevronDown } from 'lucide-react';
+import { Download, User, LogOut, LogIn, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { SignIn } from '../pages/SignIn';
 import { SignUp } from '../pages/SignUp';
