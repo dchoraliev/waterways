@@ -19,6 +19,11 @@ export default function HomeRoute() {
     // you can later navigate based on `route` if you want
   };
 
+  // NEW: Handler to navigate back to the login screen (root '/')
+  const handleSignOut = () => {
+    router.replace('/');
+  };
+
   const renderContent = () => {
     switch (currentTab) {
       case 'home':
@@ -59,7 +64,12 @@ export default function HomeRoute() {
           </View>
         );
       case 'settings':
-        return <SettingsScreen onNavigateToProjects={() => router.push(ROUTES.projects)} />;
+        return (
+          <SettingsScreen
+            onNavigateToProjects={() => router.push(ROUTES.projects)}
+            onSignOutSuccess={handleSignOut} // PASS THE NEW HANDLER HERE
+          />
+        );
       default:
         return null;
     }
