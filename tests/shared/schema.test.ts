@@ -1,7 +1,7 @@
 import { CREATE_ALL_TABLES } from '@waterways/shared/src/database/schema';
 
 describe('Shared Schema', () => {
-  it('should export ALL_TABLES array', () => {
+  it('should export CREATE_ALL_TABLES array', () => {
     expect(CREATE_ALL_TABLES).toBeDefined();
     expect(Array.isArray(CREATE_ALL_TABLES)).toBe(true);
     expect(CREATE_ALL_TABLES.length).toBe(5); // 3 tables + 2 indexes
