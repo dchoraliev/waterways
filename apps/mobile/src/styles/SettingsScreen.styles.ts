@@ -24,6 +24,40 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
+  // --- NEW STYLES FOR USER INFO BOX ---
+  userInfoBox: {
+    backgroundColor: '#1E293B', // Slate 800 - a slightly lighter dark background
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#334155', // Slate 700 for a subtle border
+  },
+  userInfoTitle: {
+    fontSize: 14,
+    color: '#94A3B8', // Slate 400
+    marginBottom: 4,
+  },
+  userInfoEmail: {
+    fontSize: 18,
+    color: '#F8FAFC', // White/Near White
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  signOutButton: {
+    backgroundColor: '#DC2626', // Red 600
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutButtonText: {
+    color: '#FFFFFF', // White
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // --- END OF NEW STYLES ---
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
