@@ -11,7 +11,7 @@
  */
 
 import { getDatabase } from './db';
-import { Trip } from '@waterways/mobile/src/database/local-db-rows';
+import { Trip } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
 
 /**
@@ -164,7 +164,22 @@ export async function updateTripById(
   >
 ): Promise<void> {
   const db = await getDatabase();
-  const allowedKeys: Array<keyof Trip> = [
+
+  type UpdatableKey = keyof Pick<
+    Trip,
+    | 'user_id'
+    | 'project_id'
+    | 'start_time'
+    | 'end_time'
+    | 'start_latitude'
+    | 'start_longitude'
+    | 'end_latitude'
+    | 'end_longitude'
+    | 'sync_status'
+    | 'last_synced_at'
+  >;
+
+  const allowedKeys: UpdatableKey[] = [
     'user_id',
     'project_id',
     'start_time',
@@ -176,20 +191,25 @@ export async function updateTripById(
     'sync_status',
     'last_synced_at',
   ];
+
   const setParts: string[] = [];
-  const params: any[] = [];
+
+  // Typed params: accepts the update values AND the id string
+  const params: Array<Trip[UpdatableKey]> = [];
 
   for (const key of allowedKeys) {
-    if (key in updates) {
+    const value = updates[key];
+
+    if (value !== undefined) {
       setParts.push(`${key} = ?`);
-      // @ts-ignore
-      params.push((updates as any)[key]);
+      params.push(value as Trip[UpdatableKey]);
     }
   }
 
   if (setParts.length === 0) return; // nothing to do
 
-  params.push(id);
+  params.push(id); // safe: params is typed to include string
+
   const sql = `UPDATE trips SET ${setParts.join(', ')} WHERE id = ?`;
   await db!.runAsync(sql, params);
 }

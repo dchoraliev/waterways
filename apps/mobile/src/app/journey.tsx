@@ -16,7 +16,7 @@ export default function JourneyRoute() {
       let userId = 'local-user';
       try {
         const { data } = await getSession();
-        const user = (data as any)?.session?.user;
+        const user = data?.session?.user;
         if (user?.id) userId = user.id;
       } catch (e) {
         console.warn('Could not read session for trip creation:', e);

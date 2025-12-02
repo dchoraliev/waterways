@@ -11,7 +11,7 @@
  */
 
 import { getDatabase } from './db';
-import { ObservationMedia } from '@waterways/mobile/src/database/local-db-rows';
+import { ObservationMedia } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
 
 /**
@@ -186,7 +186,11 @@ export async function updateMediaById(
   >
 ): Promise<void> {
   const db = await getDatabase();
-  const allowedKeys: Array<keyof ObservationMedia> = [
+  type UpdatableKey = keyof Pick<
+    ObservationMedia,
+    'local_file_path' | 'media_type' | 'file_size' | 'sync_status' | 'last_synced_at'
+  >;
+  const allowedKeys: UpdatableKey[] = [
     'local_file_path',
     'media_type',
     'file_size',
@@ -194,12 +198,12 @@ export async function updateMediaById(
     'last_synced_at',
   ];
   const setParts: string[] = [];
-  const params: any[] = [];
+  const params: Array<ObservationMedia[UpdatableKey]> = [];
 
   for (const key of allowedKeys) {
     if (key in updates) {
       setParts.push(`${key} = ?`);
-      params.push((updates as any)[key]);
+      params.push(updates[key]!);
     }
   }
 

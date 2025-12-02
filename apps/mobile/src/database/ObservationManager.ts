@@ -14,7 +14,7 @@
  */
 
 import { getDatabase } from './db';
-import { Observation } from '@waterways/mobile/src/database/local-db-rows';
+import { Observation } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
 
 /**
@@ -235,7 +235,23 @@ export async function updateObservationById(
   >
 ): Promise<void> {
   const db = await getDatabase();
-  const allowedKeys: Array<keyof Observation> = [
+
+  type UpdatableKey = keyof Pick<
+    Observation,
+    | 'latitude'
+    | 'longitude'
+    | 'observation'
+    | 'category_id'
+    | 'direction'
+    | 'audio_media_id'
+    | 'audio_transcribed'
+    | 'local_media_id'
+    | 'multimedia_url'
+    | 'sync_status'
+    | 'last_synced_at'
+  >;
+
+  const allowedKeys: UpdatableKey[] = [
     'latitude',
     'longitude',
     'observation',
@@ -248,24 +264,30 @@ export async function updateObservationById(
     'sync_status',
     'last_synced_at',
   ];
+
   const setParts: string[] = [];
-  const params: any[] = [];
+
+  // Typed params: allow valid field values AND id string
+  const params: Array<Observation[UpdatableKey]> = [];
 
   for (const key of allowedKeys) {
-    if (key in updates) {
+    if (updates[key] !== undefined) {
       setParts.push(`${key} = ?`);
-      let value = (updates as any)[key];
+      let value = updates[key]!;
+
       // Convert boolean to 0/1 for audio_transcribed
       if (key === 'audio_transcribed' && typeof value === 'boolean') {
-        value = value ? 1 : 0;
+        params.push(value ? 1 : 0);
+      } else {
+        params.push(value);
       }
-      params.push(value);
     }
   }
 
   if (setParts.length === 0) return; // nothing to do
 
   params.push(id);
+
   const sql = `UPDATE observations SET ${setParts.join(', ')} WHERE id = ?`;
   await db!.runAsync(sql, params);
 }

@@ -11,7 +11,6 @@ import { ROUTES } from '../constants/routes';
 
 // Import the new functional component
 import ProjectSelector from '../components/ProjectSelector';
-import { get } from 'http';
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -84,7 +83,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     return () => {
       mounted = false;
     };
-  }, [effectiveTripId]);
+  }, [effectiveTripId, getDraftByTripId]);
 
   // While loading the draft
   if (existingJourney === null) {
