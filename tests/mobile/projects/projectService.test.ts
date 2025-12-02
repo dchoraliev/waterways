@@ -1,4 +1,9 @@
-import { createProject, getUserProjects, joinProjectWithCode, leaveProject } from '../../../apps/mobile/src/services/projectService';
+import {
+  createProject,
+  getUserProjects,
+  joinProjectWithCode,
+  leaveProject,
+} from '../../../apps/mobile/src/services/projectService';
 import { supabase } from '@waterways/shared/src/supabase/client';
 
 // Mock Supabase
@@ -120,16 +125,30 @@ describe('projectService', () => {
   describe('getUserProjects', () => {
     it('should fetch user projects successfully', async () => {
       const mockProjects = [
-        { id: '1', name: 'Project 1', description: null, join_code: 'CODE1234', created_by: 'user-123', created_at: new Date().toISOString() },
-        { id: '2', name: 'Project 2', description: null, join_code: 'CODE5678', created_by: 'user-123', created_at: new Date().toISOString() },
+        {
+          id: '1',
+          name: 'Project 1',
+          description: null,
+          join_code: 'CODE1234',
+          created_by: 'user-123',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          name: 'Project 2',
+          description: null,
+          join_code: 'CODE5678',
+          created_by: 'user-123',
+          created_at: new Date().toISOString(),
+        },
       ];
 
       const mockFrom = {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ 
-          data: mockProjects.map(p => ({ project: p })), 
-          error: null 
+        order: jest.fn().mockResolvedValue({
+          data: mockProjects.map((p) => ({ project: p })),
+          error: null,
         }),
       };
       (mockFrom.select as jest.Mock).mockReturnValue(mockFrom);
@@ -201,7 +220,9 @@ describe('projectService', () => {
       };
       (selectMock.eq as jest.Mock).mockReturnValue(selectMock);
 
-      (supabase.from as jest.Mock).mockReturnValue({ select: jest.fn().mockReturnValue(selectMock) });
+      (supabase.from as jest.Mock).mockReturnValue({
+        select: jest.fn().mockReturnValue(selectMock),
+      });
 
       const { success, error } = await joinProjectWithCode('user-123', 'INVALID');
 
@@ -215,12 +236,14 @@ describe('projectService', () => {
       const eqChain = {
         eq: jest.fn().mockResolvedValue({ error: null }),
       };
-      
+
       const deleteMock = {
         eq: jest.fn().mockReturnValue(eqChain),
       };
 
-      (supabase.from as jest.Mock).mockReturnValue({ delete: jest.fn().mockReturnValue(deleteMock) });
+      (supabase.from as jest.Mock).mockReturnValue({
+        delete: jest.fn().mockReturnValue(deleteMock),
+      });
 
       const { error } = await leaveProject('user-123', 'project-123');
 
