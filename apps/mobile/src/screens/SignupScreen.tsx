@@ -31,6 +31,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
       console.log('Error singing up:', error);
       return;
     }
+    console.log('Sign up successful:', data);
     onSignupSuccess();
   };
 

@@ -25,7 +25,7 @@ import {
   EXPECTED_SCHEMA,
   CREATE_ALL_TABLES,
   DROP_ALL_TABLES,
-} from '@waterways/mobile/src/database/schema';
+} from '@waterways/shared/src/database/schema';
 
 const DB_NAME = 'waterways.db';
 

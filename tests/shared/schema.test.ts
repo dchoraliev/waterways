@@ -1,24 +1,24 @@
-import { CREATE_ALL_TABLES } from '../../packages/shared/src/database/schema';
+import { CREATE_ALL_TABLES } from '@waterways/shared/src/database/schema';
 
-describe('schema', () => {
-  it('has table definitions', () => {
-    const tableStatements = CREATE_ALL_TABLES.filter((sql: string) =>
-      sql.includes('CREATE TABLE')
-    );
-    expect(tableStatements.length).toBeGreaterThan(0);
+describe('Shared Schema', () => {
+  it('should export CREATE_ALL_TABLES array', () => {
+    expect(CREATE_ALL_TABLES).toBeDefined();
+    expect(Array.isArray(CREATE_ALL_TABLES)).toBe(true);
+    expect(CREATE_ALL_TABLES.length).toBe(5); // 3 tables + 2 indexes
   });
 
-  it('has index definitions', () => {
-    const indexStatements = CREATE_ALL_TABLES.filter((sql: string) =>
-      sql.includes('CREATE INDEX')
-    );
-    expect(indexStatements.length).toBeGreaterThan(0);
+  it('should contain exactly 3 CREATE TABLE statements', () => {
+    const tableStatements = CREATE_ALL_TABLES.filter((sql) => sql.includes('CREATE TABLE'));
+    expect(tableStatements.length).toBe(3); // trips, observations, observation_media
   });
 
-  it('includes observation_media table', () => {
-    const hasObservationMedia = CREATE_ALL_TABLES.some((sql: string) =>
-      sql.includes('observation_media')
-    );
-    expect(hasObservationMedia).toBe(true);
+  it('should contain exactly 2 CREATE INDEX statements', () => {
+    const indexStatements = CREATE_ALL_TABLES.filter((sql) => sql.includes('CREATE INDEX'));
+    expect(indexStatements.length).toBe(2);
+  });
+
+  it('should not contain observation_categories table', () => {
+    const hasCategories = CREATE_ALL_TABLES.some((sql) => sql.includes('observation_categories'));
+    expect(hasCategories).toBe(false);
   });
 });

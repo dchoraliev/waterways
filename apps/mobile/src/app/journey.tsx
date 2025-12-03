@@ -26,11 +26,8 @@ export default function JourneyRoute() {
       let userId = 'local-user';
       try {
         const { data } = await getSession();
-        const sessionData = data as SupabaseSessionData | null;
-        const sessionUserId = sessionData?.session?.user?.id;
-        if (sessionUserId) {
-          userId = sessionUserId;
-        }
+        const user = data?.session?.user;
+        if (user?.id) userId = user.id;
       } catch (e) {
         console.warn('Could not read session for trip creation:', e);
       }

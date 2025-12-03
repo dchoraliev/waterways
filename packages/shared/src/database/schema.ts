@@ -2,7 +2,7 @@
 // EXPECTED SCHEMA
 // ============================================
 
-export const ALL_TABLES: Record<string, string[]> = {
+export const EXPECTED_SCHEMA: Record<string, string[]> = {
   trips: [
     'id',
     'user_id',
