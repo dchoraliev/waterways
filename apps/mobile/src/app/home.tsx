@@ -7,6 +7,7 @@ import TopAppBar from '../components/TopAppBar';
 import BottomNav, { BottomTabKey } from '../components/BottomNav';
 import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import InstructionsScreen from '../screens/InstructionsScreen';
 import { ROUTES } from '../constants/routes';
 
 export default function HomeRoute() {
@@ -51,18 +52,7 @@ export default function HomeRoute() {
           </View>
         );
       case 'instruction':
-        return (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#020617',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#F9FAFB' }}>Instructions coming soon</Text>
-          </View>
-        );
+        return <InstructionsScreen />;
       case 'settings':
         return (
           <SettingsScreen
