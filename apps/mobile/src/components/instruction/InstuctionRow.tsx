@@ -8,7 +8,7 @@ interface InstructionRowProps {
 
 const InstructionRow: React.FC<InstructionRowProps> = ({ command, description }) => (
   <View style={rowStyles.container}>
-    <Text style={rowStyles.commandText}>"{command}"</Text>
+    <Text style={rowStyles.commandText}>&quot;{command}&quot;</Text>
     <Text style={rowStyles.descriptionText}>{description}</Text>
   </View>
 );
@@ -18,10 +18,10 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 8,
-    backgroundColor: '#1f2937', 
+    backgroundColor: '#1f2937',
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#38bdf8', 
+    borderLeftColor: '#38bdf8',
   },
   commandText: {
     color: '#F9FAFB',

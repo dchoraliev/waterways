@@ -13,24 +13,20 @@ const Accordion: React.FC<AccordionProps> = ({ title, children, isDefaultOpen = 
 
   return (
     <View style={accordionStyles.section}>
-      <TouchableOpacity 
-        style={accordionStyles.header} 
+      <TouchableOpacity
+        style={accordionStyles.header}
         onPress={() => setIsExpanded(!isExpanded)}
         activeOpacity={0.8}
       >
         <Text style={accordionStyles.sectionTitle}>{title}</Text>
-        <MaterialIcons 
-          name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-          size={30} 
-          color="#38bdf8" 
+        <MaterialIcons
+          name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={30}
+          color="#38bdf8"
         />
       </TouchableOpacity>
-      
-      {isExpanded && (
-        <View style={accordionStyles.content}>
-          {children}
-        </View>
-      )}
+
+      {isExpanded && <View style={accordionStyles.content}>{children}</View>}
     </View>
   );
 };
@@ -39,8 +35,8 @@ const accordionStyles = StyleSheet.create({
   section: {
     marginBottom: 20,
     borderRadius: 10,
-    overflow: 'hidden', 
-    backgroundColor: '#0f172a', 
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
     borderWidth: 1,
     borderColor: '#1e293b',
   },
@@ -50,7 +46,7 @@ const accordionStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 15,
-    backgroundColor: '#1e293b', 
+    backgroundColor: '#1e293b',
     borderBottomWidth: 1,
     borderBottomColor: 'transparent',
   },
@@ -62,7 +58,7 @@ const accordionStyles = StyleSheet.create({
   content: {
     paddingTop: 15,
     paddingBottom: 5,
-  }
+  },
 });
 
 export default Accordion;
