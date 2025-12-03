@@ -3,41 +3,44 @@
 // ==============================================
 const CATEGORIES: Record<string, string[]> = {
   Infrastructure: [
-    "bridge",
-    "power line",
-    "boat launch",
-    "dam",
-    "water withdrawal",
-    "pipe",
-    "inlet",
-    "shoreline",
-    "old infrastructure",
+    'bridge',
+    'power line',
+    'boat launch',
+    'dam',
+    'water withdrawal',
+    'pipe',
+    'inlet',
+    'shoreline',
+    'old infrastructure',
   ],
   Environmental: [
-    "erosion",
-    "algae",
-    "aquatic invasive",
-    "terrestrial invasive",
-    "water quality",
-    "foam",
-    "bottom",
-    "odor",
-    "trash",
-    "junk",
+    'erosion',
+    'algae',
+    'aquatic invasive',
+    'terrestrial invasive',
+    'water quality',
+    'foam',
+    'bottom',
+    'odor',
+    'trash',
+    'junk',
   ],
-  Wildlife: ["bird", "bird call", "sound", "fish", "mammal", "wetland"],
-  Hazards: ["obstruction"],
-  General: ["time", "comment"],
+  Wildlife: ['bird', 'bird call', 'sound', 'fish', 'mammal', 'wetland'],
+  Hazards: ['obstruction'],
+  General: ['time', 'comment'],
 };
 
 // Flatten keywords → category lookup map
 const KEYWORD_TO_CATEGORY: Record<string, string> = Object.entries(CATEGORIES)
   .map(([cat, kws]) => kws.map((kw) => [kw, cat]))
   .flat()
-  .reduce((acc, [kw, cat]) => {
-    acc[kw as string] = cat as string;
-    return acc;
-  }, {} as Record<string, string>);
+  .reduce(
+    (acc, [kw, cat]) => {
+      acc[kw as string] = cat as string;
+      return acc;
+    },
+    {} as Record<string, string>
+  );
 
 // ==============================================
 // String Similarity Helpers
@@ -53,11 +56,7 @@ function levenshtein(a: string, b: string): number {
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
     }
   }
   return dp[m][n];
@@ -94,7 +93,7 @@ export function classifyObservation(obsText: string) {
   }
 
   // Fuzzy matching by comparing per-word
-  const words = obsLower.replace(/[.,]/g, "").split(/\s+/);
+  const words = obsLower.replace(/[.,]/g, '').split(/\s+/);
 
   let bestMatch: string | null = null;
   let bestWord: string | null = null;
@@ -121,7 +120,7 @@ export function classifyObservation(obsText: string) {
   }
 
   return {
-    category: "Unclassified",
+    category: 'Unclassified',
     keyword: null,
     originalWord: null,
     exact: false,
