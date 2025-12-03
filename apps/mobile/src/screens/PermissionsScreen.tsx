@@ -128,7 +128,7 @@ const PermissionsScreen: React.FC = () => {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <View className="iconWrapper">
+          <View style={styles.iconWrapper}>
             <Info size={24} />
           </View>
           <Text style={styles.title}>Enable permissions</Text>
