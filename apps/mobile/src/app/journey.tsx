@@ -8,11 +8,11 @@ interface SupabaseUser {
   id?: string;
 }
 
-interface SupabaseSessionData {
-  session: {
-    user?: SupabaseUser;
-  } | null;
-}
+// interface SupabaseSessionData {
+//   session: {
+//     user?: SupabaseUser;
+//   } | null;
+// }
 
 export default function JourneyRoute() {
   const [tripId, setTripId] = useState<string | null>(null);

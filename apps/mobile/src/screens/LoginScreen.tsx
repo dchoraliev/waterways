@@ -29,7 +29,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
       console.log('Error signing in:', error);
       return;
     }
-    console.log('Sign in successful:', data);
+    console.log('Sign in successful:');
     onLoginSuccess();
   };
 
