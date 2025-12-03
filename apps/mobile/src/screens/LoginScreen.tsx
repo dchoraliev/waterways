@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { signIn } from '@waterways/shared/src/supabase/auth';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { signIn } from 'packages/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
@@ -19,22 +19,34 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
   const handleSignIn = async () => {
     if (!canSubmit) return;
 
-    const { error } = await signIn(email, password);
-    if (error) {
-      console.log('Error signing in:', error);
-      return;
+    setLoading(true);
+    try {
+      const { data, error } = await signIn(email.trim(), password.trim());
+
+      if (error) {
+        Alert.alert('Login Failed', error.message);
+      } else if (data.session) {
+        console.log('Login successful! User ID:', data.user?.id);
+        onLoginSuccess();
+      }
+    } catch (_error) {
+      // FIX: Renamed 'error' to '_error'
+      console.error('Login error:', _error);
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
-    console.log('Sign in successful:');
-    onLoginSuccess();
   };
 
   const handleSkipOffline = () => {
-    // For offline mode we likely still want to go to Home
+    // For offline mode we go to home without auth
     onLoginSuccess();
   };
 
@@ -48,7 +60,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <View style={styles.logoCircle}>
-              {/* placeholder for actual logo icon */}
               <Text style={styles.logoIcon}>🌊</Text>
             </View>
           </View>
@@ -92,9 +103,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
             {/* Sign In */}
             <PrimaryButton
-              label="Sign In"
+              label={loading ? 'Signing in...' : 'Sign In'}
               onPress={handleSignIn}
-              disabled={!canSubmit}
+              disabled={!canSubmit || loading}
               style={styles.signInButton}
             />
 

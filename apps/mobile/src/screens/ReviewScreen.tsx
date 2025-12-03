@@ -7,10 +7,9 @@ import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
-import { ROUTES } from '../constants/routes';
-
-// Import the new functional component
 import ProjectSelector from '../components/ProjectSelector';
+import { ROUTES } from '../constants/routes';
+import { useAuth } from '../hooks/useAuth'; // ADDED: Import the new reusable hook
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -18,6 +17,7 @@ export interface ReviewScreenProps {
 
 // Sample observations for placeholder journeys
 const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
+  // ... observations remain unchanged
   {
     id: 'obs-1',
     time: '04:08 AM',
@@ -46,16 +46,21 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
 
   const effectiveTripId = tripId || 'sample-trip';
 
-  // NOTE: This placeholder should be replaced with actual user authentication logic
-  const USER_ID = 'user-123-demo';
+  // MODIFIED: Replaced duplicated state and effect with hook call
+  const { userId, loading: authLoading } = useAuth();
+
+  // REMOVED: const [userId, setUserId] = useState<string>('00000000-0000-0000-0000-000000000000');
+  // REMOVED: useEffect(() => { ... fetching logic ... }, []);
 
   // ⬇️ NEW STATE to hold the loaded journey
   const [existingJourney, setExistingJourney] = useState<JourneyDraft | null | undefined>(
     undefined
   );
 
-  // 1. Initialize state for the selected project, retrieving it from the draft if available
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Initialize state for the selected project
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    existingJourney?.projectId || null
+  );
 
   // keep createdAt stable without calling Date.now in render/handlers
   const [baseCreatedAt, setBaseCreatedAt] = useState(0);
@@ -105,7 +110,6 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       projectId: selectedProjectId,
     });
 
-    // stay on review or go home; for now go home
     router.replace(ROUTES.home);
   };
 
@@ -118,9 +122,20 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
       projectId: selectedProjectId,
     });
 
-    // later this will also upload to the backend; for now just go home
+    // later this will also upload to the backend
     router.replace(ROUTES.home);
   };
+
+  // Guard against rendering if auth status is still loading
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Text style={{ color: '#F9FAFB', textAlign: 'center', marginTop: 50 }}>
+          Loading user data...
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root}>
@@ -136,11 +151,12 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
           <ObservationCard key={obs.id} observation={obs} />
         ))}
 
-        {/* PROJECT ASSIGNMENT: Replaced the static card with the functional component */}
+        {/* Project Assignment */}
         <ProjectSelector
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          userId={USER_ID}
+          // Pass the live userId from the hook
+          userId={userId || '00000000-0000-0000-0000-000000000000'}
         />
 
         {/* Offline info banner */}

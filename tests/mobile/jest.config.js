@@ -1,10 +1,11 @@
 module.exports = {
   displayName: 'mobile',
   preset: 'jest-expo',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['<rootDir>/**/*.test.ts', '<rootDir>/**/*.test.tsx'],
   rootDir: '.',
   moduleNameMapper: {
-    '^@waterways/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+    '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
   },
   transform: {
     '^.+\\.(js|ts|tsx)$': [
@@ -22,4 +23,12 @@ module.exports = {
     '!**/*.d.ts',
     '!**/node_modules/**',
   ],
+  testEnvironment: 'node',
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        jsx: 'react',
+      },
+    },
+  },
 };
