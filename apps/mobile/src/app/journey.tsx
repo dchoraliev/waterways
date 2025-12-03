@@ -4,6 +4,16 @@ import JourneyScreen from '../screens/JourneyScreen';
 import { createTrip } from '../database/TripManager';
 import { getSession } from '@waterways/shared/src/supabase/auth';
 
+interface SupabaseUser {
+  id?: string;
+}
+
+interface SupabaseSessionData {
+  session: {
+    user?: SupabaseUser;
+  } | null;
+}
+
 export default function JourneyRoute() {
   const [tripId, setTripId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -16,8 +26,11 @@ export default function JourneyRoute() {
       let userId = 'local-user';
       try {
         const { data } = await getSession();
-        const user = (data as any)?.session?.user;
-        if (user?.id) userId = user.id;
+        const sessionData = data as SupabaseSessionData | null;
+        const sessionUserId = sessionData?.session?.user?.id;
+        if (sessionUserId) {
+          userId = sessionUserId;
+        }
       } catch (e) {
         console.warn('Could not read session for trip creation:', e);
       }

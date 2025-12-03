@@ -11,7 +11,6 @@ import { ROUTES } from '../constants/routes';
 
 // Import the new functional component
 import ProjectSelector from '../components/ProjectSelector';
-import { get } from 'http';
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -76,7 +75,6 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
         setSelectedProjectId(journey.projectId || null);
         setBaseCreatedAt(journey.createdAt ?? 0);
       } else {
-        // fallback if no draft exists
         setBaseCreatedAt(0);
       }
     })();
@@ -84,7 +82,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     return () => {
       mounted = false;
     };
-  }, [effectiveTripId]);
+  }, [effectiveTripId, getDraftByTripId]);
 
   // While loading the draft
   if (existingJourney === null) {

@@ -5,8 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
-import { initializeDatabase } from '../database/db';
-import { error } from 'console';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -26,7 +24,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const handleSignIn = async () => {
     if (!canSubmit) return;
 
-    const { data, error } = await signIn(email, password);
+    const { error } = await signIn(email, password);
     if (error) {
       console.log('Error signing in:', error);
       return;

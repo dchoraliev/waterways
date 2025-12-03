@@ -194,12 +194,13 @@ export async function updateMediaById(
     'last_synced_at',
   ];
   const setParts: string[] = [];
-  const params: any[] = [];
+  const params: (string | number | null)[] = [];
 
   for (const key of allowedKeys) {
-    if (key in updates) {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) {
       setParts.push(`${key} = ?`);
-      params.push((updates as any)[key]);
+      const value = updates[key as keyof typeof updates];
+      params.push((value as string | number | null) ?? null);
     }
   }
 

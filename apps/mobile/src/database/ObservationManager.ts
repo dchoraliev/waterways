@@ -249,17 +249,18 @@ export async function updateObservationById(
     'last_synced_at',
   ];
   const setParts: string[] = [];
-  const params: any[] = [];
+  const params: (string | number | null)[] = [];
 
   for (const key of allowedKeys) {
-    if (key in updates) {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) {
       setParts.push(`${key} = ?`);
-      let value = (updates as any)[key];
-      // Convert boolean to 0/1 for audio_transcribed
+      let value = updates[key as keyof typeof updates];
+
       if (key === 'audio_transcribed' && typeof value === 'boolean') {
         value = value ? 1 : 0;
       }
-      params.push(value);
+
+      params.push((value as string | number | null) ?? null);
     }
   }
 
