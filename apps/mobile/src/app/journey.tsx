@@ -35,7 +35,11 @@ export default function JourneyRoute() {
 
       try {
         const coordinates = await getCurrentCoordinates();
-        const id = await createTrip({ user_id: userId, start_latitude: coordinates.latitude, start_longitude: coordinates.longitude });
+        const id = await createTrip({
+          user_id: userId,
+          start_latitude: coordinates.latitude,
+          start_longitude: coordinates.longitude,
+        });
         if (mounted) {
           setTripId(id);
           console.log('Created trip:', id, coordinates);

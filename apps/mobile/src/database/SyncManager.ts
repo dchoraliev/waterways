@@ -1,8 +1,12 @@
-import { supabase } from "@shared/supabase/client";
-import { getTripById, updateTripById } from "./TripManager";
-import { getObservationById, getObservationsByTripId, updateObservationById } from "./ObservationManager";
+import { supabase } from '@shared/supabase/client';
+import { getTripById, updateTripById } from './TripManager';
+import {
+  getObservationById,
+  getObservationsByTripId,
+  updateObservationById,
+} from './ObservationManager';
 
-import { getMediaById, updateMediaById } from "./MediaManager";
+import { getMediaById, updateMediaById } from './MediaManager';
 
 // ==================================================
 // Sync Status Enum
@@ -36,17 +40,17 @@ export async function syncTrip(tripId: string): Promise<void> {
  * Sync all observations for a given trip.
  */
 async function syncObservations(tripId: string): Promise<boolean> {
-    // Get all observations for the trip
+  // Get all observations for the trip
   const observations = await getObservationsByTripId(tripId);
   console.log(`Syncing ${observations.length} observations for trip ${tripId}`);
 
   // We need the media to be synced first
-  let mediaFailure: boolean= false;
+  let mediaFailure: boolean = false;
   for (const obs of observations) {
     // Observation has a local media file which needs to be uploaded
     if (obs.local_media_id) {
       // Upload if there is no failure yet
-      if (!mediaFailure){
+      if (!mediaFailure) {
         console.log(`Syncing observation media: ${obs.id}`);
         // const { success, url } = await syncMedia(obs.local_media_id);
         // if (success && url) {
@@ -57,10 +61,9 @@ async function syncObservations(tripId: string): Promise<boolean> {
 
       // If there was a failure, mark other trip media as failed
       else {
-      // Change the status to failed
+        // Change the status to failed
       }
     }
-    
   }
   return true;
 }

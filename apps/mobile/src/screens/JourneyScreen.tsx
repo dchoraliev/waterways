@@ -86,7 +86,11 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
 
       // Mark trip as ended
       const coordinates = await getCurrentCoordinates();
-      await updateTripById(tripId, { end_time: Date.now(), end_latitude: coordinates.latitude, end_longitude: coordinates.longitude });
+      await updateTripById(tripId, {
+        end_time: Date.now(),
+        end_latitude: coordinates.latitude,
+        end_longitude: coordinates.longitude,
+      });
       console.log('Ended journey for trip:', tripId, coordinates);
 
       // Transcribe all untranscribed audio clips for this trip
