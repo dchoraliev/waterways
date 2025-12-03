@@ -13,6 +13,7 @@
 import { getDatabase } from './db';
 import { Trip } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
+import { getCurrentCoordinates } from '../services/LocationService';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -89,8 +90,9 @@ export async function createTrip(params: {
   const id = await generateUUID();
   const now = Date.now();
   const start_time = params.start_time ?? null;
-  const start_latitude = params.start_latitude ?? null;
-  const start_longitude = params.start_longitude ?? null;
+  const coordinates = await getCurrentCoordinates();
+  const start_latitude = params.start_latitude ?? coordinates.latitude ?? null;
+  const start_longitude = params.start_longitude ?? coordinates.longitude ?? null;
   const sync_status = params.sync_status ?? SyncStatus.PENDING;
   const last_synced_at = 0;
 

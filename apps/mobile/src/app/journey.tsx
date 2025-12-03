@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import JourneyScreen from '../screens/JourneyScreen';
 import { createTrip } from '../database/TripManager';
 import { getSession } from '@waterways/shared/src/supabase/auth';
+import { getCurrentCoordinates } from '../services/LocationService';
 
 interface SupabaseUser {
   id?: string;
@@ -33,10 +34,15 @@ export default function JourneyRoute() {
       }
 
       try {
-        const id = await createTrip({ user_id: userId });
+        const coordinates = await getCurrentCoordinates();
+        const id = await createTrip({
+          user_id: userId,
+          start_latitude: coordinates.latitude,
+          start_longitude: coordinates.longitude,
+        });
         if (mounted) {
           setTripId(id);
-          console.log('Created trip:', id);
+          console.log('Created trip:', id, coordinates);
         }
       } catch (err) {
         console.error('Failed to create trip on mount:', err);

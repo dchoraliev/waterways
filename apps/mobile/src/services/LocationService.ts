@@ -1,31 +1,41 @@
-/**
- * LocationService TODO stub
- *
- * This file intentionally contains TODO stubs so callers can compile while
- * the location implementation is pending. Replace these with platform-appropriate
- * implementations (expo-location or React Native geolocation) when ready.
- */
+import * as Location from 'expo-location';
 
-export type Coordinates = {
+export interface Coordinates {
   latitude: number;
   longitude: number;
-  accuracy?: number | null;
-  timestamp?: number | null;
-};
-
-export async function requestLocationPermission(): Promise<boolean> {
-  // TODO: implement Location permission request (expo-location / PermissionsAndroid)
-  throw new Error('TODO: implement requestLocationPermission in LocationService');
 }
 
-export async function getCurrentLocation(_opts?: { timeout?: number }): Promise<Coordinates> {
-  // TODO: implement one-shot location retrieval
-  throw new Error('TODO: implement getCurrentLocation in LocationService');
+/**
+ * Requests permissions and throws if denied.
+ */
+export async function validateLocationPermission(): Promise<void> {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+
+  if (status !== 'granted') {
+    console.warn('Location permission not granted');
+    throw new Error('Location permission not granted');
+  }
+
+  console.log('Location permission granted');
 }
 
-export async function getCoordsOrNull(
-  _timeoutMs = 10000
-): Promise<{ latitude: number; longitude: number } | null> {
-  // TODO: implement safe coords retrieval that returns null on failure
-  throw new Error('TODO: implement getCoordsOrNull in LocationService');
+/**
+ * Gets the current coordinates after validating permission.
+ */
+export async function getCurrentCoordinates(): Promise<Coordinates> {
+  // Ensure permission
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== 'granted') {
+    throw new Error('Location permission not granted');
+  }
+
+  // Get device location
+  const position = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
+  });
+
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+  };
 }
