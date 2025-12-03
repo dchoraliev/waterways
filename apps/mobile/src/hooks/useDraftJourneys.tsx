@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, PropsWithChildren } from 'react';
 import type { Observation } from '../components/ObservationCard';
+import { getObservationsByTripId } from '../database/ObservationManager';
 
 export type JourneyStatus = 'draft' | 'submitted';
 
@@ -17,6 +18,7 @@ interface DraftJourneysContextValue {
   removeDraft: (id: string) => void;
   clearDrafts: () => void;
   getDraftById: (id: string) => JourneyDraft | undefined;
+  getDraftByTripId: (tripId: string) => Promise<JourneyDraft> | undefined;
 }
 
 const DraftJourneysContext = createContext<DraftJourneysContextValue | null>(null);
@@ -44,12 +46,36 @@ export const DraftJourneysProvider: React.FC<PropsWithChildren> = ({ children })
 
   const getDraftById = (id: string) => drafts.find((journey) => journey.id === id);
 
+  const getDraftByTripId = async (tripId: string) => {
+    const rows = await getObservationsByTripId(tripId);
+    const draftObservations: Observation[] = rows.map((row) => ({
+      id: row.id,
+      time: new Date(row.created_at).toLocaleString(),
+      location: 'Location unavailable',
+      description: row.observation || 'Some observation',
+      tags: row.category_id ? [row.category_id] : [],
+      hasAudio: row.audio_media_id ? true : false,
+      status: 'Offline',
+    }));
+
+    const draft: JourneyDraft = {
+      id: tripId,
+      createdAt: Date.now(),
+      status: 'draft',
+      observations: draftObservations,
+      projectId: null,
+    };
+
+    return draft;
+  };
+
   const value: DraftJourneysContextValue = {
     drafts,
     saveDraft,
     removeDraft,
     clearDrafts,
     getDraftById,
+    getDraftByTripId,
   };
 
   return <DraftJourneysContext.Provider value={value}>{children}</DraftJourneysContext.Provider>;

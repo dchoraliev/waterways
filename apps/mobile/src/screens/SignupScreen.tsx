@@ -26,11 +26,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
   const handleSubmit = async () => {
     if (!canSubmit) return;
 
-    const { data: _data, error } = await signUp(email, password); // FIX: Renamed 'data' to '_data'
+    const { error } = await signUp(email, password);
     if (error) {
       console.log('Error singing up:', error);
       return;
     }
+    console.log('Sign up successful:');
     onSignupSuccess();
   };
 

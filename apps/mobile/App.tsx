@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
-import { initializeDatabase } from './src/database/init';
+import { initializeDatabase } from './src/database/db';
 
 export default function App() {
   const [dbInitialized, setDbInitialized] = useState(false);

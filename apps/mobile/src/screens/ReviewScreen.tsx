@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // Removed useEffect
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -6,10 +6,9 @@ import { useRouter } from 'expo-router';
 import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
+import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
 import ProjectSelector from '../components/ProjectSelector';
-import { useDraftJourneys } from '../hooks/useDraftJourneys';
 import { ROUTES } from '../constants/routes';
-// REMOVED: import { supabase } from '../../../../packages/shared/src/supabase/client';
 import { useAuth } from '../hooks/useAuth'; // ADDED: Import the new reusable hook
 
 export interface ReviewScreenProps {
@@ -43,7 +42,7 @@ const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
 
 const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   const router = useRouter();
-  const { getDraftById, saveDraft } = useDraftJourneys();
+  const { getDraftByTripId, saveDraft } = useDraftJourneys();
 
   const effectiveTripId = tripId || 'sample-trip';
 
@@ -53,8 +52,10 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   // REMOVED: const [userId, setUserId] = useState<string>('00000000-0000-0000-0000-000000000000');
   // REMOVED: useEffect(() => { ... fetching logic ... }, []);
 
-  const existingJourney = getDraftById(effectiveTripId);
-  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+  // ⬇️ NEW STATE to hold the loaded journey
+  const [existingJourney, setExistingJourney] = useState<JourneyDraft | null | undefined>(
+    undefined
+  );
 
   // Initialize state for the selected project
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -62,7 +63,43 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   );
 
   // keep createdAt stable without calling Date.now in render/handlers
-  const baseCreatedAt = existingJourney?.createdAt ?? 0;
+  const [baseCreatedAt, setBaseCreatedAt] = useState(0);
+
+  // NEW: load the draft using useEffect instead of awaiting in render
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const journey = await getDraftByTripId(effectiveTripId);
+
+      if (!mounted) return;
+
+      setExistingJourney(journey);
+
+      if (journey) {
+        setSelectedProjectId(journey.projectId || null);
+        setBaseCreatedAt(journey.createdAt ?? 0);
+      } else {
+        setBaseCreatedAt(0);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveTripId, getDraftByTripId]);
+
+  // While loading the draft
+  if (existingJourney === null) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Text style={{ padding: 20 }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Original logic preserved exactly
+  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
 
   const handleSaveDraft = () => {
     saveDraft({
