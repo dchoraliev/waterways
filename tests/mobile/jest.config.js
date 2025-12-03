@@ -7,6 +7,13 @@ module.exports = {
   moduleNameMapper: {
     '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
   },
+
+moduleNameMapper: {
+  '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+  '^apps/(.*)$': '<rootDir>/../../apps/$1',
+},
+
+
   transform: {
     '^.+\\.(js|ts|tsx)$': [
       'babel-jest',

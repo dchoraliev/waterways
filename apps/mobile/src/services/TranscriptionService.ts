@@ -1,9 +1,7 @@
-// apps/mobile/src/services/TranscriptionService.ts
-
-import { File } from 'expo-file-system';
 import { supabase } from '@shared/supabase/client';
 import { getDatabase } from '../database/db';
 import { updateObservationById } from '../database/ObservationManager';
+import * as LegacyFS from 'expo-file-system/legacy';
 
 type TranscriptionResponse = {
   text?: string;
@@ -36,9 +34,6 @@ function guessMimeType(path: string): string {
   }
 }
 
-/**
- * Transcribe all untranscribed audio clips for a given trip.
- */
 export async function transcribeTripAudio(tripId: string): Promise<void> {
   const db = await getDatabase();
 
@@ -69,7 +64,6 @@ export async function transcribeTripAudio(tripId: string): Promise<void> {
 
   for (const row of rows) {
     const { observation_id, local_file_path } = row;
-
     try {
       if (!local_file_path) {
         console.warn(
@@ -79,10 +73,10 @@ export async function transcribeTripAudio(tripId: string): Promise<void> {
         continue;
       }
 
-      // ⚠️ NEW API: use File + base64(), no deprecated legacy calls.
-      // local_file_path is a "file://..." URI saved from the recorder.
-      const file = new File(local_file_path);
-      const base64 = await file.base64(); // Promise<string>
+      // Use legacy readAsStringAsync
+      const base64 = await LegacyFS.readAsStringAsync(local_file_path, {
+        encoding: 'base64',
+      });
 
       const filename = local_file_path.split('/').pop() ?? 'audio.m4a';
       const mimeType = guessMimeType(local_file_path);
@@ -94,7 +88,6 @@ export async function transcribeTripAudio(tripId: string): Promise<void> {
             audioBase64: base64,
             filename,
             mimeType,
-            // language: 'en', // optional – your edge function has a default
           },
         }
       );

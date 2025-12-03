@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-
+import { classifyObservation } from '../services/ObservationClassifier';
 import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
@@ -99,7 +99,17 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
   }
 
   // Original logic preserved exactly
-  const observations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+  const rawObservations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+
+  const observations = rawObservations.map((obs) => {
+    const result = classifyObservation(obs.description || '');
+
+    return {
+      ...obs,
+      category: result.category === 'Unclassified' ? null : result.category,
+      keyword: result.keyword,
+    };
+  });
 
   const handleSaveDraft = () => {
     saveDraft({

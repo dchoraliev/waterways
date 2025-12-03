@@ -5,16 +5,6 @@ import { createTrip } from '../database/TripManager';
 import { getSession } from '@waterways/shared/src/supabase/auth';
 import { getCurrentCoordinates } from '../services/LocationService';
 
-interface SupabaseUser {
-  id?: string;
-}
-
-// interface SupabaseSessionData {
-//   session: {
-//     user?: SupabaseUser;
-//   } | null;
-// }
-
 export default function JourneyRoute() {
   const [tripId, setTripId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
