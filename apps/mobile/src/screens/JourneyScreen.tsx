@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 
 import { updateTripById } from '../database/TripManager';
+import { getCurrentCoordinates } from '../services/LocationService';
 import { transcribeTripAudio } from '../services/TranscriptionService';
 import { saveAudioObservationForTrip } from '../services/VoiceRecorder';
 
@@ -84,8 +85,9 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
       }
 
       // Mark trip as ended
-      await updateTripById(tripId, { end_time: Date.now() });
-      console.log('Ended journey for trip:', tripId);
+      const coordinates = await getCurrentCoordinates();
+      await updateTripById(tripId, { end_time: Date.now(), end_latitude: coordinates.latitude, end_longitude: coordinates.longitude });
+      console.log('Ended journey for trip:', tripId, coordinates);
 
       // Transcribe all untranscribed audio clips for this trip
       await transcribeTripAudio(tripId);
