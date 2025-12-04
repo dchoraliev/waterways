@@ -13,7 +13,7 @@
 import { getDatabase } from './db';
 import { Trip } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
-import { getCurrentCoordinates } from '../services/LocationService';
+import { Coordinates, getCurrentCoordinates } from '../services/LocationService';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -84,17 +84,24 @@ export async function createTrip(params: {
   start_time?: number | null;
   start_latitude?: number | null;
   start_longitude?: number | null;
-  sync_status?: SyncStatus;
 }): Promise<string> {
   const db = await getDatabase();
   const id = await generateUUID();
   const now = Date.now();
   const start_time = params.start_time ?? null;
   const coordinates = await getCurrentCoordinates();
-  const start_latitude = params.start_latitude ?? coordinates.latitude ?? null;
-  const start_longitude = params.start_longitude ?? coordinates.longitude ?? null;
-  const sync_status = params.sync_status ?? SyncStatus.PENDING;
+  const sync_status = SyncStatus.PENDING;
   const last_synced_at = 0;
+  let coordinate: Coordinates;
+  if (params.start_latitude != null && params.start_longitude != null) {
+    coordinate = {
+      latitude: params.start_latitude,
+      longitude: params.start_longitude,
+    };
+  } else {
+    // Fetch device coordinates only if missing
+    coordinate = await getCurrentCoordinates();
+  }
 
   await db!.runAsync(
     `INSERT INTO trips (
@@ -108,8 +115,8 @@ export async function createTrip(params: {
       now,
       start_time,
       null,
-      start_latitude,
-      start_longitude,
+      coordinate.latitude,
+      coordinate.longitude,
       null,
       null,
       sync_status,

@@ -16,6 +16,7 @@
 import { getDatabase } from './db';
 import { Observation } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
+import { Coordinates, getCurrentCoordinates } from '../services/LocationService';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -102,13 +103,22 @@ export async function createObservation(params: {
   audio_transcribed?: boolean;
   local_media_id?: string | null;
   multimedia_url?: string | null;
-  sync_status?: SyncStatus;
 }): Promise<string> {
   const db = await getDatabase();
   const id = await generateUUID();
   const now = Date.now();
-  const sync_status = params.sync_status ?? SyncStatus.PENDING;
+  const sync_status = SyncStatus.PENDING;
   const last_synced_at = 0;
+  let coordinate: Coordinates;
+  if (params.latitude != null && params.longitude != null) {
+    coordinate = {
+      latitude: params.latitude,
+      longitude: params.longitude,
+    };
+  } else {
+    // Fetch device coordinates only if missing
+    coordinate = await getCurrentCoordinates();
+  }
 
   await db!.runAsync(
     `INSERT INTO observations (
@@ -120,8 +130,8 @@ export async function createObservation(params: {
       id,
       params.user_id,
       params.trip_id,
-      params.latitude ?? null,
-      params.longitude ?? null,
+      coordinate.latitude,
+      coordinate.longitude,
       now,
       params.audio_media_id ?? null,
       (params.audio_transcribed ?? false) ? 1 : 0,

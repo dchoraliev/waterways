@@ -51,7 +51,7 @@ export const DraftJourneysProvider: React.FC<PropsWithChildren> = ({ children })
     const draftObservations: Observation[] = rows.map((row) => ({
       id: row.id,
       time: new Date(row.created_at).toLocaleString(),
-      location: 'Location unavailable',
+      location: `${row.latitude}, ${row.longitude}`,
       description: row.observation || 'Some observation',
       tags: row.category_id ? [row.category_id] : [],
       hasAudio: row.audio_media_id ? true : false,

@@ -13,6 +13,7 @@ import { saveAudioObservationForTrip } from '../services/VoiceRecorder';
 import ListeningBanner from '../components/ListeningBanner';
 import PrimaryButton from '../components/form/PrimaryButton';
 import styles from '../styles/JourneyScreen.styles';
+import { createObservation } from '../database/ObservationManager';
 
 export interface JourneyScreenProps {
   tripId: string;
@@ -77,6 +78,28 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
     }
   };
 
+  const handleAddObservation = async () => {
+    // Temporary placeholder implementation
+    const userId = 'local-user';
+    const tempObservation = 'Test observation ' + Date.now();
+    const coordinates = await getCurrentCoordinates();
+    await createObservation({
+      user_id: userId,
+      trip_id: tripId,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      observation: tempObservation,
+    });
+    console.log(
+      'Add observation for trip:',
+      tripId,
+      'observation:',
+      tempObservation,
+      'coordinates:',
+      coordinates
+    );
+  };
+
   const handleEndJourney = async () => {
     try {
       // If still recording, stop and save the last clip
@@ -131,6 +154,13 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
             style={styles.primaryButton}
           />
         )}
+
+        {/* TEMP button only to add test observation*/}
+        <PrimaryButton
+          label="Add Observation (TEMP)"
+          onPress={handleAddObservation}
+          style={styles.secondaryButton}
+        />
 
         {/* You can remove this TEMP button once you're happy with audio */}
         <PrimaryButton

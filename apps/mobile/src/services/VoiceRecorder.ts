@@ -36,7 +36,6 @@ export const saveAudioObservationForTrip = async (
       observation: null,
       audio_media_id: null,
       audio_transcribed: false,
-      sync_status: SyncStatus.PENDING,
     });
 
     // 2) Insert into observation_media
