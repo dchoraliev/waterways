@@ -197,14 +197,18 @@ export async function getObservationsByTripId(tripId: string): Promise<Observati
  * Only provided fields in the updates object are modified; other fields remain unchanged.
  * Boolean values (audio_transcribed) are automatically converted to 0/1 integers.
  *
- * Allowed fields (cannot update id, user_id, trip_id, created_at):
+ * Allowed fields (cannot update id):
+ * - user_id - user who created the observation
+ * - trip_id - associated trip ID
+ * - supabase_trip_id - Supabase trip reference
  * - latitude - observation location latitude
  * - longitude - observation location longitude
+ * - created_at - timestamp of creation
+ * - audio_media_id - UUID of associated audio recording
+ * - audio_transcribed - whether audio has been transcribed (automatically converted to 0/1)
  * - observation - text notes/description
  * - category_id - observation category
  * - direction - viewing direction or compass heading
- * - audio_media_id - UUID of associated audio recording
- * - audio_transcribed - whether audio has been transcribed (automatically converted to 0/1)
  * - local_media_id - local media file reference
  * - multimedia_url - remote URL for synced multimedia
  * - sync_status - upload/sync state
@@ -216,59 +220,27 @@ export async function getObservationsByTripId(tripId: string): Promise<Observati
  * @returns Promise<void>
  *
  * @throws If database operation fails
- *
- * Usage:
- *   await updateObservationById('obs-uuid-123', {
- *     observation: 'Updated description',
- *     audio_transcribed: true,
- *     sync_status: 'synced',
- *     last_synced_at: Date.now()
- *   });
  */
 export async function updateObservationById(
   id: string,
-  updates: Partial<
-    Pick<
-      Observation,
-      | 'latitude'
-      | 'longitude'
-      | 'observation'
-      | 'category_id'
-      | 'direction'
-      | 'audio_media_id'
-      | 'audio_transcribed'
-      | 'local_media_id'
-      | 'multimedia_url'
-      | 'sync_status'
-      | 'last_synced_at'
-    >
-  >
+  updates: Partial<Omit<Observation, 'id'>>
 ): Promise<void> {
   const db = await getDatabase();
 
-  type UpdatableKey = keyof Pick<
-    Observation,
-    | 'latitude'
-    | 'longitude'
-    | 'observation'
-    | 'category_id'
-    | 'direction'
-    | 'audio_media_id'
-    | 'audio_transcribed'
-    | 'local_media_id'
-    | 'multimedia_url'
-    | 'sync_status'
-    | 'last_synced_at'
-  >;
+  type UpdatableKey = keyof Omit<Observation, 'id'>;
 
   const allowedKeys: UpdatableKey[] = [
+    'user_id',
+    'trip_id',
+    'supabase_trip_id',
     'latitude',
     'longitude',
+    'created_at',
+    'audio_media_id',
+    'audio_transcribed',
     'observation',
     'category_id',
     'direction',
-    'audio_media_id',
-    'audio_transcribed',
     'local_media_id',
     'multimedia_url',
     'sync_status',
@@ -276,8 +248,6 @@ export async function updateObservationById(
   ];
 
   const setParts: string[] = [];
-
-  // Typed params: allow valid field values AND id string
   const params: Array<Observation[UpdatableKey]> = [];
 
   for (const key of allowedKeys) {
@@ -294,7 +264,7 @@ export async function updateObservationById(
     }
   }
 
-  if (setParts.length === 0) return; // nothing to do
+  if (setParts.length === 0) return;
 
   params.push(id);
 

@@ -14,6 +14,7 @@ import ListeningBanner from '../components/ListeningBanner';
 import PrimaryButton from '../components/form/PrimaryButton';
 import styles from '../styles/JourneyScreen.styles';
 import { createObservation } from '../database/ObservationManager';
+import { getSession } from '@shared/supabase/auth';
 
 export interface JourneyScreenProps {
   tripId: string;
@@ -80,7 +81,14 @@ const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
 
   const handleAddObservation = async () => {
     // Temporary placeholder implementation
-    const userId = 'local-user';
+    let userId = 'local-user';
+    try {
+      const { data } = await getSession();
+      const user = data?.session?.user;
+      if (user?.id) userId = user.id;
+    } catch (e) {
+      console.warn('Could not read session for trip creation:', e);
+    }
     const tempObservation = 'Test observation ' + Date.now();
     const coordinates = await getCurrentCoordinates();
     await createObservation({

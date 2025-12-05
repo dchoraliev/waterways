@@ -24,69 +24,126 @@ async function logSyncStatus(
 ): Promise<void> {}
 
 /**
+ * Safely converts a string, number, or Date into an ISO 8601 timestamp.
+ * Returns `undefined` if the value is empty, invalid, or cannot be parsed as a date.
+ */
+export const parseDateTime = (v: string | number | Date | null | undefined): string | undefined => {
+  if (v === undefined || v === null || v === '') return undefined;
+
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+};
+
+/**
+ * Converts longitude + latitude values into an EWKT POINT string.
+ * Returns `undefined` if either value is missing or invalid.
+ *
+ * Example output:
+ *   "SRID=4326;POINT(-90.123 42.456)"
+ */
+export const parseLocationAsEWKT = (
+  lon: string | number | null | undefined,
+  lat: string | number | null | undefined,
+  srid: number = 4326
+): string | undefined => {
+  // Internal helper used only for coordinate parsing
+  const toNum = (v: string | number | null | undefined): number | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+
+    const n = Number(v);
+    return Number.isNaN(n) ? undefined : n;
+  };
+
+  const LON = toNum(lon);
+  const LAT = toNum(lat);
+
+  if (LON === undefined || LAT === undefined) return undefined;
+
+  return `SRID=${srid};POINT(${LON} ${LAT})`;
+};
+
+/**
  * Sync a trip → observations → multimedia.
  */
 export async function syncTrip(tripId: string): Promise<void> {
-  console.log(`Syncing trip - ${tripId}`);
+  // Sync the trip to receive the supabase trip id
+  const tripRecord = await getTripById(tripId);
 
-  // Before syncing the trip, we need to make sure that all the observations (includes media) are synced
-  const success = await syncObservations(tripId);
+  let supabaseTripId: string = '';
+  if (tripRecord) {
+    const payload = {
+      unique_userID_localID_pair: tripRecord.user_id + '-' + tripRecord.id,
+      user_id: tripRecord.user_id,
+      project_id: tripRecord.project_id,
+      created_at: parseDateTime(tripRecord.created_at),
+      start_time: parseDateTime(tripRecord.start_time),
+      end_time: parseDateTime(tripRecord.end_time),
+      start_location: parseLocationAsEWKT(tripRecord.start_longitude, tripRecord.start_latitude),
+      end_location: parseLocationAsEWKT(tripRecord.end_longitude, tripRecord.end_latitude),
+    };
+    console.log('Syncing trip - ', payload);
+    const { data, error } = await supabase
+      .from('trips')
+      .upsert(payload, { onConflict: 'unique_userID_localID_pair' })
+      .select('id')
+      .single();
 
-  // Finally, sync the trip record if all the observations were synced succesfully
-  if (success) {
-    const tripRecord = await getTripById(tripId);
-    if (tripRecord) {
-      const { error } = await supabase.from('trips').upsert(
-        {
-          id: tripRecord.id,
-          user_id: tripRecord.user_id,
-          project_id: tripRecord.project_id,
-          created_at: tripRecord.created_at.toString(),
-          start_time: tripRecord.start_time?.toString(),
-          end_time: tripRecord.end_time?.toString(),
-          start_location: {
-            type: 'Point',
-            coordinates: [tripRecord.start_longitude?.toString(), tripRecord.start_latitude?.toString()],
-          },
-          end_location: {
-            type: 'Point',
-            coordinates: [tripRecord.end_longitude?.toString(), tripRecord.end_latitude?.toString()],
-          },
-        },
-        { onConflict: 'id,user_id' }
-      );
-      if (error) {
-        console.warn(`Sync failed for observations ${tripRecord.id}. ERROR: ${error}`);
-        await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
-      } else {
-        // Sync successful
+    if (data) {
+      // Trip sync succesful, update the record with the new supabase id
+      supabaseTripId = data.id;
+      await updateTripById(tripId, { supabase_id: supabaseTripId });
+
+      // Sync the trip observations now
+      const success = await syncObservations(tripId, supabaseTripId);
+      if (success) {
+        // All the trip observation synced successful, resolved the trip to be synced.
         console.log(`Trip synced - ${tripId}`);
         await updateTripById(tripId, {
           sync_status: SyncStatus.SYNCED,
           last_synced_at: Date.now(),
         });
+      } else {
+        // Block the trip sync due to observation sync failure
+        console.error(`Sync blocked for trip ${tripId} due to failed observations upload`);
+        await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
       }
+    } else {
+      // Error occured during trip sync
+      console.error(`Sync failed for Trip ${tripId}. ERROR: `, error);
+      await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
     }
-  } else {
-    // Block the trip sync due to observation sync failure
-    console.warn(`Sync blocked for trip ${tripId} due to failed observations upload`);
-    await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
   }
 }
 
 /**
  * Sync all observations for a given trip.
  */
-async function syncObservations(tripId: string): Promise<boolean> {
+async function syncObservations(tripId: string, supabaseTripId: string): Promise<boolean> {
   // Get all observations for the trip
   const observations = await getObservationsByTripId(tripId);
   console.log(`Syncing ${observations.length} observations for trip ${tripId}`);
   let failure_encountered = false;
 
-  // We need the media to be synced first
-  for (const obs of observations) {
-    let upload_failed = false;
+  // Check if the received supabase_id is a valid uuid to trust it (must be 36 length)
+  if (!supabaseTripId || supabaseTripId.length !== 36) {
+    // Mark each obs failed sync, because the supabase trip id is invalid
+    console.error(
+      `Sync observations for trip ID ${tripId} failed: Invaild supabase trip id was provided.`
+    );
+    for (const obs of observations) {
+      await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
+    }
+    return false;
+  }
 
+  // Update the trip id and sync the observation as well as the media.
+  console.warn(
+    `Updating the observations trip ID from ${tripId} to supabase trip ID ${supabaseTripId}`
+  );
+  for (const obs of observations) {
+    await updateObservationById(obs.id, { supabase_trip_id: supabaseTripId });
+
+    let upload_failed = false;
     // Observation has a local media file which needs to be uploaded first
     if (obs.local_media_id) {
       const { success, url } = await syncMedia(obs.local_media_id);
@@ -102,27 +159,29 @@ async function syncObservations(tripId: string): Promise<boolean> {
     // Now sync the observation based on the media upload status
     if (!upload_failed) {
       // Upload the observation
-      const { error } = await supabase.from('observations').upsert(
-        {
-          local_observation_id: obs.id,
-          user_id: obs.user_id,
-          trip_id: obs.trip_id,
-          created_at: obs.created_at.toString(),
-          location: { type: 'Point', coordinates: [obs.longitude?.toString(), obs.latitude,toString()] },
-          observation: obs.observation,
-          // category_ids: null                     TODO: need to insert the observation as array of index
-          // observation_media:                     TODO: need to insert the media urls as array
-        },
-        { onConflict: 'local_observation_id,user_id,trip_id' }
-      );
+      const payload = {
+        unique_userID_localID_pair: obs.user_id + '-' + obs.id,
+        user_id: obs.user_id,
+        trip_id: obs.supabase_trip_id,
+        created_at: parseDateTime(obs.created_at),
+        location: parseLocationAsEWKT(obs.longitude, obs.latitude),
+        observation: obs.observation ?? undefined,
+        // category_ids: null                     TODO: need to insert the observation as array of index
+        // observation_media:                     TODO: need to insert the media urls as array
+      };
+      console.log(`Sycing observation - `, payload);
+      const { error } = await supabase
+        .from('observations')
+        .upsert(payload, { onConflict: 'unique_userID_localID_pair' });
 
       if (error) {
         // Error encountered
         failure_encountered = true;
-        console.warn(`Sync failed for observation id ${obs.id}. ERROR: ${error}`);
+        console.error(`Sync failed for observation id ${obs.id}. ERROR: `, error);
         await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
       } else {
         // Update the sync status on success
+        console.log(`Observation synced - ${obs.id}`);
         await updateObservationById(obs.id, {
           sync_status: SyncStatus.SYNCED,
           last_synced_at: Date.now(),
@@ -131,7 +190,7 @@ async function syncObservations(tripId: string): Promise<boolean> {
     } else {
       // Mark the current observation as failed due to media upload failure
       failure_encountered = true;
-      console.warn(`Sync blocked for observations ${obs.id} due to failed media upload`);
+      console.error(`Sync blocked for observations ${obs.id} due to failed media upload`);
       await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
     }
   }
@@ -146,5 +205,5 @@ async function syncObservations(tripId: string): Promise<boolean> {
 async function syncMedia(mediaId: string): Promise<{ success: boolean; url: string | null }> {
   // TODO: Implement media upload as per the files types and supabase storage configuration
   // TODO: Update the sync log and status accordingly
-  return { success: false, url: null };
+  return { success: true, url: null };
 }
