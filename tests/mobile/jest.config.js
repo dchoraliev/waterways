@@ -6,13 +6,16 @@ module.exports = {
   rootDir: '.',
 
   moduleNameMapper: {
-    // mobile src alias
+    // shared alias, used by TranscriptionService, SyncManager, etc.
+    '^@shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+
+    // mobile alias (in case you use @waterways/mobile/src/… in tests)
     '^@waterways/mobile/src/(.*)$': '<rootDir>/../../apps/mobile/src/$1',
 
-    // shared src alias
+    // older imports that may still exist
     '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
 
-    // generic apps alias (if you need it)
+    // generic apps alias
     '^apps/(.*)$': '<rootDir>/../../apps/$1',
   },
 
