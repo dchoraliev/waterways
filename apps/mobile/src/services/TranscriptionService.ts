@@ -1,4 +1,4 @@
-import { supabase } from '@shared/supabase/client';
+import { supabase } from '@waterways/shared/src/supabase/client';
 import { getDatabase } from '../database/db';
 import { updateObservationById } from '../database/ObservationManager';
 import * as LegacyFS from 'expo-file-system/legacy';
@@ -7,9 +7,10 @@ type TranscriptionResponse = {
   text?: string;
 };
 
-type UntranscribedAudioRow = {
+export type UntranscribedAudioRow = {
   observation_id: string;
-  local_file_path: string;
+  // can be null in your query / tests
+  local_file_path: string | null;
 };
 
 /**

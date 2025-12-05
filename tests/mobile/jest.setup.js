@@ -4,6 +4,47 @@ import '@testing-library/jest-native/extend-expect';
 process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 
+jest.mock('expo-sqlite', () => ({
+  openDatabase: jest.fn(() => ({
+    transaction: jest.fn((callback) => {
+      // super minimal fake transaction object
+      const tx = {
+        executeSql: jest.fn((_sql, _params, successCb) => {
+          // call success callback with an empty result if provided
+          if (successCb) {
+            successCb({
+              rows: {
+                _array: [],
+                length: 0,
+                item: () => null,
+              },
+            });
+          }
+        }),
+      };
+      callback(tx);
+    }),
+  })),
+}));
+
+//Mock expo-location
+jest.mock(
+  'expo-location',
+  () => ({
+    requestForegroundPermissionsAsync: jest
+      .fn()
+      .mockResolvedValue({ status: 'granted' }),
+    getForegroundPermissionsAsync: jest
+      .fn()
+      .mockResolvedValue({ status: 'granted' }),
+    getCurrentPositionAsync: jest.fn().mockResolvedValue({
+      coords: { latitude: 0, longitude: 0, accuracy: 10 },
+      timestamp: Date.now(),
+    }),
+  }),
+  { virtual: true },
+);
+
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
