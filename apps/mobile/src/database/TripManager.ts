@@ -13,7 +13,7 @@
 import { getDatabase } from './db';
 import { Trip } from '@waterways/shared/src/models/local-db-rows';
 import { SyncStatus } from './SyncManager';
-import { getCurrentCoordinates } from '../services/LocationService';
+import { Coordinates, getCurrentCoordinates } from '../services/LocationService';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)
@@ -84,32 +84,40 @@ export async function createTrip(params: {
   start_time?: number | null;
   start_latitude?: number | null;
   start_longitude?: number | null;
-  sync_status?: SyncStatus;
 }): Promise<string> {
   const db = await getDatabase();
   const id = await generateUUID();
   const now = Date.now();
-  const start_time = params.start_time ?? null;
-  const coordinates = await getCurrentCoordinates();
-  const start_latitude = params.start_latitude ?? coordinates.latitude ?? null;
-  const start_longitude = params.start_longitude ?? coordinates.longitude ?? null;
-  const sync_status = params.sync_status ?? SyncStatus.PENDING;
+  const start_time = params.start_time ?? now;
+  const sync_status = SyncStatus.PENDING;
   const last_synced_at = 0;
+
+  let coordinate: Coordinates;
+  if (params.start_latitude != null && params.start_longitude != null) {
+    coordinate = {
+      latitude: params.start_latitude,
+      longitude: params.start_longitude,
+    };
+  } else {
+    // Fetch device coordinates only if missing
+    coordinate = await getCurrentCoordinates();
+  }
 
   await db!.runAsync(
     `INSERT INTO trips (
-      id, user_id, project_id, created_at, start_time, end_time,
+      id, supabase_id, user_id, project_id, created_at, start_time, end_time,
       start_latitude, start_longitude, end_latitude, end_longitude, sync_status, last_synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
+      null,
       params.user_id,
       params.project_id ?? null,
       now,
       start_time,
       null,
-      start_latitude,
-      start_longitude,
+      coordinate.latitude,
+      coordinate.longitude,
       null,
       null,
       sync_status,
@@ -130,6 +138,7 @@ export async function createTrip(params: {
  * - start_time, end_time - trip timestamps
  * - start_latitude/longitude, end_latitude/longitude - GPS coordinates
  * - project_id - associated project
+ * - supabase_id - canonical Supabase trip ID for sync mapping
  * - sync_status, last_synced_at - sync metadata
  *
  * @param id - Trip UUID to update
@@ -141,10 +150,9 @@ export async function createTrip(params: {
  *
  * Usage:
  *   await updateTripById('trip-uuid-123', {
+ *     supabase_id: 'supabase-trip-uuid',
  *     end_time: Date.now(),
- *     end_latitude: 42.125,
- *     end_longitude: -87.455,
- *     sync_status: 'pending'
+ *     sync_status: 'synced'
  *   });
  */
 export async function updateTripById(
@@ -154,6 +162,7 @@ export async function updateTripById(
       Trip,
       | 'user_id'
       | 'project_id'
+      | 'supabase_id'
       | 'start_time'
       | 'end_time'
       | 'start_latitude'
@@ -171,6 +180,7 @@ export async function updateTripById(
     Trip,
     | 'user_id'
     | 'project_id'
+    | 'supabase_id'
     | 'start_time'
     | 'end_time'
     | 'start_latitude'
@@ -184,6 +194,7 @@ export async function updateTripById(
   const allowedKeys: UpdatableKey[] = [
     'user_id',
     'project_id',
+    'supabase_id',
     'start_time',
     'end_time',
     'start_latitude',
@@ -195,8 +206,6 @@ export async function updateTripById(
   ];
 
   const setParts: string[] = [];
-
-  // Typed params: accepts the update values AND the id string
   const params: Array<Trip[UpdatableKey]> = [];
 
   for (const key of allowedKeys) {
@@ -208,9 +217,9 @@ export async function updateTripById(
     }
   }
 
-  if (setParts.length === 0) return; // nothing to do
+  if (setParts.length === 0) return;
 
-  params.push(id); // safe: params is typed to include string
+  params.push(id);
 
   const sql = `UPDATE trips SET ${setParts.join(', ')} WHERE id = ?`;
   await db!.runAsync(sql, params);

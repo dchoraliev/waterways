@@ -5,6 +5,7 @@
 export const EXPECTED_SCHEMA: Record<string, string[]> = {
   trips: [
     'id',
+    'supabase_id',
     'user_id',
     'project_id',
     'created_at',
@@ -21,6 +22,7 @@ export const EXPECTED_SCHEMA: Record<string, string[]> = {
     'id',
     'user_id',
     'trip_id',
+    'supabase_trip_id',
     'latitude',
     'longitude',
     'created_at',
@@ -53,6 +55,7 @@ export const EXPECTED_SCHEMA: Record<string, string[]> = {
 export const CREATE_TRIPS_TABLE = `
 CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY,
+  supabase_id TEXT,
   user_id TEXT NOT NULL,
   project_id TEXT,
   created_at INTEGER NOT NULL,
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS observations (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   trip_id TEXT NOT NULL,
+  supabase_trip_id TEXT,
   latitude REAL,
   longitude REAL,
   created_at INTEGER NOT NULL,

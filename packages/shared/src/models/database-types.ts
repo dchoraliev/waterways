@@ -26,85 +26,52 @@ export type Database = {
         };
         Relationships: [];
       };
-      observation_media: {
-        Row: {
-          created_at: string;
-          id: string;
-          media_type: string | null;
-          media_url: string;
-          observation_id: string | null;
-        };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          media_type?: string | null;
-          media_url: string;
-          observation_id?: string | null;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          media_type?: string | null;
-          media_url?: string;
-          observation_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'observation_media_observation_id_fkey';
-            columns: ['observation_id'];
-            isOneToOne: false;
-            referencedRelation: 'observations';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       observations: {
         Row: {
-          category_id: number | null;
+          categories: string[] | null;
           created_at: string;
           id: string;
           location: unknown;
           observation: string | null;
+          observation_media: string[] | null;
           trip_id: string | null;
+          unique_userID_localID_pair: string;
           user_id: string | null;
         };
         Insert: {
-          category_id?: number | null;
+          categories?: string[] | null;
           created_at?: string;
           id?: string;
           location?: unknown;
           observation?: string | null;
+          observation_media?: string[] | null;
           trip_id?: string | null;
+          unique_userID_localID_pair: string;
           user_id?: string | null;
         };
         Update: {
-          category_id?: number | null;
+          categories?: string[] | null;
           created_at?: string;
           id?: string;
           location?: unknown;
           observation?: string | null;
+          observation_media?: string[] | null;
           trip_id?: string | null;
+          unique_userID_localID_pair?: string;
           user_id?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: 'observations_category_id_fkey';
-            columns: ['category_id'];
-            isOneToOne: false;
-            referencedRelation: 'observation_categories';
-            referencedColumns: ['id'];
-          },
-          {
             foreignKeyName: 'observations_trip_id_fkey';
             columns: ['trip_id'];
-            isOneToOne: false;
+            isOneToOne: true;
             referencedRelation: 'trips';
             referencedColumns: ['id'];
           },
           {
             foreignKeyName: 'observations_user_id_fkey';
             columns: ['user_id'];
-            isOneToOne: false;
+            isOneToOne: true;
             referencedRelation: 'users';
             referencedColumns: ['id'];
           },
@@ -152,6 +119,7 @@ export type Database = {
           created_by: string | null;
           description: string | null;
           id: string;
+          join_code: string | null;
           name: string;
         };
         Insert: {
@@ -159,6 +127,7 @@ export type Database = {
           created_by?: string | null;
           description?: string | null;
           id?: string;
+          join_code?: string | null;
           name: string;
         };
         Update: {
@@ -166,6 +135,7 @@ export type Database = {
           created_by?: string | null;
           description?: string | null;
           id?: string;
+          join_code?: string | null;
           name?: string;
         };
         Relationships: [
@@ -211,7 +181,8 @@ export type Database = {
           project_id: string | null;
           start_location: unknown;
           start_time: string | null;
-          user_id: string | null;
+          unique_userID_localID_pair: string;
+          user_id: string;
         };
         Insert: {
           created_at?: string;
@@ -221,7 +192,8 @@ export type Database = {
           project_id?: string | null;
           start_location?: unknown;
           start_time?: string | null;
-          user_id?: string | null;
+          unique_userID_localID_pair: string;
+          user_id: string;
         };
         Update: {
           created_at?: string;
@@ -231,7 +203,8 @@ export type Database = {
           project_id?: string | null;
           start_location?: unknown;
           start_time?: string | null;
-          user_id?: string | null;
+          unique_userID_localID_pair?: string;
+          user_id?: string;
         };
         Relationships: [
           {
@@ -249,6 +222,27 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      user_signups_audit: {
+        Row: {
+          created_at: string | null;
+          email: string | null;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          email?: string | null;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          email?: string | null;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       users: {
         Row: {
@@ -1190,11 +1184,11 @@ export type Database = {
           };
       st_triangulatepolygon: { Args: { g1: unknown }; Returns: unknown };
       st_union:
-        | { Args: { geom1: unknown; geom2: unknown }; Returns: unknown }
         | {
             Args: { geom1: unknown; geom2: unknown; gridsize: number };
             Returns: unknown;
-          };
+          }
+        | { Args: { geom1: unknown; geom2: unknown }; Returns: unknown };
       st_voronoilines: {
         Args: { extend_to?: unknown; g1: unknown; tolerance?: number };
         Returns: unknown;

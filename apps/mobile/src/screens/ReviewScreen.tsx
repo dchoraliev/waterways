@@ -10,6 +10,7 @@ import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
 import ProjectSelector from '../components/ProjectSelector';
 import { ROUTES } from '../constants/routes';
 import { useAuth } from '../hooks/useAuth'; // ADDED: Import the new reusable hook
+import { syncTrip } from '../database/SyncManager';
 
 export interface ReviewScreenProps {
   tripId: string;
@@ -123,7 +124,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     router.replace(ROUTES.home);
   };
 
-  const handleSubmitJourney = () => {
+  const handleSubmitJourney = async () => {
     saveDraft({
       id: effectiveTripId,
       createdAt: baseCreatedAt,
@@ -133,6 +134,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     });
 
     // later this will also upload to the backend
+    await syncTrip(tripId);
     router.replace(ROUTES.home);
   };
 

@@ -14,6 +14,7 @@
  */
 export interface Trip {
   id: string;
+  supabase_id: string;
   user_id: string;
   project_id: string | null;
   created_at: number;
@@ -34,6 +35,7 @@ export interface Observation {
   id: string;
   user_id: string;
   trip_id: string;
+  supabase_trip_id: string | null;
   latitude: null;
   longitude: number | null;
   created_at: number;
