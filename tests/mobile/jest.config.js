@@ -4,15 +4,17 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['<rootDir>/**/*.test.ts', '<rootDir>/**/*.test.tsx'],
   rootDir: '.',
+
   moduleNameMapper: {
+    // mobile src alias
+    '^@waterways/mobile/src/(.*)$': '<rootDir>/../../apps/mobile/src/$1',
+
+    // shared src alias
     '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+
+    // generic apps alias (if you need it)
+    '^apps/(.*)$': '<rootDir>/../../apps/$1',
   },
-
-moduleNameMapper: {
-  '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
-  '^apps/(.*)$': '<rootDir>/../../apps/$1',
-},
-
 
   transform: {
     '^.+\\.(js|ts|tsx)$': [
