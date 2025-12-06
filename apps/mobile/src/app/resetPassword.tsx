@@ -8,7 +8,7 @@ export default function ResetPasswordRoute() {
 
   return (
     <ResetPasswordScreen
-      onSubmitDone={() => router.replace(ROUTES.login)}
+      onPasswordChange={() => router.replace(ROUTES.home)}
       onBackToLogin={() => router.replace(ROUTES.login)}
     />
   );

@@ -15,3 +15,19 @@ export const signUp = async (email: string, password: string) => {
 export const getSession = async () => {
   return await supabase.auth.getSession();
 };
+
+export const sendResetPasswordEmail = async (email: string) => {
+  return await supabase.auth.resetPasswordForEmail(email);
+};
+
+export const verifyResetPasswordOtp = async (email: string, otp: string) => {
+  return await supabase.auth.verifyOtp({
+    email,
+    token: otp,
+    type: 'recovery',
+  });
+};
+
+export const resetPassword = async (newPassword: string) => {
+  return await supabase.auth.updateUser({ password: newPassword });
+};
