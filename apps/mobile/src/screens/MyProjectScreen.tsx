@@ -153,8 +153,9 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backButton: {
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 32,
     paddingBottom: 10,
+    paddingLeft: 28,
   },
   backButtonText: {
     color: '#60A5FA',
