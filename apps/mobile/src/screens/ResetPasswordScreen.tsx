@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   sendResetPasswordEmail,
@@ -9,6 +9,7 @@ import {
 import styles from '../styles/ResetPasswordScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
+import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
 
 export interface ResetPasswordScreenProps {
   onPasswordChange: () => void;
@@ -100,6 +101,10 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.centerWrapper}>
+          {/* Logo */}
+          <View style={styles.logoWrapper}>
+            <Image source={waterwaysLogo} style={styles.logoImage} />
+          </View>
           <Text style={styles.title}>Reset Password</Text>
           <Text style={styles.subtitle}>Verify your email to change your password</Text>
 

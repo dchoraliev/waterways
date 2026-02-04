@@ -17,17 +17,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  logoCircle: {
+  logoImage: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: '#1D4ED8', // blue
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoIcon: {
-    fontSize: 28,
-    color: '#E5F2FF',
+    borderRadius: 14,
+    backgroundColor: '#1D4ED8',
+    resizeMode: 'contain',
   },
   title: {
     fontSize: 22,
@@ -126,6 +121,11 @@ const styles = StyleSheet.create({
   },
   offlineSkipLink: {
     textDecorationLine: 'underline',
+  },
+  sessionOverlay: {
+    backgroundColor: 'rgba(2, 6, 23, 0.85)', // matches #020617
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

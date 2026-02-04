@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+  Alert,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signIn } from 'packages/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
+import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -20,7 +29,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
   const handleSignIn = async () => {
@@ -59,9 +67,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
         <View style={styles.centerWrapper}>
           {/* Logo */}
           <View style={styles.logoWrapper}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoIcon}>🌊</Text>
-            </View>
+            <Image source={waterwaysLogo} style={styles.logoImage} />
           </View>
 
           {/* Title */}

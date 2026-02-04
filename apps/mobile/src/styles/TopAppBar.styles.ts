@@ -6,21 +6,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 12,
+    gap: 12,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logoCircle: {
+  logoImage: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: '#1D4ED8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  logoIcon: {
-    fontSize: 20,
-    color: '#E5F2FF',
+    resizeMode: 'contain',
   },
   textBlock: {
     flexDirection: 'column',
