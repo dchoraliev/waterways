@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import styles from '../styles/TopAppBar.styles';
+import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
 
 const TopAppBar: React.FC = () => {
   return (
     <View style={styles.root}>
-      <View style={styles.logoCircle}>
+      <View style={styles.logoImage}>
         {/* placeholder for actual logo icon */}
-        <Text style={styles.logoIcon}>🌊</Text>
+        <Image source={waterwaysLogo} style={styles.logoImage} />
       </View>
       <View style={styles.textBlock}>
         <Text style={styles.title}>WaDE</Text>

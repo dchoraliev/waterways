@@ -1,5 +1,6 @@
 export const ROUTES = {
-  login: '/' as const,
+  splash: '/' as const,
+  login: '/login' as const,
   home: '/home' as const,
   signup: '/signup' as const,
   resetPassword: '/resetPassword' as const,
@@ -13,3 +14,4 @@ export const ROUTES = {
 };
 
 export type RouteKey = keyof typeof ROUTES;
+export type RoutePath = (typeof ROUTES)[RouteKey];

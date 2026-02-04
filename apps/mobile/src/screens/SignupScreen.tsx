@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
 import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
+import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
 
 export interface SignupScreenProps {
   onSignupSuccess: () => void;
@@ -42,6 +43,11 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.centerWrapper}>
+          {/* Logo */}
+          <View style={styles.logoWrapper}>
+            <Image source={waterwaysLogo} style={styles.logoImage} />
+          </View>
+
           <Text style={styles.title}>Create an account</Text>
           <Text style={styles.subtitle}>Sign up to start using WaDE</Text>
 

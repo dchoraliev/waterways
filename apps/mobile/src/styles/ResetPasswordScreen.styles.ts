@@ -12,6 +12,17 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     paddingHorizontal: 24,
   },
+  logoWrapper: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logoImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    backgroundColor: '#1D4ED8',
+    resizeMode: 'contain',
+  },
   title: {
     fontSize: 22,
     fontWeight: '600',
