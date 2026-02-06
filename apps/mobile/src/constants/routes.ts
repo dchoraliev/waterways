@@ -1,17 +1,17 @@
 export const ROUTES = {
-  splash: '/' as const,
-  login: '/login' as const,
-  home: '/home' as const,
-  signup: '/signup' as const,
-  resetPassword: '/resetPassword' as const,
-  map: '/map' as const,
-  instruction: '/instruction' as const,
-  settings: '/settings' as const,
-  journey: '/journey' as const,
-  review: '/review' as const,
-  drafts: '/drafts' as const,
-  projects: '/projects' as const,
-};
+  splash: '/' as any,
+  login: '/login' as any,
+  home: '/home' as any,
+  signup: '/signup' as any,
+  resetPassword: '/resetPassword' as any,
+  map: '/map' as any,
+  instruction: '/instruction' as any,
+  settings: '/settings' as any,
+  journey: '/journey' as any,
+  review: '/review' as any,
+  drafts: '/drafts' as any,
+  projects: '/projects' as any,
+} as const;
 
 export type RouteKey = keyof typeof ROUTES;
 export type RoutePath = (typeof ROUTES)[RouteKey];
