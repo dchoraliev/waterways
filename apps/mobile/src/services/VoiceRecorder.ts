@@ -10,6 +10,8 @@ function makeId(prefix: string) {
  * Save a recorded audio file as an observation + observation_media row
  * for the given trip and user.
  *
+ * Returns the observation ID so the caller can start a camera window.
+ *
  * NOTE:
  * - We no longer call FileSystem.getInfoAsync (deprecated / throws in SDK 54).
  * - We assume the URI we got from the recorder is valid.
@@ -18,11 +20,11 @@ export const saveAudioObservationForTrip = async (
   tripId: string,
   userId: string,
   uri: string
-): Promise<void> => {
+): Promise<string | null> => {
   try {
     if (!uri) {
       console.warn('[VoiceRecorder] No URI provided to saveAudioObservationForTrip');
-      return;
+      return null;
     }
 
     // If you really want to validate, you could use the new File API later.
@@ -71,7 +73,11 @@ export const saveAudioObservationForTrip = async (
       'uri',
       uri
     );
+
+    // Return the observation ID for camera window
+    return observationId;
   } catch (err) {
     console.error('[VoiceRecorder] Failed to save audio observation', err);
+    return null;
   }
 };
