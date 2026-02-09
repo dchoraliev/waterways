@@ -58,11 +58,17 @@ describe('Supabase Auth Wrapper (shared package)', () => {
     const mockRes = { data: { user: { id: 'u1' } }, error: null };
     mockSignUp.mockResolvedValueOnce(mockRes);
 
-    const res = await auth.signUp('new@example.com', 'password');
+    const res = await auth.signUp('new@example.com', 'password', 'John', 'Doe');
 
     expect(mockSignUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'password',
+      options: {
+        data: {
+          first_name: 'John',
+          last_name: 'Doe',
+        },
+      },
     });
     expect(res).toBe(mockRes);
   });

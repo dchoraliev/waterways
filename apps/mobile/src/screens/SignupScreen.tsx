@@ -12,6 +12,23 @@ export interface SignupScreenProps {
   onBackToLogin: () => void;
 }
 
+// Helper function to parse full name into first and last name
+const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
+  const trimmedName = fullName.trim();
+  const nameParts = trimmedName.split(/\s+/); // Split by whitespace
+
+  if (nameParts.length === 0) {
+    return { firstName: '', lastName: '' };
+  } else if (nameParts.length === 1) {
+    return { firstName: nameParts[0], lastName: '' };
+  } else {
+    // First part is first name, everything else is last name
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ');
+    return { firstName, lastName };
+  }
+};
+
 const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLogin }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,7 +44,9 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
   const handleSubmit = async () => {
     if (!canSubmit) return;
 
-    const { error } = await signUp(email, password);
+    const { firstName, lastName } = parseFullName(name);
+
+    const { error } = await signUp(email, password, firstName, lastName);
     if (error) {
       console.log('Error singing up:', error);
       return;
