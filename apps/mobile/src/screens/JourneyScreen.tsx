@@ -1,184 +1,417 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-
-import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
-
-import { updateTripById } from '../database/TripManager';
-import { getCurrentCoordinates } from '../services/LocationService';
-import { transcribeTripAudio } from '../services/TranscriptionService';
-import { saveAudioObservationForTrip } from '../services/VoiceRecorder';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import ListeningBanner from '../components/ListeningBanner';
-import PrimaryButton from '../components/form/PrimaryButton';
-import styles from '../styles/JourneyScreen.styles';
-import { createObservation } from '../database/ObservationManager';
-import { getSession } from '@shared/supabase/auth';
+import { RecentObservationItem } from '../components/RecentObservationItem';
+import { styles } from '../styles/JourneyScreen.styles';
 
-export interface JourneyScreenProps {
+import { updateTripById } from '../database/TripManager';
+import { getObservationsByTripId } from '../database/ObservationManager';
+
+import { getCurrentUserId } from '../services/AuthService';
+import { getCurrentCoordinates } from '../services/LocationService';
+import { transcribeTripAudio } from '../services/TranscriptionService';
+import { showToast } from '../utils/toast';
+
+// expo-audio (NOT expo-av)
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+
+import { saveAudioObservationForTrip } from '../services/VoiceRecorder';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getMediaCountsForTrip } from '../services/MediaQueries';
+
+const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
+
+type ObservationRow = {
+  id: string;
+  created_at?: number | null;
+};
+
+interface DBObservationRow {
+  id: string;
+  created_at?: number | null;
+}
+
+function formatDuration(secondsTotal: number) {
+  const s = Math.max(0, Math.floor(secondsTotal));
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+interface JourneyScreenProps {
   tripId: string;
 }
 
-const JourneyScreen: React.FC<JourneyScreenProps> = ({ tripId }) => {
+export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const router = useRouter();
-  const [isListening, setIsListening] = useState(false);
+  const journeyStartRef = useRef<number>(Date.now());
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
 
-  const USER_ID = 'local-user'; // TODO: replace with real auth user id
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [loadingObservations, setLoadingObservations] = useState(true);
+  const [observations, setObservations] = useState<ObservationRow[]>([]);
 
-  // Configure audio + request mic permission once
+  // Media counts (loaded from database)
+  const [photoCount, setPhotoCount] = useState(0);
+  const [videoCount, setVideoCount] = useState(0);
+
+  // --- Audio recording state (manual observation) ---
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recState = useAudioRecorderState(recorder);
+
+  const isRecording = !!recState?.isRecording;
+  const [savingManualObservation, setSavingManualObservation] = useState(false);
+
+  // --- End journey state ---
+  const [endingJourney, setEndingJourney] = useState(false);
+
+  // --- Camera window state (10 seconds after observation) ---
+  const [cameraWindowActive, setCameraWindowActive] = useState(false);
+  const [cameraWindowSecondsLeft, setCameraWindowSecondsLeft] = useState(0);
+  const [lastObservationId, setLastObservationId] = useState<string | null>(null);
+  // eslint-disable-next-line no-undef
+  const cameraWindowTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    (async () => {
-      try {
-        const status = await AudioModule.requestRecordingPermissionsAsync();
-        if (!status.granted) {
-          Alert.alert('Microphone permission', 'Permission to access the microphone was denied.');
+    // eslint-disable-next-line no-undef
+    const t = setInterval(() => {
+      const s = (Date.now() - journeyStartRef.current) / 1000;
+      setSecondsElapsed(s);
+    }, 1000);
+    // eslint-disable-next-line no-undef
+    return () => clearInterval(t);
+  }, []);
+
+  const loadObservations = useCallback(async (activeTripId: string) => {
+    setLoadingObservations(true);
+    try {
+      const rows = await getObservationsByTripId(activeTripId);
+      const normalized: ObservationRow[] = (rows ?? []).map((r: DBObservationRow) => ({
+        id: r.id,
+        created_at: r.created_at ?? null,
+      }));
+
+      normalized.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+      setObservations(normalized);
+
+      // Load media counts
+      const counts = await getMediaCountsForTrip(activeTripId);
+      setPhotoCount(counts.photoCount);
+      setVideoCount(counts.videoCount);
+    } catch (e) {
+      console.warn('Failed to load observations:', e);
+    } finally {
+      setLoadingObservations(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!tripId) return;
+    void loadObservations(tripId);
+  }, [tripId, loadObservations]);
+
+  // Start 10-second camera window
+  const startCameraWindow = useCallback((observationId: string) => {
+    console.log('[DEBUG] startCameraWindow called with ID:', observationId);
+
+    // Clear any existing timer
+    if (cameraWindowTimerRef.current) {
+      console.log('[DEBUG] Clearing existing camera timer');
+      // eslint-disable-next-line no-undef
+      clearInterval(cameraWindowTimerRef.current);
+    }
+
+    setLastObservationId(observationId);
+    setCameraWindowActive(true);
+    setCameraWindowSecondsLeft(10);
+
+    console.log('[DEBUG] Camera window activated, countdown started');
+
+    // Countdown timer
+    // eslint-disable-next-line no-undef
+    cameraWindowTimerRef.current = setInterval(() => {
+      setCameraWindowSecondsLeft((prev) => {
+        console.log('[DEBUG] Camera window seconds left:', prev - 1);
+        if (prev <= 1) {
+          // Window expired
+          console.log('[DEBUG] Camera window expired');
+          if (cameraWindowTimerRef.current) {
+            // eslint-disable-next-line no-undef
+            clearInterval(cameraWindowTimerRef.current);
+            cameraWindowTimerRef.current = null;
+          }
+          setCameraWindowActive(false);
+          setLastObservationId(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  // Cleanup camera window timer on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraWindowTimerRef.current) {
+        // eslint-disable-next-line no-undef
+        clearInterval(cameraWindowTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Manual observation button
+  const onManualObservationPress = useCallback(async () => {
+    if (!tripId) return;
+
+    if (savingManualObservation) return;
+
+    try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        showToast('Not logged in. Please sign in again.');
+        return;
+      }
+
+      if (!isRecording) {
+        const perm = await requestRecordingPermissionsAsync();
+        if (!perm.granted) {
+          showToast('Microphone permission denied.');
           return;
         }
 
         await setAudioModeAsync({
-          playsInSilentMode: true,
           allowsRecording: true,
+          playsInSilentMode: true,
         });
-      } catch (e) {
-        console.error('[JourneyScreen] Error configuring audio', e);
-      }
-    })();
-  }, []);
 
-  const handleStartListening = async () => {
-    try {
-      console.log('Start listening for trip:', tripId);
-      await audioRecorder.prepareToRecordAsync();
-      audioRecorder.record();
-      setIsListening(true);
-    } catch (err) {
-      console.error('[JourneyScreen] Error starting recording', err);
-      Alert.alert('Recording error', 'Could not start recording audio.');
-    }
-  };
+        await recorder.prepareToRecordAsync();
+        recorder.record();
 
-  const handleStopListening = async () => {
-    try {
-      console.log('Stop listening for trip:', tripId);
-      await audioRecorder.stop();
-      setIsListening(false);
-
-      const uri = audioRecorder.uri;
-      if (!uri) {
-        console.warn('[JourneyScreen] No recording URI after stop');
+        // Removed toast - UI shows recording state
         return;
       }
 
-      // Save this clip as an observation linked to this trip
-      await saveAudioObservationForTrip(tripId, USER_ID, uri);
-    } catch (err) {
-      console.error('[JourneyScreen] Error stopping recording', err);
-      Alert.alert('Recording error', 'Could not stop recording audio.');
-    }
-  };
+      // Stop and save
+      setSavingManualObservation(true);
 
-  const handleAddObservation = async () => {
-    // Temporary placeholder implementation
-    let userId = 'local-user';
-    try {
-      const { data } = await getSession();
-      const user = data?.session?.user;
-      if (user?.id) userId = user.id;
-    } catch (e) {
-      console.warn('Could not read session for trip creation:', e);
-    }
-    const tempObservation = 'Test observation ' + Date.now();
-    const coordinates = await getCurrentCoordinates();
-    await createObservation({
-      user_id: userId,
-      trip_id: tripId,
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-      observation: tempObservation,
-    });
-    console.log(
-      'Add observation for trip:',
-      tripId,
-      'observation:',
-      tempObservation,
-      'coordinates:',
-      coordinates
-    );
-  };
+      await recorder.stop();
 
-  const handleEndJourney = async () => {
-    try {
-      // If still recording, stop and save the last clip
-      if (isListening) {
-        await handleStopListening();
+      const fileUri = recorder.uri;
+      if (!fileUri) {
+        showToast('Recording failed (no file). Try again.');
+        return;
       }
 
-      // Mark trip as ended
-      const coordinates = await getCurrentCoordinates();
+      console.log('[DEBUG] About to save observation with URI:', fileUri);
+
+      const observationId = await saveAudioObservationForTrip(tripId, userId, fileUri);
+
+      console.log('[DEBUG] Observation ID returned:', observationId);
+
+      // Removed toast - observation appears in list automatically
+      await loadObservations(tripId);
+
+      if (observationId) {
+        console.log('[DEBUG] Starting camera window for observation:', observationId);
+        startCameraWindow(observationId);
+      } else {
+        console.warn('[DEBUG] No observation ID returned, camera window not started');
+      }
+    } catch (e) {
+      console.warn('Manual observation failed:', e);
+      showToast('Failed to record/save observation');
+    } finally {
+      setSavingManualObservation(false);
+    }
+  }, [tripId, isRecording, recorder, savingManualObservation, loadObservations, startCameraWindow]);
+
+  // Open camera for the last observation
+  const onOpenCameraPress = useCallback(() => {
+    if (!lastObservationId) return;
+
+    router.push({
+      pathname: '/camera-capture',
+      params: { observationId: lastObservationId },
+    });
+  }, [lastObservationId, router]);
+
+  // End journey button
+  const onEndJourneyPress = useCallback(async () => {
+    console.log('[DEBUG] End journey pressed, tripId:', tripId);
+
+    if (!tripId) {
+      showToast('No active journey to end.');
+      return;
+    }
+
+    if (endingJourney) {
+      console.log('[DEBUG] Already ending journey, ignoring');
+      return;
+    }
+
+    try {
+      setEndingJourney(true);
+      console.log('[DEBUG] Starting end journey process');
+      showToast('Ending journey and transcribing audio...');
+
+      const endCoordinates = await getCurrentCoordinates();
+      console.log('[DEBUG] Got end coordinates:', endCoordinates);
+
       await updateTripById(tripId, {
         end_time: Date.now(),
-        end_latitude: coordinates.latitude,
-        end_longitude: coordinates.longitude,
+        end_latitude: endCoordinates.latitude,
+        end_longitude: endCoordinates.longitude,
       });
-      console.log('Ended journey for trip:', tripId, coordinates);
+      console.log('[DEBUG] Updated trip');
 
-      // Transcribe all untranscribed audio clips for this trip
       await transcribeTripAudio(tripId);
-      console.log('[JourneyScreen] Triggered transcription for trip:', tripId);
+      console.log('[DEBUG] Transcription complete');
 
-      // Go to review
+      // Clear the active trip from storage so a new one can be created next time
+      await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+      console.log('[DEBUG] Cleared active trip from storage');
+
+      showToast('Journey ended. Transcriptions complete!');
+
+      console.log('[DEBUG] Navigating to: /review/' + tripId);
       router.push(`/review/${tripId}`);
-    } catch (err) {
-      console.error('[JourneyScreen] Error ending journey', err);
-      Alert.alert(
-        'Journey error',
-        'Something went wrong while ending the journey. You can review later from the home screen.'
-      );
-      // Still navigate, so the user can see what was saved
-      router.push(`/review/${tripId}`);
+      console.log('[DEBUG] Navigation called');
+    } catch (error) {
+      console.error('[JourneyScreen] Failed to end journey:', error);
+      showToast('Failed to end journey. Please try again.');
+    } finally {
+      setEndingJourney(false);
     }
-  };
+  }, [tripId, router, endingJourney]);
+
+  const obsCount = observations.length;
+  const manualDisabled = !tripId;
+  const endJourneyDisabled = !tripId || endingJourney;
 
   return (
-    <SafeAreaView style={styles.root}>
-      <ListeningBanner isListening={isListening} onStopListening={handleStopListening} />
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Current Journey</Text>
+          <Text style={styles.timerText}>{formatDuration(secondsElapsed)}</Text>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>Journey in progress</Text>
-        <Text style={styles.subtitle}>Record observations while traveling along the waterway.</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#55A7FF' }]}>{obsCount}</Text>
+              <Text style={styles.statLabel}>Observations</Text>
+            </View>
 
-        {!isListening ? (
-          <PrimaryButton
-            label="Start listening"
-            onPress={handleStartListening}
-            style={styles.primaryButton}
-          />
-        ) : (
-          <PrimaryButton
-            label="Pause listening"
-            onPress={handleStopListening}
-            style={styles.primaryButton}
-          />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#A78BFA' }]}>{photoCount}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#FFB020' }]}>{videoCount}</Text>
+              <Text style={styles.statLabel}>Videos</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Listening banner */}
+        <ListeningBanner text={`Listening for "Hey WaDE"`} />
+
+        {/* Manual Observation card */}
+        <Pressable
+          disabled={manualDisabled}
+          onPress={onManualObservationPress}
+          style={({ pressed }) => [
+            styles.card,
+            styles.manualObservationCard,
+            manualDisabled ? { opacity: 0.6 } : null,
+            pressed && !manualDisabled ? { opacity: 0.85 } : null,
+          ]}
+        >
+          <Text style={styles.manualObservationTitle}>
+            {savingManualObservation
+              ? 'Saving…'
+              : isRecording
+                ? 'Tap to Stop & Save'
+                : 'Start Observation'}
+          </Text>
+          <Text style={styles.manualObservationSubtitle}>
+            {isRecording
+              ? 'Recording is active. Tap again to save this observation.'
+              : 'Tap to record an observation.'}
+          </Text>
+        </Pressable>
+
+        {/* Camera card - only visible for 10 seconds after observation */}
+        {cameraWindowActive && (
+          <>
+            {console.log(
+              '[DEBUG] RENDERING CAMERA BUTTON - Active:',
+              cameraWindowActive,
+              'Seconds:',
+              cameraWindowSecondsLeft
+            )}
+            <Pressable
+              onPress={onOpenCameraPress}
+              style={({ pressed }) => [
+                styles.card,
+                styles.cameraCard,
+                pressed ? { opacity: 0.85 } : null,
+              ]}
+            >
+              <Text style={styles.cameraText}>📸 Add Photo/Video</Text>
+              <Text style={styles.cameraSubtext}>
+                Available for {cameraWindowSecondsLeft} more second
+                {cameraWindowSecondsLeft !== 1 ? 's' : ''}
+              </Text>
+            </Pressable>
+          </>
         )}
 
-        {/* TEMP button only to add test observation*/}
-        <PrimaryButton
-          label="Add Observation (TEMP)"
-          onPress={handleAddObservation}
-          style={styles.secondaryButton}
-        />
+        {/* End Journey card */}
+        <Pressable
+          onPress={onEndJourneyPress}
+          disabled={endJourneyDisabled}
+          style={({ pressed }) => [
+            styles.card,
+            styles.endJourneyCard,
+            endJourneyDisabled ? { opacity: 0.6 } : null,
+            pressed && !endJourneyDisabled ? { opacity: 0.85 } : null,
+          ]}
+        >
+          <Text style={styles.endJourneyLabel}>
+            {endingJourney ? 'Transcribing...' : 'End Journey'}
+          </Text>
+        </Pressable>
 
-        {/* You can remove this TEMP button once you're happy with audio */}
-        <PrimaryButton
-          label="End journey"
-          onPress={handleEndJourney}
-          style={styles.secondaryButton}
-        />
-      </View>
-    </SafeAreaView>
+        {/* Recent Observations */}
+        <Text style={styles.sectionTitle}>Recent Observations</Text>
+
+        {loadingObservations ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <>
+            {observations.slice(0, 6).map((o, idx) => (
+              <RecentObservationItem
+                key={o.id}
+                title={`Observation #${obsCount - idx}`}
+                subtitle={o.created_at ? new Date(o.created_at).toLocaleString() : undefined}
+                onPress={() => console.log('Pressed observation', o.id)}
+              />
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
-};
-
-export default JourneyScreen;
+}

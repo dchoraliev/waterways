@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { classifyObservation } from '../services/ObservationClassifier';
 import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
@@ -9,16 +9,17 @@ import PrimaryButton from '../components/form/PrimaryButton';
 import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
 import ProjectSelector from '../components/ProjectSelector';
 import { ROUTES } from '../constants/routes';
-import { useAuth } from '../hooks/useAuth'; // ADDED: Import the new reusable hook
+import { useAuth } from '../hooks/useAuth';
 import { syncTrip } from '../database/SyncManager';
+import { getObservationsByTripId } from '../database/ObservationManager';
+import { Observation as DBObservation } from '@waterways/shared/src/models/local-db-rows';
 
 export interface ReviewScreenProps {
-  tripId: string;
+  tripId?: string;
 }
 
 // Sample observations for placeholder journeys
 const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
-  // ... observations remain unchanged
   {
     id: 'obs-1',
     time: '04:08 AM',
@@ -41,37 +42,95 @@ const DEFAULT_SAMPLE_OBSERVATIONS: Observation[] = [
   },
 ];
 
-const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
+/**
+ * Convert database observation to UI observation format
+ */
+function dbObservationToUIObservation(dbObs: DBObservation): Observation {
+  const time = dbObs.created_at
+    ? new Date(dbObs.created_at).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+
+  const location =
+    dbObs.latitude != null && dbObs.longitude != null
+      ? `${dbObs.latitude.toFixed(6)}, ${dbObs.longitude.toFixed(6)}`
+      : '';
+
+  return {
+    id: dbObs.id,
+    time,
+    location,
+    description: dbObs.observation || '',
+    tags: dbObs.category_id ? [dbObs.category_id] : [],
+    hasAudio: !!dbObs.audio_media_id,
+    status: dbObs.sync_status === 'synced' ? 'Synced' : 'Offline',
+  };
+}
+
+const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; tripId?: string }>();
   const { getDraftByTripId, saveDraft } = useDraftJourneys();
 
-  const effectiveTripId = tripId || 'sample-trip';
+  // Get tripId from props, route param [id], or query param tripId
+  const tripId =
+    propTripId ||
+    (typeof params.id === 'string' ? params.id : params.id?.[0]) ||
+    (typeof params.tripId === 'string' ? params.tripId : params.tripId?.[0]) ||
+    'sample-trip';
 
-  // MODIFIED: Replaced duplicated state and effect with hook call
   const { userId, loading: authLoading } = useAuth();
 
-  // REMOVED: const [userId, setUserId] = useState<string>('00000000-0000-0000-0000-000000000000');
-  // REMOVED: useEffect(() => { ... fetching logic ... }, []);
-
-  // ⬇️ NEW STATE to hold the loaded journey
   const [existingJourney, setExistingJourney] = useState<JourneyDraft | null | undefined>(
     undefined
   );
+  const [loadingObservations, setLoadingObservations] = useState(true);
+  const [dbObservations, setDbObservations] = useState<DBObservation[]>([]);
 
-  // Initialize state for the selected project
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     existingJourney?.projectId || null
   );
 
-  // keep createdAt stable without calling Date.now in render/handlers
   const [baseCreatedAt, setBaseCreatedAt] = useState(0);
 
-  // NEW: load the draft using useEffect instead of awaiting in render
+  // Load observations from database
   useEffect(() => {
     let mounted = true;
 
     (async () => {
-      const journey = await getDraftByTripId(effectiveTripId);
+      if (tripId === 'sample-trip') {
+        // Sample trip - don't load from DB
+        setLoadingObservations(false);
+        return;
+      }
+
+      try {
+        setLoadingObservations(true);
+        const observations = await getObservationsByTripId(tripId);
+
+        if (!mounted) return;
+
+        setDbObservations(observations || []);
+      } catch (error) {
+        console.error('[ReviewScreen] Failed to load observations:', error);
+      } finally {
+        if (mounted) setLoadingObservations(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [tripId]);
+
+  // Load draft journey
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const journey = await getDraftByTripId(tripId);
 
       if (!mounted) return;
 
@@ -88,19 +147,25 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
     return () => {
       mounted = false;
     };
-  }, [effectiveTripId, getDraftByTripId]);
+  }, [tripId, getDraftByTripId]);
 
-  // While loading the draft
-  if (existingJourney === null) {
+  // While loading
+  if (existingJourney === undefined || loadingObservations) {
     return (
       <SafeAreaView style={styles.root}>
-        <Text style={{ padding: 20 }}>Loading...</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text style={{ color: '#F9FAFB', marginTop: 16 }}>Loading observations...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  // Original logic preserved exactly
-  const rawObservations = existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS;
+  // Determine which observations to use
+  const rawObservations =
+    tripId === 'sample-trip'
+      ? existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS
+      : dbObservations.map(dbObservationToUIObservation);
 
   const observations = rawObservations.map((obs) => {
     const result = classifyObservation(obs.description || '');
@@ -114,7 +179,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
 
   const handleSaveDraft = () => {
     saveDraft({
-      id: effectiveTripId,
+      id: tripId,
       createdAt: baseCreatedAt,
       status: 'draft',
       observations,
@@ -126,15 +191,23 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
 
   const handleSubmitJourney = async () => {
     saveDraft({
-      id: effectiveTripId,
+      id: tripId,
       createdAt: baseCreatedAt,
       status: 'submitted',
       observations,
       projectId: selectedProjectId,
     });
 
-    // later this will also upload to the backend
-    await syncTrip(tripId);
+    // Sync the trip to backend
+    if (tripId !== 'sample-trip') {
+      try {
+        await syncTrip(tripId);
+      } catch (error) {
+        console.error('[ReviewScreen] Failed to sync trip:', error);
+        // Continue anyway - will sync later
+      }
+    }
+
     router.replace(ROUTES.home);
   };
 
@@ -155,27 +228,32 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId }) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journey review</Text>
-          <Text style={styles.subtitle}>Trip ID: {effectiveTripId}</Text>
+          <Text style={styles.subtitle}>Trip ID: {tripId}</Text>
         </View>
 
         {/* Observations list */}
-        {observations.map((obs) => (
-          <ObservationCard key={obs.id} observation={obs} />
-        ))}
+        {observations.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 16 }}>
+              No observations recorded for this journey.
+            </Text>
+          </View>
+        ) : (
+          observations.map((obs) => <ObservationCard key={obs.id} observation={obs} />)
+        )}
 
         {/* Project Assignment */}
         <ProjectSelector
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          // Pass the live userId from the hook
           userId={userId || '00000000-0000-0000-0000-000000000000'}
         />
 
         {/* Offline info banner */}
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineBannerText}>
-            You have {observations.length} observations that will be uploaded automatically when
-            internet connection is restored.
+            You have {observations.length} observation{observations.length !== 1 ? 's' : ''} that
+            will be uploaded automatically when internet connection is restored.
           </Text>
         </View>
 

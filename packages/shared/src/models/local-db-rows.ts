@@ -36,7 +36,7 @@ export interface Observation {
   user_id: string;
   trip_id: string;
   supabase_trip_id: string | null;
-  latitude: null;
+  latitude: number | null; // ← Changed from "null" to "number | null"
   longitude: number | null;
   created_at: number;
   audio_media_id: string | null;
