@@ -8,7 +8,7 @@ export default function SignupRoute() {
 
   return (
     <SignupScreen
-      onSignupSuccess={() => router.replace(ROUTES.home)}
+      onSignupSuccess={() => router.replace(ROUTES.login)}
       onBackToLogin={() => router.replace(ROUTES.login)}
     />
   );
