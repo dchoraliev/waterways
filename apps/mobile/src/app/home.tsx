@@ -32,8 +32,8 @@ export default function HomeRoute() {
           <HomeScreen
             onStartJourney={() => router.push(ROUTES.journey)}
             onViewRecordings={() => {
-              // placeholder: later wire to real history
-              router.push('/review/sample-trip');
+              // Navigate to the list of previous journeys
+              router.push(ROUTES.review);
             }}
             onViewDrafts={() => router.push(ROUTES.drafts)}
           />
