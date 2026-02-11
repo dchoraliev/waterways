@@ -8,8 +8,15 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
   },
-  header: {
+  headerRow: {
     marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerText: {
+    flex: 1,
+    marginRight: 12,
   },
   title: {
     fontSize: 20,
@@ -20,6 +27,18 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  closeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#111827',
+    backgroundColor: '#020617',
+  },
+  closeButtonText: {
+    color: '#E5E7EB',
+    fontSize: 12,
   },
   emptyState: {
     flex: 1,

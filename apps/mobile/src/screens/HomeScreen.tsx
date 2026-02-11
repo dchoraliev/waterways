@@ -30,13 +30,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* View previous recordings */}
+        {/* View previous journeys */}
         <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={onViewRecordings}>
           <View style={styles.cardIconCircle}>
             <Text style={styles.cardIcon}>⏱</Text>
           </View>
           <View style={styles.cardTextCol}>
-            <Text style={styles.cardTitle}>View Previous Recordings</Text>
+            <Text style={styles.cardTitle}>View Previous Journeys</Text>
             <Text style={styles.cardSubtitle}>Browse your journey history</Text>
           </View>
         </TouchableOpacity>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
@@ -13,9 +13,19 @@ const DraftsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Saved drafts</Text>
-        <Text style={styles.subtitle}>Review and submit journeys you&apos;ve saved.</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Saved drafts</Text>
+          <Text style={styles.subtitle}>Review and submit journeys you&apos;ve saved.</Text>
+        </View>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeButton}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
       </View>
 
       {draftJourneys.length === 0 ? (
