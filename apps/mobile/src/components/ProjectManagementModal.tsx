@@ -171,7 +171,11 @@ const ProjectManagementModal: React.FC<Props> = ({
                   return (
                     <View style={styles.memberItem}>
                       <View style={styles.memberInfo}>
-                        {item.email ? (
+                        {item.first_name || item.last_name ? (
+                          <Text style={styles.memberEmail}>
+                            {item.first_name} {item.last_name}
+                          </Text>
+                        ) : item.email ? (
                           <Text style={styles.memberEmail}>{item.email}</Text>
                         ) : (
                           <Text style={styles.memberEmail}>{item.user_id.substring(0, 16)}...</Text>
