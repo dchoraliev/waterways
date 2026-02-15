@@ -21,7 +21,8 @@ const TipsForBestResults = () => (
         • **Add multiple classifiers** to an observation for better categorization.
       </Text>
       <Text style={tipsStyles.tipItem}>
-        • If WaDE doesn&apos;t respond, wait a moment and try saying **&quot;Hey WaDE&quot;** again.
+        • If WaDE doesn&apos;t respond, wait a moment and try saying **&quot;Hey WaDE start
+        recording&quot;** again.
       </Text>
     </View>
   </View>
