@@ -190,6 +190,15 @@ export async function getObservationsByTripId(tripId: string): Promise<Observati
   return rows ?? [];
 }
 
+export async function getObservationsByUserId(userId: string): Promise<Observation[]> {
+  const db = await getDatabase();
+  const rows = await db!.getAllAsync<Observation>(
+    `SELECT * FROM observations WHERE user_id = ? ORDER BY created_at ASC`,
+    [userId]
+  );
+  return rows ?? [];
+}
+
 /**
  * Update specific fields on an observation record by id.
  *

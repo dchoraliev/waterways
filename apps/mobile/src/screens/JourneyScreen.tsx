@@ -9,7 +9,7 @@ import { updateTripById } from '../database/TripManager';
 import { getObservationsByTripId } from '../database/ObservationManager';
 
 import { getCurrentUserId } from '../services/AuthService';
-import { getCurrentCoordinates } from '../services/LocationService';
+import { getCurrentCoordinates, stopLocationTracking } from '../services/LocationService';
 import { transcribeTripAudio } from '../services/TranscriptionService';
 import { showToast } from '../utils/toast';
 
@@ -271,6 +271,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         end_longitude: endCoordinates.longitude,
       });
       console.log('[DEBUG] Updated trip');
+
+      // Stop location tracking when journey ends, regardless of success or failure
+      stopLocationTracking();
 
       await transcribeTripAudio(tripId);
       console.log('[DEBUG] Transcription complete');
