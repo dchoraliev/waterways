@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { classifyObservation } from '../services/ObservationClassifier';
 import styles from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
@@ -86,7 +86,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   const [existingJourney, setExistingJourney] = useState<JourneyDraft | null | undefined>(
     undefined
   );
-  const [loadingObservations, setLoadingObservations] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [dbObservations, setDbObservations] = useState<DBObservation[]>([]);
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -95,45 +95,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
 
   const [baseCreatedAt, setBaseCreatedAt] = useState(0);
 
-  // Load observations from database
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      if (tripId === 'sample-trip') {
-        // Sample trip - don't load from DB
-        setLoadingObservations(false);
-        return;
-      }
-
-      try {
-        setLoadingObservations(true);
+  // Function to load all data
+  const loadData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      // Load DB observations for real trips
+      if (tripId !== 'sample-trip') {
         const observations = await getObservationsByTripId(tripId);
-
-        if (!mounted) return;
-
         setDbObservations(observations || []);
-      } catch (error) {
-        console.error('[ReviewScreen] Failed to load observations:', error);
-      } finally {
-        if (mounted) setLoadingObservations(false);
       }
-    })();
 
-    return () => {
-      mounted = false;
-    };
-  }, [tripId]);
-
-  // Load draft journey
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
+      // Load draft journey
       const journey = await getDraftByTripId(tripId);
-
-      if (!mounted) return;
-
       setExistingJourney(journey);
 
       if (journey) {
@@ -142,15 +115,26 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
       } else {
         setBaseCreatedAt(0);
       }
-    })();
-
-    return () => {
-      mounted = false;
-    };
+    } catch (error) {
+      console.error('[ReviewScreen] Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [tripId, getDraftByTripId]);
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Reload data when screen comes into focus (returning from edit screen)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   // While loading
-  if (existingJourney === undefined || loadingObservations) {
+  if (loading || existingJourney === undefined) {
     return (
       <SafeAreaView style={styles.root}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -163,11 +147,18 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
 
   // Determine which observations to use
   const rawObservations =
-    tripId === 'sample-trip'
-      ? existingJourney?.observations || DEFAULT_SAMPLE_OBSERVATIONS
-      : dbObservations.map(dbObservationToUIObservation);
-
+    existingJourney?.observations ||
+    (tripId === 'sample-trip'
+      ? DEFAULT_SAMPLE_OBSERVATIONS
+      : dbObservations.map(dbObservationToUIObservation));
+  // MERGED: Only auto-classify if the observation hasn't been manually edited
   const observations = rawObservations.map((obs) => {
+    // If observation was manually edited, preserve its category and keyword
+    if (obs.manuallyEdited) {
+      return obs;
+    }
+
+    // Otherwise, auto-classify
     const result = classifyObservation(obs.description || '');
 
     return {
@@ -239,7 +230,22 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
             </Text>
           </View>
         ) : (
-          observations.map((obs) => <ObservationCard key={obs.id} observation={obs} />)
+          observations.map((obs, index) => (
+            <ObservationCard
+              key={obs.id}
+              observation={obs}
+              onEdit={() =>
+                router.push({
+                  pathname: '/edit-observation',
+                  params: {
+                    id: obs.id,
+                    tripId: tripId,
+                    observationIndex: index.toString(),
+                  },
+                })
+              }
+            />
+          ))
         )}
 
         {/* Project Assignment */}

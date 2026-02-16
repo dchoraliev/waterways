@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import TagPill from './TagPill';
 import locationIcon from '../assets/icons/location-pin.png';
 import editIcon from '../assets/icons/edit.png';
+import mediaIcon from '../assets/icons/media_attached_icon.png';
 
 export type ObservationStatus = 'Offline' | 'Synced' | 'Error';
 
@@ -13,16 +14,19 @@ export interface Observation {
   description: string; // transcription text
   tags: string[];
   hasAudio?: boolean;
+  hasMedia?: boolean; // true if a photo or video was attached
   status?: ObservationStatus;
   category?: string | null; // used ONLY for color coding
   keyword?: string | null; // shown as text: "Keyword: <keyword>"
+  manuallyEdited?: boolean;
 }
 
 interface ObservationCardProps {
   observation: Observation;
+  onEdit?: () => void;
 }
 
-const ObservationCard: React.FC<ObservationCardProps> = ({ observation }) => {
+const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }) => {
   const { time, location, description, tags, status } = observation;
 
   function getCategoryColor(cat: string): string {
@@ -64,17 +68,22 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation }) => {
             </View>
           )}
 
+          {/* Media attached icon - only shows when hasMedia is true */}
+          {observation.hasMedia === true && <Image source={mediaIcon} style={styles.mediaIcon} />}
+
           <View style={styles.editRow}>
-            <Image source={editIcon} style={styles.editIcon} />
-            <Text style={styles.editText}>Edit</Text>
+            <TouchableOpacity style={styles.editRow} onPress={onEdit}>
+              <Image source={editIcon} style={styles.editIcon} />
+              <Text style={styles.editText}>Edit</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* 🔹 Transcription text (only once) */}
+      {/* Transcription text */}
       <Text style={styles.description}>{description}</Text>
 
-      {/* 🔹 Tags */}
+      {/* Tags */}
       {tags.length > 0 && (
         <View style={styles.tagsRow}>
           {tags.map((tag) => (
@@ -82,9 +91,10 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation }) => {
           ))}
         </View>
       )}
+
       {(observation.category || observation.keyword) && (
         <View style={styles.classificationRow}>
-          {/* CATEGORY WITH SMALL COLOR DOT */}
+          {/* Category with small color dot */}
           {observation.category && observation.category !== 'Unclassified' && (
             <View style={styles.categoryRow}>
               <View
@@ -97,7 +107,7 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation }) => {
             </View>
           )}
 
-          {/* KEYWORD TEXT */}
+          {/* Keyword text */}
           {observation.keyword && (
             <Text style={styles.keywordText}>
               <Text style={styles.keywordLabel}>Keyword: </Text>
@@ -150,13 +160,13 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   statusBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 3,
     backgroundColor: '#065F46',
-    marginRight: 8,
   },
   statusOffline: {
     backgroundColor: '#92400E',
@@ -164,6 +174,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     color: '#F9FAFB',
+  },
+  mediaIcon: {
+    width: 18,
+    height: 18,
+    tintColor: '#9CA3AF',
   },
   editRow: {
     flexDirection: 'row',
@@ -190,18 +205,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginBottom: 8,
   },
-
-  // 🔹 CATEGORY pill (color-coded)
   classificationRow: {
     marginTop: 8,
     gap: 4,
   },
-
   classificationText: {
     fontSize: 12,
     color: '#9CA3AF',
   },
-
   classificationLabel: {
     fontWeight: '600',
     color: '#D1D5DB',
@@ -211,25 +222,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-
   categoryDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     marginRight: 6,
   },
-
   categoryText: {
     fontSize: 12,
-    color: '#D1D5DB', // soft bright gray
+    color: '#D1D5DB',
     fontWeight: '600',
   },
-
   keywordText: {
     fontSize: 12,
     color: '#9CA3AF',
   },
-
   keywordLabel: {
     fontWeight: '600',
     color: '#D1D5DB',
