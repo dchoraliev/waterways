@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { styles } from '../styles/CameraCaptureScreen.styles';
 import { showToast } from '../utils/toast';
 import { attachLocalMediaToObservation } from '../services/CameraMediaService';
+import { useDraftJourneys } from '../hooks/useDraftJourneys';
 
 type Mode = 'picture' | 'video';
 
@@ -32,6 +33,7 @@ export default function CameraCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ observationId?: string | string[] }>();
   const observationId = normalizeParam(params.observationId);
+  const { markObservationHasMedia } = useDraftJourneys();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -89,6 +91,9 @@ export default function CameraCaptureScreen() {
         fileSize: size,
       });
 
+      // Mark this observation as having media attached
+      markObservationHasMedia(observationId);
+
       showToast('Photo attached');
       router.back();
     } catch (e) {
@@ -139,6 +144,9 @@ export default function CameraCaptureScreen() {
         type: 'video',
         fileSize: size,
       });
+
+      // Mark this observation as having media attached
+      markObservationHasMedia(observationId);
 
       showToast('Video attached');
       router.back();
