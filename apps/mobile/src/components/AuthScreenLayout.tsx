@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, View, Text, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/AuthScreenLayout.styles';
 
@@ -12,10 +12,7 @@ interface AuthScreenLayoutProps {
 const AuthScreenLayout: React.FC<AuthScreenLayoutProps> = ({ title, subtitle, children }) => {
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView
-        style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.root}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"

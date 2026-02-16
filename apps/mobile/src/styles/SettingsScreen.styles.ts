@@ -1,4 +1,4 @@
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 // Keep colors centralized so they match the existing dark theme.
 export const TOKENS = {
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     borderColor: TOKENS.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    paddingVertical: 10,
     fontSize: 14,
     color: TOKENS.text,
   },

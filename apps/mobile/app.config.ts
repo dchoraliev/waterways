@@ -24,21 +24,27 @@ export default {
       backgroundColor: '#ffffff',
     },
 
-    ios: {
-      supportsTablet: true,
-    },
-
     android: {
+      package: 'com.waterways.mobile',
+      permissions: ['android.permission.RECORD_AUDIO', 'android.permission.INTERNET'],
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-    },
-
-    web: {
-      favicon: './assets/favicon.png',
+      // Ensure generated AndroidManifest contains tools:replace for appComponentFactory
+      // This prevents manifest-merger conflicts when transitive support libs are present
+      manifest: {
+        $: {
+          'xmlns:tools': 'http://schemas.android.com/tools'
+        },
+        application: {
+          $: {
+            'tools:replace': 'android:appComponentFactory'
+          }
+        }
+      }
     },
 
     plugins: ['expo-router'],

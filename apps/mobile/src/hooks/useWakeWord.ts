@@ -1,0 +1,678 @@
+/**
+ * useWakeWord - Production-grade React hook for wake word detection
+ *
+ * This hook provides a complete wake word detection solution with:
+ * - Continuous listening for wake word
+ * - Automatic transition to recording mode after detection
+ * - Robust error handling and recovery
+ * - Fuzzy matching for improved accuracy
+ * - Proper cleanup and lifecycle management
+ *
+ * Usage:
+ * ```tsx
+ * const wakeWord = useWakeWord({
+ *   wakeWord: 'hey wade start recording',
+ *   onWakeWordDetected: () => console.log('Wake word detected!'),
+ *   onTranscript: (text) => console.log('Transcribed:', text),
+ * });
+ *
+ * // Start listening
+ * await wakeWord.startListening();
+ *
+ * // Stop
+ * await wakeWord.stop();
+ * ```
+ */
+
+import { useEffect, useRef, useCallback, useState } from 'react';
+import VoiceRecognitionService, {
+  RecognitionResult,
+  RecognitionError,
+  RecognitionState,
+} from '../services/VoiceRecognitionService';
+import AudioRecordingService, {
+  RecordingResult,
+  RecordingStopReason,
+} from '../services/AudioRecordingService';
+import { detectWakeWordWithVariations, WakeWordMatch } from '../utils/stringMatching';
+import { hasNativeModules } from '../utils/platformDetection';
+
+export type WakeWordState =
+  | 'idle' // Not active
+  | 'initializing' // Starting up
+  | 'listening' // Listening for wake word
+  | 'detected' // Wake word detected, transitioning
+  | 'recording' // Recording user's command/input
+  | 'processing' // Processing final results
+  | 'error'; // Error state
+
+export interface WakeWordConfig {
+  wakeWord: string;
+  threshold?: number; // Confidence threshold for wake word detection (0-1)
+  locale?: string;
+  continuous?: boolean; // Keep listening after wake word
+  maxAlternatives?: number;
+  secondaryThresholdOffset?: number;
+  boostedSensitivityDurationMs?: number;
+  primedWindowMs?: number;
+  minPrefixConfidence?: number;
+  onWakeWordDetected?: (match: WakeWordMatch) => void;
+  onTranscript?: (text: string, isFinal: boolean) => void;
+  onError?: (error: RecognitionError) => void;
+  onStateChange?: (state: WakeWordState) => void;
+  onRecordingComplete?: (recording: RecordingResult) => void;
+  recordingDelayMs?: number;
+  recordingDurationMs?: number;
+}
+
+export interface WakeWordControls {
+  // Control methods
+  startListening: () => Promise<boolean>;
+  stop: () => Promise<void>;
+  reset: () => void;
+
+  // State
+  state: WakeWordState;
+  isListening: boolean;
+  isRecording: boolean;
+  isAvailable: boolean;
+  isAudioRecording: boolean;
+
+  // Results
+  partialTranscript: string;
+  finalTranscript: string;
+  lastWakeWordMatch: WakeWordMatch | null;
+  lastError: RecognitionError | null;
+  recording: {
+    uri: string | null;
+    durationMillis: number;
+    reason: RecordingStopReason | null;
+    startedAt: number | null;
+    endedAt: number | null;
+  };
+  recordings: RecordingResult[];
+
+  // Debugging
+  debugInfo: {
+    consecutiveErrors: number;
+    totalDetections: number;
+    lastDetectionTime: number | null;
+  };
+
+  // Advanced features
+  voiceService: VoiceRecognitionService | null;
+}
+
+export function useWakeWord(config: WakeWordConfig): WakeWordControls {
+  const {
+    wakeWord,
+    threshold = 0.85,
+    locale = 'en-US',
+    continuous = true,
+    maxAlternatives = 5,
+    secondaryThresholdOffset = 0.12,
+    boostedSensitivityDurationMs = 4000,
+    primedWindowMs = 1800,
+    minPrefixConfidence = 0.78,
+    onWakeWordDetected,
+    onTranscript,
+    onError,
+    onStateChange,
+    onRecordingComplete,
+    recordingDelayMs = 1000,
+    recordingDurationMs = 10000,
+  } = config;
+  const EXTERNAL_RECORDING_COOLDOWN_MS = 1200;
+
+  // State
+  const [state, setState] = useState<WakeWordState>('idle');
+  const [isAvailable, setIsAvailable] = useState(false);
+  const [partialTranscript, setPartialTranscript] = useState('');
+  const [finalTranscript, setFinalTranscript] = useState('');
+  const [lastWakeWordMatch, setLastWakeWordMatch] = useState<WakeWordMatch | null>(null);
+  const [lastError, setLastError] = useState<RecognitionError | null>(null);
+  const [recordings, setRecordings] = useState<RecordingResult[]>([]);
+  const [currentRecording, setCurrentRecording] = useState({
+    uri: null as string | null,
+    durationMillis: 0,
+    reason: null as RecordingStopReason | null,
+    startedAt: null as number | null,
+    endedAt: null as number | null,
+  });
+  const [isAudioRecording, setIsAudioRecording] = useState(false);
+
+  // Debug state
+  const [debugInfo, setDebugInfo] = useState({
+    consecutiveErrors: 0,
+    totalDetections: 0,
+    lastDetectionTime: null as number | null,
+  });
+
+  // Refs for stable references
+  const voiceService = useRef(VoiceRecognitionService.getInstance());
+  const audioService = useRef(AudioRecordingService.getInstance());
+  const isRecordingMode = useRef(false);
+  const transitionTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const recordingStartTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const recordingStopTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const ignoreResultsRef = useRef(false);
+  const onStateChangeRef = useRef(onStateChange);
+  const primedUntilRef = useRef<number | null>(null);
+  const lastPrefixMatchRef = useRef<WakeWordMatch | null>(null);
+  const boostedUntilRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
+  // Update state with callback
+  const updateState = useCallback((newState: WakeWordState) => {
+    setState(newState);
+    onStateChangeRef.current?.(newState);
+  }, []);
+
+  const clearRecordingTimers = useCallback(() => {
+    if (recordingStartTimeout.current) {
+      globalThis.clearTimeout(recordingStartTimeout.current);
+      recordingStartTimeout.current = null;
+    }
+    if (recordingStopTimeout.current) {
+      globalThis.clearTimeout(recordingStopTimeout.current);
+      recordingStopTimeout.current = null;
+    }
+  }, []);
+
+  const stopAudioRecording = useCallback(
+    async (reason: RecordingStopReason) => {
+      const service = audioService.current;
+      clearRecordingTimers();
+
+      try {
+        if (service.isRecording()) {
+          const result = await service.stopRecording(reason);
+          setIsAudioRecording(false);
+
+          if (result) {
+            setCurrentRecording(result);
+            setRecordings((prev) => [result, ...prev]);
+            onRecordingComplete?.(result);
+          } else {
+            setCurrentRecording((prev) => ({
+              ...prev,
+              reason,
+              endedAt: Date.now(),
+            }));
+          }
+        } else {
+          setCurrentRecording((prev) => ({
+            ...prev,
+            reason,
+            endedAt: Date.now(),
+          }));
+          setIsAudioRecording(false);
+        }
+      } catch (error) {
+        console.error('[useWakeWord] Failed to stop audio recording:', error);
+      } finally {
+        isRecordingMode.current = false;
+        ignoreResultsRef.current = true;
+        updateState('processing');
+      }
+    },
+    [clearRecordingTimers, onRecordingComplete, updateState]
+  );
+
+  const startAudioRecording = useCallback(async () => {
+    try {
+      await audioService.current.startRecording();
+      setIsAudioRecording(true);
+      const startedAt = Date.now();
+      setCurrentRecording({
+        uri: null,
+        durationMillis: 0,
+        reason: null,
+        startedAt,
+        endedAt: null,
+      });
+      if (recordingDurationMs > 0) {
+        recordingStopTimeout.current = globalThis.setTimeout(() => {
+          recordingStopTimeout.current = null;
+          void stopAudioRecording('timeout');
+        }, recordingDurationMs);
+      }
+    } catch (error) {
+      console.error('[useWakeWord] Failed to start audio recording:', error);
+      isRecordingMode.current = false;
+      updateState('error');
+    }
+  }, [recordingDurationMs, stopAudioRecording, updateState]);
+
+  const resetSensitivityGuards = useCallback(() => {
+    primedUntilRef.current = null;
+    lastPrefixMatchRef.current = null;
+    boostedUntilRef.current = null;
+  }, []);
+
+  const extendPrimedWindow = useCallback(
+    (match: WakeWordMatch) => {
+      primedUntilRef.current = Date.now() + primedWindowMs;
+      lastPrefixMatchRef.current = match;
+    },
+    [primedWindowMs]
+  );
+
+  const markBoostedSensitivity = useCallback(() => {
+    boostedUntilRef.current = Date.now() + boostedSensitivityDurationMs;
+  }, [boostedSensitivityDurationMs]);
+
+  const isPrimedActive = useCallback(() => {
+    return (primedUntilRef.current ?? 0) > Date.now();
+  }, []);
+
+  const isBoostedActive = useCallback(() => {
+    return (boostedUntilRef.current ?? 0) > Date.now();
+  }, []);
+
+  const getEffectiveThreshold = useCallback(() => {
+    if (isBoostedActive()) {
+      return Math.max(0.5, threshold - secondaryThresholdOffset);
+    }
+    if (isPrimedActive()) {
+      return Math.max(0.55, threshold - secondaryThresholdOffset / 2);
+    }
+    return threshold;
+  }, [isBoostedActive, isPrimedActive, threshold, secondaryThresholdOffset]);
+
+  const evaluateWakeWordMatch = useCallback(
+    (match: WakeWordMatch): { shouldTrigger: boolean; enrichedMatch: WakeWordMatch } => {
+      let shouldTrigger = match.isMatch;
+
+      if (match.stage === 'prefix') {
+        const prefixConfidence = match.segments?.prefix?.confidence ?? match.confidence;
+        if (prefixConfidence >= Math.max(minPrefixConfidence, threshold - 0.05)) {
+          extendPrimedWindow(match);
+        }
+      }
+
+      if (!shouldTrigger && isPrimedActive() && match.stage === 'full') {
+        const primedThreshold = Math.max(0.6, threshold - secondaryThresholdOffset / 2);
+        if (match.confidence >= primedThreshold) {
+          shouldTrigger = true;
+        }
+      }
+
+      if (
+        !shouldTrigger &&
+        match.confidence >= Math.max(0.6, threshold - secondaryThresholdOffset)
+      ) {
+        markBoostedSensitivity();
+      }
+
+      if (shouldTrigger) {
+        resetSensitivityGuards();
+        const enrichedMatch: WakeWordMatch = match.isMatch
+          ? match
+          : { ...match, isMatch: true, stage: match.stage ?? 'full' };
+        return { shouldTrigger: true, enrichedMatch };
+      }
+
+      return { shouldTrigger: false, enrichedMatch: match };
+    },
+    [
+      extendPrimedWindow,
+      isPrimedActive,
+      markBoostedSensitivity,
+      minPrefixConfidence,
+      resetSensitivityGuards,
+      secondaryThresholdOffset,
+      threshold,
+    ]
+  );
+
+  const triggerWakeWordFlow = useCallback(
+    (match: WakeWordMatch) => {
+      setLastWakeWordMatch(match);
+      setDebugInfo((prev) => ({
+        ...prev,
+        totalDetections: prev.totalDetections + 1,
+        lastDetectionTime: Date.now(),
+      }));
+
+      updateState('detected');
+      onWakeWordDetected?.(match);
+      setPartialTranscript('');
+      setFinalTranscript('');
+      clearRecordingTimers();
+
+      if (recordingDurationMs <= 0) {
+        // External recording mode: parent handles recording lifecycle.
+        // Keep recognition in listening mode after a short cooldown so
+        // repeated wake words can still be detected reliably.
+        isRecordingMode.current = false;
+        ignoreResultsRef.current = true;
+
+        const cooldownMs = Math.max(recordingDelayMs, EXTERNAL_RECORDING_COOLDOWN_MS);
+        transitionTimeout.current = globalThis.setTimeout(() => {
+          transitionTimeout.current = null;
+          ignoreResultsRef.current = false;
+          updateState('listening');
+        }, cooldownMs);
+        return;
+      }
+
+      isRecordingMode.current = true;
+      ignoreResultsRef.current = false;
+
+      transitionTimeout.current = globalThis.setTimeout(() => {
+        updateState('recording');
+        transitionTimeout.current = null;
+      }, recordingDelayMs);
+
+      recordingStartTimeout.current = globalThis.setTimeout(() => {
+        void startAudioRecording();
+        recordingStartTimeout.current = null;
+      }, recordingDelayMs);
+    },
+    [
+      clearRecordingTimers,
+      onWakeWordDetected,
+      recordingDelayMs,
+      recordingDurationMs,
+      startAudioRecording,
+      updateState,
+    ]
+  );
+
+  // Initialize service
+  useEffect(() => {
+    const recognitionService = voiceService.current;
+    const recordingService = audioService.current;
+
+    const init = async () => {
+      if (!hasNativeModules()) {
+        setIsAvailable(false);
+        updateState('idle');
+        return;
+      }
+
+      const success = await recognitionService.initialize({
+        locale,
+        continuous: true, // Always use continuous mode internally
+        maxAlternatives,
+        returnPartialResults: true,
+        wakeWord,
+        wakeWordThreshold: threshold,
+      });
+
+      setIsAvailable(success);
+
+      if (!success) {
+        updateState('error');
+      }
+    };
+
+    void init();
+
+    // Cleanup - stop listening but don't destroy singleton service
+    return () => {
+      if (recognitionService.isListening()) {
+        recognitionService.stop();
+      }
+      if (transitionTimeout.current) {
+        globalThis.clearTimeout(transitionTimeout.current);
+      }
+      clearRecordingTimers();
+      if (recordingService.isRecording()) {
+        recordingService.stopRecording('manual').catch(() => {
+          /* noop */
+        });
+      }
+    };
+  }, [locale, maxAlternatives, wakeWord, threshold, clearRecordingTimers, updateState]);
+
+  // Handle recognition results
+  const handleResults = useCallback(
+    (results: RecognitionResult[]) => {
+      if (results.length === 0) return;
+
+      const bestResult = results[0];
+      const text = bestResult.text;
+
+      console.log(
+        `[useWakeWord] Results - Mode: ${isRecordingMode.current ? 'recording' : 'listening'}, Text: "${text}"`
+      );
+
+      if (!isRecordingMode.current && ignoreResultsRef.current) {
+        return;
+      }
+
+      if (isRecordingMode.current) {
+        // Recording mode - capture transcription
+        setFinalTranscript(text);
+        onTranscript?.(text, true);
+
+        if (!continuous) {
+          // Stop after recording if not continuous
+          updateState('processing');
+          voiceService.current.stop();
+        }
+      } else {
+        // Listening mode - check for wake word
+        const effectiveThreshold = getEffectiveThreshold();
+        const match = detectWakeWordWithVariations(text, wakeWord, effectiveThreshold);
+        const { shouldTrigger, enrichedMatch } = evaluateWakeWordMatch(match);
+
+        console.log(
+          `[useWakeWord] Wake check - Stage: ${match.stage ?? 'unknown'} | Confidence: ${match.confidence.toFixed(2)} | Trigger: ${shouldTrigger}`
+        );
+
+        if (shouldTrigger) {
+          triggerWakeWordFlow(enrichedMatch);
+        }
+      }
+    },
+    [
+      wakeWord,
+      continuous,
+      getEffectiveThreshold,
+      evaluateWakeWordMatch,
+      triggerWakeWordFlow,
+      onTranscript,
+      updateState,
+    ]
+  );
+
+  // Handle partial results
+  const handlePartialResults = useCallback(
+    (results: RecognitionResult[]) => {
+      if (results.length === 0) return;
+
+      const text = results[0].text;
+      setPartialTranscript(text);
+
+      if (isRecordingMode.current) {
+        // Show partial transcription
+        onTranscript?.(text, false);
+      } else {
+        // In listening mode, check partial results for faster response
+        const effectiveThreshold = getEffectiveThreshold();
+        const match = detectWakeWordWithVariations(text, wakeWord, effectiveThreshold);
+        const { shouldTrigger, enrichedMatch } = evaluateWakeWordMatch(match);
+
+        if (shouldTrigger) {
+          console.log(
+            `[useWakeWord] Wake word detected (partial) - Stage: ${match.stage ?? 'unknown'} | Confidence: ${match.confidence.toFixed(2)}`
+          );
+          triggerWakeWordFlow(enrichedMatch);
+        }
+      }
+    },
+    [wakeWord, getEffectiveThreshold, evaluateWakeWordMatch, triggerWakeWordFlow, onTranscript]
+  );
+
+  // Handle errors
+  const handleError = useCallback(
+    (error: RecognitionError) => {
+      if (error.isRecoverable) {
+        if (isRecordingMode.current) {
+          isRecordingMode.current = false;
+          updateState('listening');
+        }
+        return;
+      }
+
+      console.error('[useWakeWord] Error:', error);
+
+      setLastError(error);
+      onError?.(error);
+
+      setDebugInfo((prev) => ({
+        ...prev,
+        consecutiveErrors: prev.consecutiveErrors + 1,
+      }));
+
+      updateState('error');
+    },
+    [onError, updateState]
+  );
+
+  // Handle state changes from service
+  const handleServiceStateChange = useCallback(
+    (serviceState: RecognitionState) => {
+      // Map service state to wake word state
+      switch (serviceState) {
+        case 'idle':
+          if (state !== 'idle') {
+            updateState('idle');
+          }
+          break;
+        case 'initializing':
+          updateState('initializing');
+          break;
+        case 'listening':
+          if (!isRecordingMode.current) {
+            if (!ignoreResultsRef.current) {
+              updateState('listening');
+            }
+          }
+          break;
+        case 'error':
+          updateState('error');
+          break;
+      }
+    },
+    [state, updateState]
+  );
+
+  // Start listening for wake word
+  const startListening = useCallback(async (): Promise<boolean> => {
+    if (!isAvailable) {
+      console.error('[useWakeWord] Voice recognition not available');
+      return false;
+    }
+
+    // Reset state
+    isRecordingMode.current = false;
+    setPartialTranscript('');
+    setFinalTranscript('');
+    setLastError(null);
+    setDebugInfo((prev) => ({ ...prev, consecutiveErrors: 0 }));
+    ignoreResultsRef.current = false;
+    resetSensitivityGuards();
+    if (transitionTimeout.current) {
+      globalThis.clearTimeout(transitionTimeout.current);
+      transitionTimeout.current = null;
+    }
+    clearRecordingTimers();
+    if (audioService.current.isRecording()) {
+      await audioService.current.stopRecording('manual');
+    }
+    setIsAudioRecording(false);
+
+    updateState('initializing');
+
+    const success = await voiceService.current.start({
+      onResults: handleResults,
+      onPartialResults: handlePartialResults,
+      onError: handleError,
+      onStateChange: handleServiceStateChange,
+    });
+
+    if (success) {
+      updateState('listening');
+    } else {
+      updateState('error');
+    }
+
+    return success;
+  }, [
+    isAvailable,
+    handleResults,
+    handlePartialResults,
+    handleError,
+    handleServiceStateChange,
+    updateState,
+    clearRecordingTimers,
+    resetSensitivityGuards,
+  ]);
+
+  // Stop listening
+  const stop = useCallback(async () => {
+    if (transitionTimeout.current) {
+      globalThis.clearTimeout(transitionTimeout.current);
+      transitionTimeout.current = null;
+    }
+
+    clearRecordingTimers();
+    if (audioService.current.isRecording()) {
+      await stopAudioRecording('manual');
+    }
+    isRecordingMode.current = false;
+    resetSensitivityGuards();
+    await voiceService.current.stop();
+    updateState('idle');
+  }, [clearRecordingTimers, resetSensitivityGuards, stopAudioRecording, updateState]);
+
+  // Reset to initial state
+  const reset = useCallback(() => {
+    isRecordingMode.current = false;
+    setPartialTranscript('');
+    setFinalTranscript('');
+    setLastWakeWordMatch(null);
+    setLastError(null);
+    setDebugInfo({
+      consecutiveErrors: 0,
+      totalDetections: 0,
+      lastDetectionTime: null,
+    });
+    resetSensitivityGuards();
+  }, [resetSensitivityGuards]);
+
+  return {
+    // Control methods
+    startListening,
+    stop,
+    reset,
+
+    // State
+    state,
+    isListening: state === 'listening' || state === 'detected',
+    isRecording: state === 'recording' || state === 'processing',
+    isAvailable,
+    isAudioRecording,
+
+    // Results
+    partialTranscript,
+    finalTranscript,
+    lastWakeWordMatch,
+    lastError,
+    recording: currentRecording,
+    recordings,
+
+    // Debugging
+    debugInfo,
+
+    // Voice service instance for advanced features (battery stats, etc.)
+    voiceService: voiceService.current,
+  };
+}

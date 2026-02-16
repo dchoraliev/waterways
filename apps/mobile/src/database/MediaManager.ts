@@ -12,7 +12,7 @@
 
 import { getDatabase } from './db';
 import { ObservationMedia } from '@waterways/shared/src/models/local-db-rows';
-import { SyncStatus } from './SyncManager';
+import { SyncStatus } from './SyncStatus';
 
 /**
  * UUID v4 generator (RFC 4122 compliant)

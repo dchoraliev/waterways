@@ -32,7 +32,7 @@ export const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontWeight: '800' },
 
   cameraWrap: { flex: 1 },
-  camera: { flex: 1, borderRadius: 18, overflow: 'hidden', marginHorizontal: 12 },
+  camera: { flex: 1, marginHorizontal: 12 },
   controls: { padding: 14 },
 
   modeRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
