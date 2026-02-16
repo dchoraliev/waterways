@@ -1,5 +1,5 @@
 import { supabase } from '@shared/supabase/client';
-import { getTripById, updateTripById } from './TripManager';
+import { getTripById, getTripsBySyncStatus, updateTripById } from './TripManager';
 import { getObservationsByTripId, updateObservationById } from './ObservationManager';
 
 import { getMediaById, updateMediaById } from './MediaManager';
@@ -9,6 +9,7 @@ import { getMediaById, updateMediaById } from './MediaManager';
 // ==================================================
 export enum SyncStatus {
   PENDING = 'pending',
+  REVIEWED = 'reviewed',
   SYNCED = 'synced',
   ERROR = 'error',
 }
@@ -61,6 +62,32 @@ export const parseLocationAsEWKT = (
 
   return `SRID=${srid};POINT(${LON} ${LAT})`;
 };
+
+export async function syncAllReviewedTrips(): Promise<void> {
+  // Get all trips with pending sync status
+  const pendingTrips = await getTripsBySyncStatus(SyncStatus.REVIEWED);
+  console.log(`Found ${pendingTrips.length} trips pending sync. Starting sync process...`);
+  for (const trip of pendingTrips) {
+    try {
+      await syncTrip(trip.id);
+    } catch (error) {
+      console.error(`Error syncing trip ${trip.id}:`, error);
+    }
+  }
+}
+
+export async function syncAllFailedTrips(): Promise<void> {
+  // Get all trips with error sync status
+  const failedTrips = await getTripsBySyncStatus(SyncStatus.ERROR);
+  console.log(`Found ${failedTrips.length} trips with failed sync. Starting retry process...`);
+  for (const trip of failedTrips) {
+    try {
+      await syncTrip(trip.id);
+    } catch (error) {
+      console.error(`Error retrying sync for trip ${trip.id}:`, error);
+    }
+  }
+}
 
 /**
  * Sync a trip → observations → multimedia.

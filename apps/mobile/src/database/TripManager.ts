@@ -244,6 +244,20 @@ export async function getTripById(id: string): Promise<Trip | null> {
   return rows && rows.length ? rows[0] : null;
 }
 
+export async function getTripsBySyncStatus(syncStatus: SyncStatus): Promise<Trip[]> {
+  const db = await getDatabase();
+  const rows = await db!.getAllAsync<Trip>(`SELECT * FROM trips WHERE sync_status = ?`, [
+    syncStatus,
+  ]);
+  return rows || [];
+}
+
+export async function getTripsByUserId(userId: string): Promise<Trip[]> {
+  const db = await getDatabase();
+  const rows = await db!.getAllAsync<Trip>(`SELECT * FROM trips WHERE user_id = ?`, [userId]);
+  return rows || [];
+}
+
 /**
  * Delete a trip by id.
  *

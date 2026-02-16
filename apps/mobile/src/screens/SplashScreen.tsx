@@ -6,6 +6,8 @@ import { getSession } from 'packages/shared/src/supabase/auth';
 import RippleSplash from '../components/RippleSplash';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '../constants/routes';
+import { performAutoSyncTaskOnce, startNetworkListener } from '../services/NetworkService';
+import { updateAndSyncOfflineDataToCurrentUser } from '../services/OfflineService';
 
 const SplashScreen = () => {
   const router = useRouter();
@@ -20,6 +22,9 @@ const SplashScreen = () => {
         // Initialize database
         console.log('Initializing database...');
         await initializeDatabase();
+        // start network listener to auto-sync when connectivity is regained
+        console.log('Starting network listener...');
+        await startNetworkListener();
         // Check for existing user session
         console.log('Checking existing user session...');
         const { data, error } = await getSession();
@@ -27,7 +32,11 @@ const SplashScreen = () => {
         if (!isMounted) return;
 
         if (data?.session) {
-          // Valid session exists -> proceed to the home page
+          // Valid session exists -> Navigate to home screen
+
+          // Attempt to update any offline data to the current user and fire auto-sync
+          await updateAndSyncOfflineDataToCurrentUser();
+
           console.log('Valid session found, navigating to home...');
           router.replace(ROUTES.home);
         } else {

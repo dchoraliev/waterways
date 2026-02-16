@@ -1,5 +1,6 @@
 // apps/mobile/src/services/AuthService.ts
 import { getSession } from '@waterways/shared/src/supabase/auth';
+import { OFFLINE_USER_ID } from './OfflineService';
 
 interface SessionResponse {
   data?: {
@@ -25,8 +26,9 @@ export async function getCurrentUserId(): Promise<string | null> {
         ? ((res as SessionResponse).data?.session ?? null)
         : (res ?? null);
 
-    return session?.user?.id ?? null;
-  } catch {
-    return null;
+    return session?.user?.id ?? OFFLINE_USER_ID;
+  } catch (error) {
+    console.error('Error getting current user ID:', error);
+    return OFFLINE_USER_ID;
   }
 }

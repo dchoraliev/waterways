@@ -14,6 +14,8 @@ import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
 import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import { updateAndSyncOfflineDataToCurrentUser } from '../services/OfflineService';
+import { performAutoSyncTaskOnce } from '../services/NetworkService';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -43,6 +45,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
       } else if (data.session) {
         console.log('Login successful! User ID:', data.user?.id);
         onLoginSuccess();
+        // Update the offline data to current user account after successful login
+        await updateAndSyncOfflineDataToCurrentUser();
+        // Also trigger a one-time sync after login to sync any pending data immediately
+        performAutoSyncTaskOnce();
       }
     } catch (_error) {
       // FIX: Renamed 'error' to '_error'

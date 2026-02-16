@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import JourneyScreen from '../screens/JourneyScreen';
 import { createTrip } from '../database/TripManager';
 import { getSession } from '@waterways/shared/src/supabase/auth';
-import { getCurrentCoordinates } from '../services/LocationService';
+import { getCurrentCoordinates, startLocationTracking } from '../services/LocationService';
+import { OFFLINE_USER_ID } from '../services/OfflineService';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -20,6 +21,9 @@ export default function JourneyRoute() {
       setCreating(true);
 
       try {
+        // Start location tracking immediately when starting a journey
+        await startLocationTracking();
+
         // Check if there's an active trip in storage
         const existingTripId = await AsyncStorage.getItem(ACTIVE_TRIP_KEY);
 
@@ -35,7 +39,7 @@ export default function JourneyRoute() {
         // No existing trip, create a new one
         console.log('[JourneyRoute] No existing trip, creating new one...');
 
-        let userId = 'local-user';
+        let userId = OFFLINE_USER_ID; // Default to offline user ID
         try {
           const { data } = await getSession();
           const user = data?.session?.user;
