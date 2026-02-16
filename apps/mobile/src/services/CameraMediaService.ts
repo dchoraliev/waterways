@@ -1,4 +1,5 @@
 import { addMedia } from '../database/MediaManager';
+import { updateObservationById } from '../database/ObservationManager';
 
 type AttachParams = {
   observationId: string;
@@ -19,10 +20,14 @@ export async function attachLocalMediaToObservation({
 }: AttachParams) {
   const mediaType = type === 'photo' ? 'image' : 'video';
 
-  return addMedia({
+  const media = await addMedia({
     observation_id: observationId,
     local_file_path: localUri,
     media_type: mediaType,
     file_size: fileSize,
   });
+
+  await updateObservationById(observationId, { local_media_id: media.id });
+
+  return media;
 }

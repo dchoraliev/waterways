@@ -236,7 +236,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
               observation={obs}
               onEdit={() =>
                 router.push({
-                  pathname: '/edit-observation',
+                  pathname: '../edit-observation',
                   params: {
                     id: obs.id,
                     tripId: tripId,

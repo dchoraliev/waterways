@@ -3,25 +3,94 @@ import { getTripById, getTripsBySyncStatus, updateTripById } from './TripManager
 import { getObservationsByTripId, updateObservationById } from './ObservationManager';
 
 import { getMediaById, updateMediaById } from './MediaManager';
+import { SyncStatus } from './SyncStatus';
 
-// ==================================================
-// Sync Status Enum
-// ==================================================
-export enum SyncStatus {
-  PENDING = 'pending',
-  REVIEWED = 'reviewed',
-  SYNCED = 'synced',
-  ERROR = 'error',
+const IMAGE_BUCKET = 'Images';
+const VIDEO_BUCKET = 'Vidoes';
+let observationMediaUpsertAvailable = true;
+
+function getMediaBucketName(mediaType: string | null | undefined): string {
+  return mediaType === 'video' ? VIDEO_BUCKET : IMAGE_BUCKET;
 }
+
+function getMediaFileExtension(mediaType: string | null | undefined): string {
+  if (mediaType === 'video') return 'mp4';
+  return 'jpg';
+}
+
+function getMediaContentType(mediaType: string | null | undefined): string {
+  if (mediaType === 'video') return 'video/mp4';
+  return 'image/jpeg';
+}
+
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const cleaned = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+
+  const output: number[] = [];
+  for (let i = 0; i < cleaned.length; i += 4) {
+    const e1 = chars.indexOf(cleaned.charAt(i));
+    const e2 = chars.indexOf(cleaned.charAt(i + 1));
+    const c3 = cleaned.charAt(i + 2);
+    const c4 = cleaned.charAt(i + 3);
+    const e3 = c3 === '=' ? 64 : chars.indexOf(c3);
+    const e4 = c4 === '=' ? 64 : chars.indexOf(c4);
+
+    const b1 = (e1 << 2) | (e2 >> 4);
+    output.push(b1 & 0xff);
+
+    if (e3 !== 64) {
+      const b2 = ((e2 & 15) << 4) | (e3 >> 2);
+      output.push(b2 & 0xff);
+    }
+
+    if (e4 !== 64) {
+      const b3 = ((e3 & 3) << 6) | e4;
+      output.push(b3 & 0xff);
+    }
+  }
+
+  return Uint8Array.from(output).buffer;
+}
+
+async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
+  const fetchFn = (
+    globalThis as unknown as {
+      fetch?: (
+        input: string
+      ) => Promise<{ ok: boolean; status: number; arrayBuffer: () => Promise<ArrayBuffer> }>;
+    }
+  ).fetch;
+
+  if (fetchFn) {
+    try {
+      const response = await fetchFn(uri);
+      if (response.ok) {
+        return response.arrayBuffer();
+      }
+    } catch {
+      // Fall through to file-system fallback
+    }
+  }
+
+  const fsModule = await import('expo-file-system/legacy');
+  const base64 = await fsModule.readAsStringAsync(uri, {
+    encoding: fsModule.EncodingType.Base64,
+  });
+
+  return decodeBase64ToArrayBuffer(base64);
+}
+
+export { SyncStatus };
 
 /**
  * @param tripId
  */
-async function logSyncStatus(
-  table_name: string,
-  record_id: string,
-  status: SyncStatus,
-  error_message?: string
+async function _logSyncStatus(
+  _table_name: string,
+  _record_id: string,
+  _status: SyncStatus,
+  _error_message?: string
 ): Promise<void> {}
 
 /**
@@ -65,7 +134,7 @@ export const parseLocationAsEWKT = (
 
 export async function syncAllReviewedTrips(): Promise<void> {
   // Get all trips with pending sync status
-  const pendingTrips = await getTripsBySyncStatus(SyncStatus.REVIEWED);
+  const pendingTrips = await getTripsBySyncStatus(SyncStatus.PENDING);
   console.log(`Found ${pendingTrips.length} trips pending sync. Starting sync process...`);
   for (const trip of pendingTrips) {
     try {
@@ -171,12 +240,14 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
     await updateObservationById(obs.id, { supabase_trip_id: supabaseTripId });
 
     let upload_failed = false;
+    let observationMediaUrls: string[] | null = null;
     // Observation has a local media file which needs to be uploaded first
     if (obs.local_media_id) {
       const { success, url } = await syncMedia(obs.local_media_id);
       if (success && url) {
         // Update the observation with the new multimedia URL
         await updateObservationById(obs.id, { multimedia_url: url });
+        observationMediaUrls = [url];
       } else {
         // Mark the media upload as failed so the observation is not synced
         upload_failed = true;
@@ -189,12 +260,12 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
       const payload = {
         unique_userID_localID_pair: obs.user_id + '-' + obs.id,
         user_id: obs.user_id,
-        trip_id: obs.supabase_trip_id,
+        trip_id: supabaseTripId,
         created_at: parseDateTime(obs.created_at),
         location: parseLocationAsEWKT(obs.longitude, obs.latitude),
         observation: obs.observation ?? undefined,
+        observation_media: observationMediaUrls,
         // category_ids: null                     TODO: need to insert the observation as array of index
-        // observation_media:                     TODO: need to insert the media urls as array
       };
       console.log(`Sycing observation - `, payload);
       const { error } = await supabase
@@ -230,7 +301,73 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
  * Upload all multimedia for a single observation.
  */
 async function syncMedia(mediaId: string): Promise<{ success: boolean; url: string | null }> {
-  // TODO: Implement media upload as per the files types and supabase storage configuration
-  // TODO: Update the sync log and status accordingly
-  return { success: true, url: null };
+  const media = await getMediaById(mediaId);
+  if (!media) {
+    console.error(`Sync failed: media ${mediaId} was not found in local database`);
+    return { success: false, url: null };
+  }
+
+  try {
+    const bucket = getMediaBucketName(media.media_type);
+    const extension = getMediaFileExtension(media.media_type);
+    const contentType = getMediaContentType(media.media_type);
+    const path = `${media.observation_id}/${media.id}.${extension}`;
+    console.log(
+      `[SyncManager] Uploading media ${media.id} type=${media.media_type ?? 'unknown'} bucket=${bucket} path=${path}`
+    );
+    const fileBuffer = await readFileAsArrayBuffer(media.local_file_path);
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, fileBuffer, {
+      contentType,
+      upsert: true,
+    });
+
+    if (uploadError) {
+      console.error(`Sync failed: upload error for media ${mediaId}`, uploadError);
+      await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+      return { success: false, url: null };
+    }
+
+    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+    const publicUrl = publicData.publicUrl || null;
+
+    if (observationMediaUpsertAvailable) {
+      const supabaseUntyped = supabase as unknown as {
+        from: (table: string) => { upsert: (payload: unknown) => Promise<{ error: unknown }> };
+      };
+
+      const { error: mediaRowError } = await supabaseUntyped.from('observation_media').upsert({
+        id: media.id,
+        observation_id: media.observation_id,
+        media_url: publicUrl ?? path,
+        media_type: media.media_type === 'video' ? 'video' : 'image',
+        created_at: parseDateTime(media.created_at),
+      });
+
+      if (mediaRowError) {
+        const code = (mediaRowError as { code?: string })?.code;
+        if (code === 'PGRST205') {
+          observationMediaUpsertAvailable = false;
+          console.log(
+            '[SyncManager] public.observation_media is unavailable in this Supabase schema. Skipping that upsert going forward.'
+          );
+        } else {
+          console.warn(
+            `[SyncManager] Media uploaded successfully, but observation_media upsert failed for ${mediaId}. Continuing.`
+          );
+          console.warn(mediaRowError);
+        }
+      }
+    }
+
+    await updateMediaById(mediaId, {
+      sync_status: SyncStatus.SYNCED,
+      last_synced_at: Date.now(),
+    });
+
+    return { success: true, url: publicUrl ?? path };
+  } catch (error) {
+    console.error(`Sync failed: unexpected error while uploading media ${mediaId}`, error);
+    await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+    return { success: false, url: null };
+  }
 }

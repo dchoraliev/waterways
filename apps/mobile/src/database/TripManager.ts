@@ -12,7 +12,7 @@
 
 import { getDatabase } from './db';
 import { Trip } from '@waterways/shared/src/models/local-db-rows';
-import { SyncStatus } from './SyncManager';
+import { SyncStatus } from './SyncStatus';
 import { Coordinates, getCurrentCoordinates } from '../services/LocationService';
 
 /**

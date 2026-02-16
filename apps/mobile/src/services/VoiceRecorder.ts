@@ -1,6 +1,6 @@
 import { getDatabase } from '../database/db';
 import { createObservation, updateObservationById } from '../database/ObservationManager';
-import { SyncStatus } from '../database/SyncManager';
+import { SyncStatus } from '../database/SyncStatus';
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;

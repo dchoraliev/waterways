@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import styles from '../styles/HomeScreen.styles';
 
 export interface HomeScreenProps {
@@ -15,7 +15,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   return (
     <View style={styles.root}>
-      <View style={styles.contentWrapper}>
+      <ScrollView
+        contentContainerStyle={styles.contentWrapper}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>Welcome to WaDE</Text>
         <Text style={styles.subtitle}>Track and explore waterway deltas</Text>
 
@@ -51,7 +54,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.cardSubtitle}>Review and submit saved journeys</Text>
           </View>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 };

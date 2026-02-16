@@ -4,14 +4,20 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
     "web": "expo start --web",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "prebuild": "expo prebuild --clean",
+    "run:android": "expo run:android",
+    "install:debug": "cd android && ./gradlew installDebug",
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "start:dev-client": "expo start --dev-client",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-voice/voice": "^3.2.1",
     "expo": "~54.0.25",
     "expo-audio": "^1.0.15",
     "expo-camera": "^17.0.9",
@@ -35,6 +41,18 @@
     "@types/react": "~19.1.10",
     "babel-plugin-transform-inline-environment-variables": "^0.4.4",
     "typescript": "~5.9.2"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "type-check": "tsc --noEmit",
+    "prebuild": "expo prebuild --clean",
+    "run:android": "expo run:android",
+    "install:debug": "cd android && ./gradlew installDebug",
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "start:dev-client": "expo start --dev-client",
+    "ios": "expo run:ios"
   },
   "overrides": {
     "glob": "11.1.0",

@@ -71,3 +71,90 @@ waterways.db
 *.temp
 .temp/
 tmp/
+
+# Expo / EAS / Metro
+.expo/
+.expo-shared/
+.expo/*
+.expo-shared/*
+.cache/
+metro-cache/
+
+# Android build artifacts
+**/android/**/build/
+**/android/.gradle/
+**/android/local.properties
+**/android/*.keystore
+**/android/*.jks
+**/android/*.apk
+android/app/build/
+
+# iOS / Xcode
+**/ios/Pods/
+**/ios/build/
+**/ios/*.xcworkspace
+**/ios/*.xcuserdatad
+*.xcuserstate
+
+# EAS & CI
+.eas/
+fastlane/report.xml
+fastlane/Preview.html
+
+# Credentials / secrets that should never be committed
+*.keystore
+*.jks
+*.p12
+*.pem
+serviceAccountKey.json
+*.mobileprovision
+
+# Misc
+.vscode/
+.idea/
+*.hprof
+
+# Keep migration and config files in supabase but ignore local temp
+supabase/.branches/
+supabase/.temp/
+supabase/.env.local
+
+# Generated node_modules in nested packages (workspace)
+**/node_modules/
+
+# Build artifacts created by bundlers
+dist/
+build/
+web-build/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Logs and coverage
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+coverage/
+junit.xml
+*.lcov
+
+# TypeScript
+*.tsbuildinfo
+.tsbuildinfo
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+waterways.db
+*.db-shm
+*.db-walr
+
+.github

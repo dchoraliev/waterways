@@ -3,5 +3,14 @@
 .temp
 .env.local
 
+# Functions / node artifacts
+functions/**/node_modules/
+functions/**/dist/
+
 # Logs
 *.log
+
+# Cloud platform artifacts
+.netlify/
+.vercel/
+

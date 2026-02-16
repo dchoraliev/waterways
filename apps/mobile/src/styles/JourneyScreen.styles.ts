@@ -42,6 +42,59 @@ export const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  // Wake word tooltip
+  tooltipBanner: {
+    backgroundColor: '#1e3a5f',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6',
+  },
+  tooltipText: {
+    color: '#93c5fd',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Recording countdown timer
+  recordingCountdownCard: {
+    backgroundColor: '#dc2626',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fee2e2',
+  },
+  recordingCountdownNumber: {
+    color: 'white',
+    fontSize: 64,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  recordingCountdownLabel: {
+    color: '#fecaca',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recordingCountdownSubtext: {
+    color: '#fecaca',
+    fontSize: 13,
+  },
+
+  // Observation button
+  observationButton: {
+    backgroundColor: '#0f766e',
+    paddingVertical: 20,
+  },
+  observationButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
   listeningBanner: {
     backgroundColor: '#15803d',
     padding: 14,
@@ -51,6 +104,13 @@ export const styles = StyleSheet.create({
   listeningText: {
     color: 'white',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  listeningTranscript: {
+    color: '#d1fae5',
+    fontSize: 12,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 
   card: {
@@ -104,6 +164,13 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  expoWakeWordNotice: {
+    color: '#94a3b8',
+    textAlign: 'center',
+    fontSize: 13,
+    marginBottom: 12,
   },
 
   sectionTitle: {

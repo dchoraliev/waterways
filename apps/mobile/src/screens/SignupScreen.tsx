@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
+import { View, Text, KeyboardAvoidingView, TouchableOpacity, Image } from 'react-native';
 import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
@@ -57,10 +57,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
 
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView
-        style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.root}>
         <View style={styles.centerWrapper}>
           {/* Logo */}
           <View style={styles.logoWrapper}>
