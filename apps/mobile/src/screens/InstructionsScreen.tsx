@@ -57,17 +57,30 @@ const InstructionsScreen = () => {
           />
           <InstructionRow
             command="End journey"
-            description="Stops and saves the current trip recording."
+            description="Stops and saves the current trip recording. It may take a few seconds to process your observations."
           />
         </Accordion>
 
         {/* 6. Review & Navigation (General Commands) - ACCORDION */}
-        <Accordion title="Review & Navigation">
+        <Accordion title="Navigation">
           <InstructionRow
-            command="Show history"
+            command="View Previous Journeys"
             description="Displays the list of previously saved journeys."
           />
-          <InstructionRow command="Go home" description="Navigates back to the main home screen." />
+          <InstructionRow
+            command="View Draft Journeys"
+            description="Shows any unsubmitted journeys."
+          />
+          <InstructionRow command="Home" description="Navigates back to the main home screen." />
+          <InstructionRow
+            command="Map"
+            description="Opens the map view to see observations made."
+          />
+          <InstructionRow command="Settings" description="Opens the app settings menu." />
+          <InstructionRow
+            command="My Projects"
+            description="Provides access to all projects you are apart of."
+          />
         </Accordion>
       </View>
     </ScrollView>

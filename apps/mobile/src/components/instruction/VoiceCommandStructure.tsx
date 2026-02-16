@@ -19,7 +19,7 @@ const VoiceCommandStructure = () => (
     {/* Steps */}
     <Step
       title="1. Wake Word"
-      description='Start every command with "Hey WaDE" to activate the system.'
+      description='Start every command with "Hey WaDE start recording" to activate the system.'
     />
     <Step
       title="2. Category"
@@ -31,7 +31,11 @@ const VoiceCommandStructure = () => (
     />
     <Step
       title="4. Stop Recording"
-      description='When you are finished recording an observation, say "Stop recording".'
+      description="Each observation ends after 15 seconds have passed."
+    />
+    <Step
+      title="5. Add Media"
+      description="Optionally, add photos or videos to your observation by pressing take photo or video button within 10 seconds of finishing your voice command."
     />
   </View>
 );

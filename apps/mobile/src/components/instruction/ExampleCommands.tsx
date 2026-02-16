@@ -25,42 +25,42 @@ const ExampleCommands = () => (
     <ExampleItem
       tagLabel="Bridge"
       tagColor="#bbf7d0"
-      command="Hey WaDE. Bridge. I see the Interstate 80 bridge."
+      command="Hey WaDE start recording. Bridge. I see the Interstate 80 bridge."
     />
     <ExampleItem
       tagLabel="Dam"
       tagColor="#bbf7d0"
-      command="Hey WaDE. Dam. Small hydroelectric dam at 2 o&rsquo;clock."
+      command="Hey WaDE start recording. Dam. Small hydroelectric dam at 2 o&rsquo;clock."
     />
     <ExampleItem
       tagLabel="Bird"
       tagColor="#e9d5ff"
-      command="Hey WaDE. Bird. Great blue heron spotted on the left bank."
+      command="Hey WaDE start recording. Bird. Great blue heron spotted on the left bank."
     />
     <ExampleItem
       tagLabel="Mammal"
       tagColor="#e9d5ff"
-      command="Hey WaDE. Mammal. River otter swimming at 10 o&rsquo;clock."
+      command="Hey WaDE start recording. Mammal. River otter swimming at 10 o&rsquo;clock."
     />
     <ExampleItem
       tagLabel="Erosion"
       tagColor="#a5f3fc"
-      command="Hey WaDE. Erosion. Significant bank erosion on right side."
+      command="Hey WaDE start recording. Erosion. Significant bank erosion on right side."
     />
     <ExampleItem
       tagLabel="Water Quality"
       tagColor="#a5f3fc"
-      command="Hey WaDE. Water Quality. Water appears murky and brown."
+      command="Hey WaDE start recording. Water Quality. Water appears murky and brown."
     />
     <ExampleItem
       tagLabel="Obstruction"
       tagColor="#fed7aa"
-      command="Hey WaDE. Obstruction. Fallen tree blocking right channel."
+      command="Hey WaDE start recording. Obstruction. Fallen tree blocking right channel."
     />
     <ExampleItem
       tagLabel="Comment"
       tagColor="#bfdbfe"
-      command="Hey WaDE. Comment. Beautiful day for paddling, calm waters."
+      command="Hey WaDE start. Comment. Beautiful day for paddling, calm waters."
     />
   </View>
 );
