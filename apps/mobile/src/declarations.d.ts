@@ -29,3 +29,23 @@ declare module 'expo-audio' {
   export function useAudioRecorder(preset?: unknown): ExpoAudioRecorder;
   export function useAudioRecorderState(recorder: unknown): { isRecording?: boolean } | null;
 }
+
+// Metro exposes require.context at bundle-time.
+// Augment NodeJS.Require (the actual type of the global `require` in @types/node)
+// so `tsc` passes in CI where expo-env.d.ts is not committed to git.
+// Return type matches expo-router's RequireContext interface (keys, call sig, resolve, id).
+declare namespace NodeJS {
+  interface Require {
+    context(
+      path: string,
+      recursive?: boolean,
+      regExp?: RegExp
+    ): {
+      keys(): string[];
+      (id: string): any;
+      <T>(id: string): T;
+      resolve(id: string): string;
+      id: string;
+    };
+  }
+}

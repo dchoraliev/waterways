@@ -1,0 +1,4 @@
+# Copy this file to `android/local.properties` and update the path below
+# This file is intentionally committed as a template. Do NOT commit your machine-specific `local.properties`.
+
+sdk.dir=C:/Users/<YourUsername>/AppData/Local/Android/Sdk
