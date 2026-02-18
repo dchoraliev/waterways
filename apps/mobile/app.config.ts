@@ -16,7 +16,7 @@ export default {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
-    newArchEnabled: true,
+    newArchEnabled: false,
 
     splash: {
       image: './assets/splash-icon.png',
@@ -33,21 +33,9 @@ export default {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      // Ensure generated AndroidManifest contains tools:replace for appComponentFactory
-      // This prevents manifest-merger conflicts when transitive support libs are present
-      manifest: {
-        $: {
-          'xmlns:tools': 'http://schemas.android.com/tools'
-        },
-        application: {
-          $: {
-            'tools:replace': 'android:appComponentFactory'
-          }
-        }
-      }
     },
 
-    plugins: ['expo-router'],
+    plugins: ['expo-router', './plugins/withAndroidCompatibility.js'],
 
     experiments: {
       typedRoutes: true,
@@ -57,6 +45,13 @@ export default {
     extra: {
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      eas: {
+        projectId: 'de247055-1e3a-4887-8d8b-1b633101d7b8',
+      },
+      // Ensure Expo Router knows the `src/app` location in this workspace
+      router: {
+        root: 'src/app',
+      },
     },
   },
 };

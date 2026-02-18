@@ -1,33 +1,47 @@
 # Waterways Quick Start Guide
 
-A comprehensive setup and development guide for Waterways—an offline-first mobile app with cloud synchronization. This guide covers local development, building, and testing on Android devices.
+Setup and development guide for Waterways — an offline-first mobile app with cloud sync. Covers local development, Android builds, and device testing.
 
 **Estimated setup time:** 15–20 minutes (after dependencies install)  
-**For architecture and system design, see:** [ARCHITECTURE.md](ARCHITECTURE.md)
+**Architecture and system design:** [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
 ## Prerequisites
 
-### Required
+**Required**
 
 - **Node.js** 20 LTS or later
 - **Yarn** 1.22 or later
 - **Git** (latest)
 - **Android Studio** (with Android SDK and platform tools)
-- **Java 17** (for Gradle compilation)
+- **Java 17** (for Gradle)
 
-### Optional
+**Optional**
 
-- **Expo Go** app on Android (for fast JS-only iteration)
-- **Supabase CLI** (`npx supabase` or `npm i -g supabase`)
-- **EAS CLI** (`npm i -g eas-cli`) for cloud builds
+- **Expo Go** on Android — fast JS-only iteration without a native build
+- **Supabase CLI** — `npx supabase` or `npm i -g supabase`
+- **EAS CLI** — `npm i -g eas-cli` for cloud builds
+
+---
+
+## Where to Run Commands
+
+Commands in this guide run from one of three directories:
+
+| Directory | Commands |
+|---|---|
+| **repo root** (`waterways/`) | `yarn install`, `yarn mobile`, `yarn web`, `yarn lint`, `yarn test`, `yarn format`, `yarn type-check` |
+| **`apps/mobile/`** | `yarn start`, `yarn prebuild`, `yarn build:apk`, `yarn run:android`, `yarn install:debug`, `yarn start:dev-client` |
+| **`apps/mobile/android/`** | Gradle wrapper commands: `./gradlew assembleRelease`, `./gradlew bundleRelease`, etc. (use `.\gradlew.bat` on Windows) |
+
+Each command block below includes a `# Run from:` comment when it isn't obvious.
 
 ---
 
 ## Initial Setup
 
-### 1. Clone and Install Dependencies
+### 1. Clone and install
 
 ```bash
 git clone <your-repo-url>
@@ -35,336 +49,424 @@ cd waterways
 yarn install
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure environment variables
 
-Create a `.env` file at the repository root:
+Create a `.env` file at the **repo root**:
 
 ```env
-# Supabase (mobile)
+# Mobile (Expo)
 EXPO_PUBLIC_SUPABASE_URL=<your-supabase-url>
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 
-# Supabase (web)
+# Web (Vite)
 VITE_SUPABASE_URL=<your-supabase-url>
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
-**How to find these values:**
-1. Open [Supabase Dashboard](https://app.supabase.com)
-2. Select your project
-3. Navigate to **Project Settings** → **API**
-4. Copy the URL and Anon Key
-
----
-
-## Build Options for Android
-
-Choose the appropriate build strategy based on your development workflow:
-
-| Build Type | Best For | Setup | Output Location |
-|---|---|---|---|
-| **Expo Go** | Fast JS/UI iterations | `yarn mobile` | Runs in Expo Go app (no native rebuild) |
-| **Dev Client** | Native module debugging & iteration | `yarn run:android` then `yarn start:dev-client` | Debug app installed + Metro server |
-| **Debug APK** | QA testing on device | `yarn prebuild && yarn build:apk` | `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` |
-| **Release APK/AAB** | Pre-release / Play Store submission | See [Release Builds](#release-builds) | `apps/mobile/android/app/build/outputs/` |
-| **EAS Cloud** | Team builds without local Gradle setup | `eas build --platform android --profile preview` | EAS Dashboard |
-
-### Important: Gradle Wrapper
-
-The Gradle wrapper files (`gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`) must exist in `apps/mobile/android/`.
-
-**If you see "gradlew is not recognized":**
-- Use `.\gradlew.bat` on Windows PowerShell/CMD instead of `./gradlew`
-- Or regenerate the Android project: `yarn prebuild`
-- Or open Git Bash/WSL and use `./gradlew`
+To find these values: open the [Supabase Dashboard](https://app.supabase.com), select your project, and go to **Project Settings → API**.
 
 ---
 
 ## Running the Apps
 
-### Mobile (Expo)
-
-From the repository root:
+### Mobile
 
 ```bash
+# Run from: repo root
 yarn mobile
 ```
 
-Or from the `apps/mobile` directory:
+### Web
 
 ```bash
-cd apps/mobile
-yarn start
-```
-
-### Web (Vite)
-
-From the repository root:
-
-```bash
+# Run from: repo root
 yarn web
 ```
 
-Expected: App launches on `http://localhost:5173` (or next available Vite port)
+Opens at `http://localhost:5173` (or the next available Vite port).
 
 ---
 
-## Android Device Testing
+## Android Build Options
 
-### One-Time Device Setup
+| Build type | Best for | How to start |
+|---|---|---|
+| **Expo Go** | Fast JS/UI changes — no native rebuild | `yarn mobile` (repo root) |
+| **Dev Client** | Native module work with fast JS reloads | `yarn run:android` then `yarn start:dev-client` (both from `apps/mobile`) |
+| **Debug APK** | QA or sharing with testers | `yarn prebuild && yarn build:apk` (`apps/mobile`) → `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` |
+| **Release APK/AAB** | Pre-release or Play Store submission | See [Release Builds](#release-builds) |
+| **EAS Cloud** | Team builds without local Gradle — not yet verified for this repo | `eas build --platform android --profile preview` (`apps/mobile`) |
 
-1. **Enable Developer Options** on your Android device:
-   - Settings → About phone → Tap "Build number" 7 times
-2. **Enable USB Debugging:**
-   - Settings → Developer Options → Enable USB Debugging
-3. **Connect via USB** and accept the "Allow USB Debugging?" prompt on your device
-4. **Verify ADB connection:**
+### Gradle wrapper note
+
+The wrapper files (`gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`) must exist in `apps/mobile/android/`. If they're missing, run `yarn prebuild` from `apps/mobile` to regenerate them.
+
+On Windows, always use `.\gradlew.bat` instead of `./gradlew` in PowerShell/CMD. Git Bash and WSL can use `./gradlew`.
+
+---
+
+## Android Device Setup
+
+### One-time setup
+
+1. **Enable Developer Options:** Settings → About phone → Tap "Build number" 7 times
+2. **Enable USB Debugging:** Settings → Developer Options → USB Debugging → On
+3. Connect via USB and accept the "Allow USB Debugging?" prompt on the device
+4. Verify the connection:
 
    ```bash
    adb devices
    ```
 
-   Expected output: Device listed as `device`. If status is `unauthorized`, accept the prompt on your phone and retry.
+   The device should be listed as `device`. If it shows `unauthorized`, accept the prompt on the phone and retry.
 
-### Per-Session Connection Setup
+### Per-session ADB setup
 
-Run these commands to ensure stable ADB connectivity for Metro:
+Run this at the start of each development session to ensure Metro can reach the device:
 
 ```bash
-# Restart ADB server
 adb kill-server
 adb start-server
 adb devices
 
-# Configure port forwarding for Metro
+# Port forwarding for Metro
 adb reverse tcp:8081 tcp:8081
 adb reverse tcp:19000 tcp:19000
 adb reverse tcp:19001 tcp:19001
 
-# Verify mappings
-adb reverse --list
+adb reverse --list   # confirm mappings
 ```
 
-### Testing Workflow: Native Debug Loop
+---
 
-**Recommended for active development with native modules or native dependencies:**
+## Development Workflows
 
-1. **Build and install debug app** (one-time, after native changes):
+### Native debug loop (recommended for native module work)
+
+Use this when you're working on native code or need native modules available during development.
+
+1. Build and install the debug app (repeat after any native change):
 
    ```bash
-   cd apps/mobile
+   # Run from: apps/mobile
    yarn run:android
    ```
 
-2. **Start Metro for the dev client** (in a separate terminal):
+2. Start Metro in a second terminal:
 
    ```bash
-   cd apps/mobile
+   # Run from: apps/mobile
    yarn start:dev-client
    ```
 
-3. **Test on device:**
-   - Open the installed app on your Android device
-   - Run your test scenario
-   - After JS-only edits: Just reload the app (no rebuild needed)
-   - After native changes: Re-run `yarn run:android`
+3. Open the installed app on the device. After JS-only changes, reload the app. After native changes, re-run `yarn run:android`.
 
-### Testing Workflow: APK Install Loop
+### APK install loop (for sharing builds or isolated testing)
 
-**For building standalone debug APKs (useful for sharing with testers):**
-
-1. **Generate native Android project and build APK:**
+1. Generate the native project and build the APK:
 
    ```bash
-   cd apps/mobile
+   # Run from: apps/mobile
    yarn prebuild
    yarn build:apk
    ```
 
-2. **Install on connected device:**
+2. Install on device:
 
    ```bash
-   cd apps/mobile
+   # Run from: apps/mobile
+
+   # Debug APK
    yarn install:debug
+   # or directly:
+   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+
+   # Release APK (uninstall any previously signed variant first)
+   adb uninstall com.waterways.mobile || true
+   adb install -r android/app/build/outputs/apk/release/app-release.apk
    ```
 
-   Alternative:
+   If the release APK is unsigned, sign it with `apksigner` before installing:
+
    ```bash
-   adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+   $ANDROID_HOME/build-tools/<version>/apksigner sign \
+     --ks android/keystore.jks \
+     --ks-key-alias <alias> \
+     --out android/app/build/outputs/apk/release/app-release-signed.apk \
+     android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+   adb install -r android/app/build/outputs/apk/release/app-release-signed.apk
    ```
 
-3. **Start Metro server** (in another terminal):
+3. To install an AAB locally using [`bundletool`](https://developer.android.com/tools/bundletool):
 
    ```bash
-   cd apps/mobile
-   yarn start
-   ```
+   # Run from: apps/mobile/android
+   ./gradlew bundleRelease
 
-4. **Launch and test** on the device
+   java -jar bundletool.jar build-apks \
+     --bundle=app/build/outputs/bundle/release/app-release.aab \
+     --output=app-release.apks \
+     --mode=universal
+
+   java -jar bundletool.jar install-apks --apks=app-release.apks
+   ```
 
 ---
 
 ## Release Builds
 
-### Local Release Build (Gradle)
+### Checklist before every release build
+
+1. Pull latest and run `yarn` at the repo root — this applies patches in `patches/`.
+2. Copy `apps/mobile/local.properties.template` to `apps/mobile/android/local.properties` and set `sdk.dir` to your Android SDK path (use forward slashes on Windows, e.g. `C:/Users/<You>/AppData/Local/Android/Sdk`).
+3. Run `yarn prebuild --clean --platform android` from `apps/mobile` — this applies the Expo config plugins that inject required native settings.
+4. Run the Gradle wrapper command for your platform (see below).
+
+### Build commands
+
+**Windows (PowerShell / CMD):**
+
+```powershell
+# Run from: apps/mobile/android
+.\gradlew.bat assembleRelease      # APK
+.\gradlew.bat bundleRelease        # AAB (Play Store format)
+```
 
 **macOS / Linux:**
+
 ```bash
-cd apps/mobile/android
+# Run from: apps/mobile/android
 ./gradlew assembleRelease      # APK
 ./gradlew bundleRelease        # AAB (Play Store format)
 ```
 
-Artifacts are output to `apps/mobile/android/app/build/outputs/`
+Artifacts are written to `apps/mobile/android/app/build/outputs/`.
 
-**Note:** Release builds require keystore (signing) configuration. See Gradle documentation for production signing setup.
+> **iOS:** local iOS release builds require macOS and Xcode. Use EAS Build for cloud iOS artifacts.
 
-### Cloud Build with EAS (Optional)
+### How native settings are managed
 
-Use Expo's **EAS Build** service to compile artifacts without local Gradle setup:
+A few things in this repo are enforced automatically so you don't have to manage them by hand:
 
-#### One-Time Setup
+- `apps/mobile/plugins/withAndroidCompatibility.js` — an Expo config plugin (tracked in git) that injects `android.enableJetifier=true` and other compatibility settings into the generated native project during `yarn prebuild`.
+- `patches/` — library-level fixes (e.g. `@react-native-voice+voice*.patch`) applied automatically on `yarn install` via `postinstall`. Do not edit these manually.
+
+If `assembleRelease` fails with a Metro module resolution error (`Unable to resolve module expo-router/entry`), run `yarn prebuild --clean` from `apps/mobile` before retrying the Gradle command.
+
+### Voice / wake-word in release APKs
+
+If you're building a release that uses the wake-word or speech features, check these settings before building:
+
+- `apps/mobile/android/gradle.properties` — `newArchEnabled=false`
+- `apps/mobile/app.config.ts` — `newArchEnabled: false` and `android.permissions` includes `android.permission.RECORD_AUDIO`
+- Increment `versionCode` / `versionName` in `android/app/build.gradle` for each sideload test
+
+**Run the pre-release config validator every time before building:**
 
 ```bash
-npm install -g eas-cli      # Or use `npx eas`
+# Run from: repo root
+yarn workspace @waterways/mobile check:release-config
+```
+
+Expected output: `Release config check passed.` On failure, the script prints specific fixes and exits non-zero. Add this as a pre-build step in CI to catch misconfigured APKs early.
+
+**Build and verify on device:**
+
+```bash
+# Run from: apps/mobile
+yarn prebuild --clean
+cd android
+./gradlew assembleRelease            # Windows: .\\gradlew.bat assembleRelease
+adb uninstall com.waterways.mobile || true
+adb install -r app/build/outputs/apk/release/app-release.apk
+adb logcat -d '*:S' ReactNative:V ReactNativeJS:V AndroidRuntime:E | grep "Wake status\|useWakeWord"
+```
+
+The Journey screen should show a wake-word status message (`Wake word is starting…`, `Wake word unavailable in this build/device`, or `💡 Say "Hey Wade, Start Recording"`). If you see `Cannot read property 'isSpeechAvailable' of null`, confirm `newArchEnabled=false` in both `gradle.properties` and `app.config.ts`, then rebuild.
+
+> `@react-native-voice/voice` is not compatible with React Native's New Architecture (TurboModules). Keeping `newArchEnabled=false` is the required workaround until the module is migrated.
+
+See [WAKE_WORD_SYSTEM.md](WAKE_WORD_SYSTEM.md) for design notes.
+
+### Cloud builds with EAS (optional)
+
+EAS Build compiles artifacts without local Gradle setup.
+
+> ⚠️ EAS has not been verified for this repo — all builds so far have been done locally. It will likely be needed for Play Store deployment. Validate with the `preview` profile and confirm `eas.json` and plugins before relying on it.
+
+**One-time setup:**
+
+```bash
+npm install -g eas-cli
 eas login
-cd apps/mobile
-eas build:configure         # Creates `eas.json` if needed
+# Run from: apps/mobile
+eas build:configure
 ```
 
-#### Build Commands
+**Build commands (from `apps/mobile`):**
 
 ```bash
-# Preview build (internal testing)
-eas build --platform android --profile preview
-
-# Production build (Play Store)
-eas build --platform android --profile production
+eas build --platform android --profile preview      # internal testing
+eas build --platform android --profile production   # Play Store
 ```
 
-Download your APK/AAB from the EAS Dashboard and distribute.
+Download the APK/AAB from the EAS Dashboard.
 
 ---
 
 ## Quality Assurance
 
-### Run Tests
-
-From repository root:
+### Tests
 
 ```bash
-yarn test              # All tests
-yarn test:mobile       # Mobile unit/integration tests only
-yarn test:web          # Web tests only
-yarn test:shared       # Shared library tests only
+# Run from: repo root
+yarn test              # all tests
+yarn test:mobile       # mobile unit/integration only
+yarn test:web          # web only
+yarn test:shared       # shared library only
 ```
 
-### Linting and Type Checking
+### Lint, type-check, format
 
 ```bash
-yarn lint              # ESLint (fix: --fix flag)
-yarn type-check        # TypeScript validation
+# Run from: repo root
+yarn lint              # ESLint (add --fix to auto-fix)
+yarn type-check        # TypeScript
 yarn format            # Prettier (write mode)
 ```
 
-### Database Schema Changes
+### Database schema changes
 
 After modifying the Postgres schema, regenerate TypeScript types:
 
 ```bash
+# Run from: repo root
 yarn types:generate
 npx prettier --write packages/shared/src/models/database-types.ts
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md#database-schema-changes-checklist) for the complete schema workflow.
+See [ARCHITECTURE.md](ARCHITECTURE.md#database-schema-changes-checklist) for the full schema workflow.
 
 ---
 
 ## Troubleshooting
 
-### Metro Cache Issues
-
-Clear the Metro bundler cache:
+### Metro cache issues
 
 ```bash
-cd apps/mobile
+# Run from: apps/mobile
 yarn start --clear
 ```
 
-### Android SDK Location Not Found
+### Android SDK not found
 
 **Error:**
 ```
-com.android.builder.errors.EvalIssueException: SDK location not found. 
-Define a valid SDK location with an ANDROID_HOME environment variable 
-or by setting the sdk.dir path in your project's local properties file.
+SDK location not found. Define a valid SDK location with an ANDROID_HOME
+environment variable or by setting sdk.dir in local.properties.
 ```
 
-**Solution 1: Set ANDROID_HOME environment variable (Recommended)**
+**Option 1 — Set `ANDROID_HOME` (recommended):**
 
-1. Locate your Android SDK installation:
-   - Android Studio default: `C:\Users\<YourUsername>\AppData\Local\Android\Sdk`
-   - Or check in Android Studio: **File** → **Settings** → **Appearance & Behavior** → **System Settings** → **Android SDK** → Note the SDK location
+Find your SDK path:
+- Android Studio default on Windows: `C:\Users\<YourUsername>\AppData\Local\Android\Sdk`
+- Or check in Android Studio: **File → Settings → Appearance & Behavior → System Settings → Android SDK**
 
-2. Set the environment variable on Windows:
-   - Open **System Properties** → **Environment Variables**
-   - Create a new **User variable** named `ANDROID_HOME` with the SDK path as value
-   - Or use PowerShell:
-     ```powershell
-     $env:ANDROID_HOME = "C:\Users\<YourUsername>\AppData\Local\Android\Sdk"
-     ```
+Set it:
 
-3. Verify the variable is set:
-   ```bash
-   echo $env:ANDROID_HOME  # PowerShell
-   echo %ANDROID_HOME%     # CMD
-   ```
-
-4. **Restart your terminal** and retry the build
-
-**Solution 2: Create local.properties file**
-
-1. Create or edit `apps/mobile/android/local.properties`:
-   ```properties
-   sdk.dir=C:\Users\<YourUsername>\AppData\Local\Android\Sdk
-   ```
-
-2. Replace the path with your actual Android SDK location
-
-3. Retry the build:
-   ```bash
-   cd apps/mobile
-   yarn build:apk
-   ```
-
-### Gradle Wrapper Not Recognized (Windows)
-
-**Solution 1:** Use the Windows batch file:
 ```powershell
-.\gradlew.bat assembleDebug  # Instead of ./gradlew
+# PowerShell (current session)
+$env:ANDROID_HOME = "C:\Users\<YourUsername>\AppData\Local\Android\Sdk"
 ```
 
-**Solution 2:** Regenerate the wrapper:
+For a permanent setting, add `ANDROID_HOME` as a User variable in **System Properties → Environment Variables**. Restart your terminal after.
+
+**Option 2 — Set `sdk.dir` in `local.properties`:**
+
+Copy the template and edit it:
+
 ```bash
+cp apps/mobile/local.properties.template apps/mobile/android/local.properties
+```
+
+Then set `sdk.dir` in `apps/mobile/android/local.properties`:
+
+```properties
+sdk.dir=C:/Users/<YourUsername>/AppData/Local/Android/Sdk
+```
+
+Use forward slashes even on Windows.
+
+**Verify `android.enableJetifier=true` is in `gradle.properties`:**
+
+This line is required — omitting it causes manifest merge errors with legacy support libraries. The project's Expo config plugin injects it during `yarn prebuild`, but verify it's present before building:
+
+```powershell
+# PowerShell
+Select-String -Path apps/mobile/android/gradle.properties -Pattern 'android.enableJetifier'
+```
+
+```bash
+# macOS / Linux
+grep 'android.enableJetifier' apps/mobile/android/gradle.properties
+```
+
+If it's missing, either add it manually or run `yarn prebuild --clean --platform android` from `apps/mobile`.
+
+**Then retry:**
+
+```bash
+# Run from: apps/mobile
+yarn build:apk
+```
+
+### Release bundle fails: `Unable to resolve module expo-router/entry`
+
+**Error:** `Task :app:createBundleReleaseJsAndAssets FAILED` — Metro can't resolve `./../../node_modules/expo-router/entry.js`.
+
+This happens when Metro resolves the entry path from the wrong working directory in a monorepo. The fix is to use a stable local entry file:
+
+- `apps/mobile/package.json` should have `"main": "index.ts"`
+- `apps/mobile/index.ts` is the stable entry point
+
+After pulling the fix:
+
+```bash
+# Run from: apps/mobile
+yarn prebuild --clean --platform android
+cd android
+./gradlew assembleRelease
+```
+
+### Gradle wrapper not recognized (Windows)
+
+Use the batch wrapper instead:
+
+```powershell
+# Run from: apps/mobile/android
+.\gradlew.bat assembleDebug
+```
+
+Or regenerate it:
+
+```bash
+# Run from: apps/mobile
 yarn prebuild
 ```
 
-**Solution 3:** Use Git Bash or WSL:
-```bash
-# Open Git Bash and run:
-./gradlew assembleDebug
-```
+Or use Git Bash / WSL where `./gradlew` works normally.
 
-### Port Already in Use
-
-Kill existing Metro processes and restart:
+### Port already in use
 
 ```bash
-cd apps/mobile
+# Run from: apps/mobile
 yarn start
 ```
 
-### Wireless ADB Debugging (Android 11+)
+Metro will prompt to use a different port, or kill the existing process first.
+
+### Wireless ADB (Android 11+)
 
 ```bash
 adb pair <phone-ip>:<pairing-port>
@@ -372,16 +474,15 @@ adb connect <phone-ip>:5555
 adb devices
 ```
 
-### Supabase Authentication / Data Errors
+### Supabase auth or data errors
 
-- **Verify `.env` values** are correct and visible to your app
-- **Check RLS policies** in the Supabase Dashboard align with your write operations
-- **Re-authenticate** in the app to refresh your session token
+- Verify `.env` values are correct and match your project
+- Check that RLS policies in the Supabase Dashboard match your write operations
+- Re-authenticate in the app to refresh the session token
 
 ---
 
 ## Next Steps
 
-- **System Architecture:** Review [ARCHITECTURE.md](ARCHITECTURE.md) for offline-first design, data flow, and sync orchestration
-- **Wake Word System:** See [WAKE_WORD_SYSTEM.md](WAKE_WORD_SYSTEM.md) for voice recognition setup
-- **Contributing:** Follow the pre-PR checklist in [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) — offline-first design, data flow, sync orchestration, and the pre-PR checklist
+- **Wake word system:** [WAKE_WORD_SYSTEM.md](WAKE_WORD_SYSTEM.md) — voice recognition setup and design notes

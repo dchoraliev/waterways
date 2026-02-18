@@ -170,6 +170,17 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     wakeWordStopRef.current = wakeWord.stop;
   });
 
+  useEffect(() => {
+    console.log('[JourneyScreen] Wake status', {
+      platform: Platform.OS,
+      expoGo: isExpoGo(),
+      wakeWordAvailable: wakeWord.isAvailable,
+      wakeWordEnabled,
+      wakeWordState: wakeWord.state,
+      wakeWordError: wakeWord.lastError?.message ?? null,
+    });
+  }, [wakeWord.isAvailable, wakeWordEnabled, wakeWord.state, wakeWord.lastError]);
+
   useFocusEffect(
     useCallback(() => {
       const shouldEnableWakeWord = Platform.OS === 'android' && !isExpoGo() && wakeWord.isAvailable;
@@ -434,6 +445,18 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   }, [tripId, router, endingJourney]);
 
   const obsCount = observations.length;
+  const shouldRenderWakeWordStatus = Platform.OS === 'android';
+  const wakeWordStatusText = isExpoGo()
+    ? 'Wake word disabled in Expo Go'
+    : recordingCountdown > 0
+      ? 'Recording observation...'
+      : !wakeWord.isAvailable
+        ? 'Wake word unavailable in this build/device'
+        : wakeWordEnabled
+          ? '💡 Say “Hey Wade, Start Recording”'
+          : wakeWord.lastError
+            ? `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`
+            : 'Wake word is starting…';
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -462,9 +485,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         </View>
 
         {/* Wake word listening tooltip */}
-        {wakeWordEnabled && recordingCountdown === 0 && (
-          <View style={styles.tooltipBanner}>
-            <Text style={styles.tooltipText}>💡 Say &ldquo;Hey Wade, Start Recording&rdquo;</Text>
+        {shouldRenderWakeWordStatus && (
+          <View style={styles.wakeWordStatusBanner}>
+            <Text style={styles.wakeWordStatusText}>{wakeWordStatusText}</Text>
           </View>
         )}
 
@@ -496,8 +519,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
             {recordingCountdown > 0 ? '⏹ Stop Recording' : '🎙 Start Observation'}
           </Text>
         </Pressable>
-
-        {isExpoGo() && <Text style={styles.expoWakeWordNotice}>Wake word disabled in Expo Go</Text>}
 
         {/* Camera card - only visible for 10 seconds after observation */}
         {cameraWindowActive && (

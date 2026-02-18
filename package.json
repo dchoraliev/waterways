@@ -34,7 +34,8 @@
     "lint:fix": "npx eslint \"apps/**/*.{ts,tsx}\" \"packages/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" --fix",
     "format": "npx prettier --write \"apps/**/*.{ts,tsx,json}\" \"packages/**/*.{ts,tsx,json}\" \"tests/**/*.{ts,tsx,json}\"",
     "format:check": "npx prettier --check \"apps/**/*.{ts,tsx,json}\" \"packages/**/*.{ts,tsx,json}\" \"tests/**/*.{ts,tsx,json}\"",
-    "type-check": "yarn workspace @waterways/mobile type-check && yarn workspace @waterways/web type-check && yarn workspace @waterways/shared type-check"
+    "type-check": "yarn workspace @waterways/mobile type-check && yarn workspace @waterways/web type-check && yarn workspace @waterways/shared type-check",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -59,7 +60,8 @@
     "supabase": "^2.58.5",
     "ts-jest": "^29.4.5",
     "tsx": "^4.20.6",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "patch-package": "^6.5.0"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

@@ -57,6 +57,22 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  wakeWordStatusBanner: {
+    backgroundColor: '#0b5ed7',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  wakeWordStatusText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
   // Recording countdown timer
   recordingCountdownCard: {
     backgroundColor: '#dc2626',

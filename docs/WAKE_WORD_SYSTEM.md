@@ -98,3 +98,23 @@ flowchart LR
 - Always provide a touch fallback for every voice path.
 - Keep destructive actions behind confirmation.
 - Log intent classification results for debugging and QA.
+
+---
+
+## Release build checklist (Android)
+
+When producing a standalone Android APK that uses the native `@react-native-voice/voice` module, ensure the following so wake-word works in release builds:
+
+- Set `newArchEnabled = false` in `apps/mobile/android/gradle.properties` (react-native-voice is not New-Architecture/TurboModule-ready in this codebase).
+- Ensure `newArchEnabled: false` is present in `apps/mobile/app.config.ts` so Expo prebuilds with the same flag.
+- Confirm `android.permissions` includes `RECORD_AUDIO` in `app.config.ts` (required at runtime).
+- Bump `versionCode`/`versionName` in `android/app/build.gradle` for each side-loaded APK iteration.
+- Use `yarn workspace @waterways/mobile check:release-config` (or `node apps/mobile/scripts/check-release-config.js`) to validate the above before building.
+
+Notes & rationale
+
+- The fix used in this repository is to disable the New Architecture for Android builds to keep compatibility with `@react-native-voice/voice` while we migrate native voice code to the new architecture.
+- The `check:release-config` script performs the basic safety checks listed above and fails the build process if mismatches are detected.
+
+If you want this repository to support the New Architecture in the future, the long-term fix is to update or replace the voice/native speech module with a TurboModule-compatible implementation and add appropriate ProGuard/Turbomodule keep rules.
+
