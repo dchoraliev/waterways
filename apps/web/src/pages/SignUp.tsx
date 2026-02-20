@@ -31,10 +31,10 @@ export function SignUp({ onNavigateToSignIn, onSuccess }: SignUpProps) {
 
     try {
       await signUp(name, email, password);
-      toast.success('Account created successfully!');
+      toast.success('Account created successfully! Please check your email for verification.');
       onSuccess?.();
-    } catch {
-      toast.error('Failed to create account. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }

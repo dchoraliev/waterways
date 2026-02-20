@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Home } from 'lucide-react';
 import imgImageWithFallback from '../assets/images/background.png';
+import { supabase } from '../services/supabase';
 
 interface LoginPageProps {
   onSuccess: () => void;
@@ -26,8 +27,8 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       await signIn(email, password);
       toast.success('Successfully signed in!');
       onSuccess();
-    } catch {
-      toast.error('Failed to sign in. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -39,10 +40,10 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
 
     try {
       await signUp(name, email, password);
-      toast.success('Account created successfully!');
+      toast.success('Account created successfully! Please check your email for verification.');
       onSuccess();
-    } catch {
-      toast.error('Failed to create account. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -53,13 +54,17 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // Mock forgot password functionality
-      await new Promise((resolve) => globalThis.setTimeout(resolve, 1000));
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${globalThis.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
       toast.success('Password reset link sent to your email!');
       setIsForgotPassword(false);
       setEmail('');
-    } catch {
-      toast.error('Failed to send reset link. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send reset link. Please try again.');
     } finally {
       setLoading(false);
     }

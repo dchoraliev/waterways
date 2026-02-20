@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Map, Marker } from 'pigeon-maps';
 import type { Observation } from '../types/observation';
 import { X, MapPin } from 'lucide-react';
@@ -10,22 +10,13 @@ interface MapViewProps {
 }
 
 export function MapView({ observations, onObservationClick }: MapViewProps) {
-  const [center, setCenter] = useState<[number, number]>([52.5, -1.5]);
-  const [zoom, setZoom] = useState(6);
+  // 🇺🇸 Start centered on the US and don't recenter on filters
+  const [center, setCenter] = useState<[number, number]>([39.5, -98.35]);
+  const [zoom, setZoom] = useState(4);
   const [, setClickedObservationId] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
 
-  useEffect(() => {
-    if (observations.length > 0) {
-      const avgLat =
-        observations.reduce((sum, obs) => sum + obs.location.lat, 0) / observations.length;
-      const avgLng =
-        observations.reduce((sum, obs) => sum + obs.location.lng, 0) / observations.length;
-      // Schedule center update asynchronously to avoid calling setState synchronously inside the effect
-      globalThis.setTimeout(() => setCenter([avgLat, avgLng]), 0);
-    }
-  }, [observations]);
-
+  // No useEffect here – we don't recenter based on observations at all
   const clusters = useMemo(() => {
     return clusterObservations(observations, zoom);
   }, [observations, zoom]);
@@ -42,56 +33,49 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
     }
   };
 
-  // clickedObservation computed when needed; removed unused local variable to satisfy linter
-
   return (
     <div className="size-full relative">
       <Map
         center={center}
         zoom={zoom}
         onBoundsChanged={({ center, zoom }) => {
-          setCenter(center);
+          setCenter(center as [number, number]);
           setZoom(zoom);
         }}
       >
-        {clusters.map((cluster) => {
-          return (
-            <Marker
-              key={cluster.id}
-              anchor={[cluster.lat, cluster.lng]}
-              onClick={() => handleMarkerClick(cluster)}
-            >
-              {cluster.isCluster ? (
-                // Cluster marker
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
-                  <div
-                    className={`
+        {clusters.map((cluster) => (
+          <Marker
+            key={cluster.id}
+            anchor={[cluster.lat, cluster.lng]}
+            onClick={() => handleMarkerClick(cluster)}
+          >
+            {cluster.isCluster ? (
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
+                <div
+                  className={`
                     flex items-center justify-center rounded-full
                     bg-destructive text-destructive-foreground
                     shadow-lg cursor-pointer transition-transform duration-200
                     ${cluster.observations.length >= 10 ? 'size-14' : 'size-12'}
                   `}
-                  >
-                    <span className="font-semibold">{cluster.observations.length}</span>
-                  </div>
+                >
+                  <span className="font-semibold">{cluster.observations.length}</span>
                 </div>
-              ) : (
-                // Single observation marker
-                <div className="pointer-events-none">
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-auto">
-                    <MapPin
-                      className="size-8 text-destructive drop-shadow-lg cursor-pointer transition-colors"
-                      fill="currentColor"
-                    />
-                  </div>
+              </div>
+            ) : (
+              <div className="pointer-events-none">
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-auto">
+                  <MapPin
+                    className="size-8 text-destructive drop-shadow-lg cursor-pointer transition-colors"
+                    fill="currentColor"
+                  />
                 </div>
-              )}
-            </Marker>
-          );
-        })}
+              </div>
+            )}
+          </Marker>
+        ))}
       </Map>
 
-      {/* Cluster list popup */}
       {selectedCluster && (
         <div className="absolute left-4 top-4 w-80 max-h-[500px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-[1000]">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">

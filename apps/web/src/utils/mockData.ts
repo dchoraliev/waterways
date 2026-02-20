@@ -10,6 +10,7 @@ export const mockObservations: Observation[] = [
       lng: -0.1246,
       name: 'London Bridge',
     },
+    createdAt: '2024-03-15T14:30:00.000Z',
     timestamp: '14:30 GMT',
     date: '2024-03-15',
     observation:
@@ -30,6 +31,7 @@ export const mockObservations: Observation[] = [
       lng: -0.0759,
       name: 'Canary Wharf',
     },
+    createdAt: '2024-08-22T09:15:00.000Z',
     timestamp: '09:15 GMT',
     date: '2024-08-22',
     observation:
@@ -53,6 +55,7 @@ export const mockObservations: Observation[] = [
       lng: -0.137,
       name: 'Brighton Beach',
     },
+    createdAt: '2024-06-10T10:45:00.000Z',
     timestamp: '11:45 BST',
     date: '2024-06-10',
     observation:
@@ -73,6 +76,7 @@ export const mockObservations: Observation[] = [
       lng: -2.9248,
       name: 'Lake Windermere',
     },
+    createdAt: '2025-01-20T16:00:00.000Z',
     timestamp: '16:00 GMT',
     date: '2025-01-20',
     observation:
@@ -93,6 +97,7 @@ export const mockObservations: Observation[] = [
       lng: -0.3037,
       name: 'Richmond Lock',
     },
+    createdAt: '2025-02-05T13:20:00.000Z',
     timestamp: '13:20 GMT',
     date: '2025-02-05',
     observation:
@@ -113,6 +118,7 @@ export const mockObservations: Observation[] = [
       lng: -1.8904,
       name: 'Gas Street Basin',
     },
+    createdAt: '2024-11-18T10:30:00.000Z',
     timestamp: '10:30 GMT',
     date: '2024-11-18',
     observation:
@@ -133,6 +139,7 @@ export const mockObservations: Observation[] = [
       lng: 1.3134,
       name: 'Dover Harbour',
     },
+    createdAt: '2024-04-30T08:00:00.000Z',
     timestamp: '08:00 GMT',
     date: '2024-04-30',
     observation:
@@ -153,6 +160,7 @@ export const mockObservations: Observation[] = [
       lng: -5.1052,
       name: 'Loch Linnhe',
     },
+    createdAt: '2024-07-14T15:45:00.000Z',
     timestamp: '15:45 GMT',
     date: '2024-07-14',
     observation:

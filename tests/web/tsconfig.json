@@ -1,0 +1,12 @@
+{
+  "extends": "../../apps/web/tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "types": ["jest", "node"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "paths": {
+      "./supabaseEnv": ["../../apps/web/src/services/supabaseEnv.node.ts"]
+    }
+  },
+  "include": ["../../apps/web/src", "**/*.test.ts", "**/*.test.tsx"]
+}

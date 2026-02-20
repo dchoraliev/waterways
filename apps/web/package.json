@@ -16,6 +16,7 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.39.0",
+    "@waterways/shared": "*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
     "expo": "~54.0.23",
@@ -31,8 +32,8 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.17",
-    "@types/react": "~19.1.0",
-    "@types/react-dom": "^18.2.18",
+    "@types/react": "19.2.3",
+    "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "^4.2.1",
     "babel-plugin-transform-inline-environment-variables": "^0.4.4",
     "tailwindcss": "^4.1.17",
