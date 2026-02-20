@@ -46,6 +46,7 @@ export const EXPECTED_SCHEMA: Record<string, string[]> = {
     'sync_status',
     'last_synced_at',
   ],
+  settings: ['id', 'dark_mode_enabled', 'notifications_enabled'],
 };
 
 // ============================================
@@ -127,6 +128,18 @@ CREATE INDEX IF NOT EXISTS idx_observation_media_observation_id ON observation_m
 `;
 
 // ============================================
+// LOCAL SETTINGS TABLE
+// ============================================
+
+export const CREATE_SETTINGS_TABLE = `
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY,
+  dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
+  notifications_enabled INTEGER NOT NULL DEFAULT 1
+);
+`;
+
+// ============================================
 // ALL TABLES ARRAY
 // ============================================
 
@@ -136,6 +149,7 @@ export const CREATE_ALL_TABLES = [
   CREATE_OBSERVATION_MEDIA_TABLE,
   CREATE_OBSERVATIONS_TRIP_ID_INDEX,
   CREATE_OBSERVATION_MEDIA_OBSERVATION_ID_INDEX,
+  CREATE_SETTINGS_TABLE,
 ];
 
 // ============================================
@@ -145,4 +159,5 @@ export const DROP_ALL_TABLES = [
   `DROP TABLE IF EXISTS observation_media;`,
   `DROP TABLE IF EXISTS observations;`,
   `DROP TABLE IF EXISTS trips;`,
+  `DROP TABLE IF EXISTS settings;`,
 ];

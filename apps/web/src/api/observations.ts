@@ -74,6 +74,7 @@ type ObservationRow = {
     first_name: string | null;
     last_name: string | null;
     email: string;
+    share_name_on_map: boolean | null;
   } | null;
 };
 
@@ -105,7 +106,8 @@ export async function fetchObservations(): Promise<Observation[]> {
       users (
         first_name,
         last_name,
-        email
+        email,
+        share_name_on_map
       )
     `);
 
@@ -122,8 +124,10 @@ export async function fetchObservations(): Promise<Observation[]> {
     const projectName = r.trips?.projects?.name ?? 'Untitled Project';
 
     const observerName = r.users
-      ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
-      : 'Unknown Observer';
+      ? r.users.share_name_on_map === false
+        ? 'Anonymous'
+        : `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
+      : 'Deleted User';
 
     const createdRaw = r.created_at ?? '';
 
@@ -208,7 +212,8 @@ export async function fetchDailyObservations(): Promise<Observation[]> {
       users (
         first_name,
         last_name,
-        email
+        email,
+        share_name_on_map
       )
     `
     )
@@ -228,8 +233,10 @@ export async function fetchDailyObservations(): Promise<Observation[]> {
     const projectName = r.trips?.projects?.name ?? 'Untitled Project';
 
     const observerName = r.users
-      ? `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
-      : 'Unknown Observer';
+      ? r.users.share_name_on_map === false
+        ? 'Anonymous'
+        : `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
+      : 'Deleted User';
 
     const createdRaw = r.created_at ?? '';
 

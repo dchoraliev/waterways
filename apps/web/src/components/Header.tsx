@@ -71,6 +71,7 @@ export function Header({
   projects,
 }: HeaderProps) {
   const { user, signOut } = useAuth();
+  const visibleUserName = user?.showNameOnMap === false ? 'Anonymous' : user?.name;
   if (user && (!projects || projects.length === 0)) {
     console.log('Header: user has no projects in context', user.id, user.name, projects);
   }
@@ -140,13 +141,13 @@ export function Header({
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
                       <User className="size-4 mr-2" />
-                      {user.name}
+                      {visibleUserName}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 z-[2000]">
                     <DropdownMenuLabel>
                       <div className="flex flex-col space-y-1">
-                        <p>{user.name}</p>
+                        <p>{visibleUserName}</p>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </DropdownMenuLabel>

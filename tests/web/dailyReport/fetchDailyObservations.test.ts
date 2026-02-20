@@ -153,7 +153,7 @@ describe('fetchDailyObservations', () => {
 
     const result = await fetchDailyObservations();
 
-    expect(result[0].observerName).toBe('Unknown Observer');
+    expect(result[0].observerName).toBe('Deleted User');
   });
 
   it('should handle missing project name', async () => {
