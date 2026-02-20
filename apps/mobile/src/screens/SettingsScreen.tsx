@@ -8,14 +8,15 @@ import {
   Pressable,
   TextInput,
   Modal,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SettingsScreen.styles';
-import { getSession, signOut } from 'packages/shared/src/supabase/auth';
+import { signIn, signOut, resetPassword, deleteAccount } from 'packages/shared/src/supabase/auth';
+import { supabase } from 'packages/shared/src/supabase/client';
 import { TOKENS } from '../styles/SettingsScreen.styles';
 import { Ionicons } from '@expo/vector-icons';
 import { Switch } from 'react-native';
+import { getLocalSettings, updateLocalSettings } from '../database/db';
 
 interface UserProfile {
   name: string;
@@ -31,6 +32,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onNavigateToProjects,
   onSignOutSuccess,
 }) => {
+  const MIN_PASSWORD_LENGTH = 8;
+  const PASSWORD_SPECIAL_CHAR_REGEX = /[^A-Za-z0-9]/;
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,45 +49,119 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [confirmEmail, setConfirmEmail] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  // Toggles (wire these to your real settings storage later)
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Toggles
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [showNameOnMap, setShowNameOnMap] = useState(true);
+
+  // Used to prevent multiple rapid updates
+  const [isUpdatingShowNameOnMap, setIsUpdatingShowNameOnMap] = useState(false);
+
+  const loadUserProfile = async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Error getting session:', error);
+      setUserProfile(null);
+      return;
+    }
+
+    const user = session?.user;
+    const email = user?.email ?? null;
+
+    let firstNameFromDb: string | null = null;
+    let lastNameFromDb: string | null = null;
+    let showNameOnMapFromDb = true;
+
+    if (user) {
+      const { data: dbUser, error: dbUserError } = await supabase
+        .from('users')
+        .select('first_name, last_name, share_name_on_map')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (dbUserError) {
+        console.warn('Error loading users row in SettingsScreen:', dbUserError);
+      } else if (dbUser) {
+        firstNameFromDb = dbUser.first_name;
+        lastNameFromDb = dbUser.last_name;
+        showNameOnMapFromDb = dbUser.share_name_on_map ?? true;
+      }
+    }
+
+    const fullNameFromDb = [firstNameFromDb, lastNameFromDb]
+      .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+      .join(' ')
+      .trim();
+
+    const nameFromMeta =
+      fullNameFromDb ||
+      (user?.user_metadata?.full_name as string | undefined) ||
+      (user?.user_metadata?.name as string | undefined) ||
+      (email ? email.split('@')[0] : undefined);
+
+    if (user && email) {
+      setUserProfile({
+        email,
+        name: nameFromMeta ? String(nameFromMeta) : 'User',
+      });
+      setShowNameOnMap(showNameOnMapFromDb);
+    } else {
+      setUserProfile(null);
+      setShowNameOnMap(true);
+    }
+  };
+
+  const loadLocalSettings = async () => {
+    try {
+      const localSettings = await getLocalSettings();
+      setIsDarkMode(localSettings.darkModeEnabled);
+      setNotificationsEnabled(localSettings.notificationsEnabled);
+    } catch (error) {
+      console.warn('Failed to load local settings:', error);
+    }
+  };
 
   // Fetch the user's email on mount using the existing getSession
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data, error } = await getSession();
-
-      if (error) {
-        console.error('Error getting session:', error);
-        setUserProfile(null);
-        return;
-      }
-
-      const user = data.session?.user;
-      const email = user?.email ?? null;
-      const nameFromMeta =
-        (user?.user_metadata?.full_name as string | undefined) ||
-        (user?.user_metadata?.name as string | undefined) ||
-        (email ? email.split('@')[0] : undefined);
-
-      if (email) {
-        setUserProfile({
-          email,
-          name: nameFromMeta ? String(nameFromMeta) : 'User',
-        });
-      } else {
-        setUserProfile(null);
-      }
-    };
-    fetchUser();
+    loadUserProfile();
+    loadLocalSettings();
   }, []);
+
+  const handleDarkModeToggle = async (value: boolean) => {
+    setIsDarkMode(value);
+
+    try {
+      await updateLocalSettings({ darkModeEnabled: value });
+    } catch (error) {
+      console.warn('Failed to persist dark mode setting:', error);
+    }
+  };
+
+  const handleDisableNotificationsToggle = async (disabled: boolean) => {
+    const nextNotificationsEnabled = !disabled;
+    setNotificationsEnabled(nextNotificationsEnabled);
+
+    try {
+      await updateLocalSettings({ notificationsEnabled: nextNotificationsEnabled });
+    } catch (error) {
+      console.warn('Failed to persist notifications setting:', error);
+    }
+  };
 
   const initials = useMemo(() => {
     const name = userProfile?.name?.trim();
@@ -119,35 +197,136 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     onNavigateToProjects?.();
   };
 
-  const handleEmailChange = () => {
+  const resetDeleteDialog = () => {
+    setShowDeleteDialog(false);
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
+  const handleDeletePasswordChange = (value: string) => {
+    setDeletePassword(value);
+    if (deleteError) setDeleteError('');
+  };
+
+  const formatDeleteAccountError = (error: unknown): string => {
+    const fallback = 'Unable to delete account. Please try again.';
+
+    if (!error || typeof error !== 'object') {
+      return fallback;
+    }
+
+    const errorRecord = error as Record<string, unknown>;
+    const details: string[] = [];
+
+    if (typeof errorRecord.name === 'string' && errorRecord.name.trim()) {
+      details.push(errorRecord.name.trim());
+    }
+
+    const context =
+      errorRecord.context && typeof errorRecord.context === 'object'
+        ? (errorRecord.context as Record<string, unknown>)
+        : undefined;
+
+    if (context) {
+      const status = context.status;
+      const statusText = context.statusText;
+
+      if (typeof status === 'number') {
+        details.push(
+          `HTTP ${status}${typeof statusText === 'string' && statusText.trim() ? ` ${statusText}` : ''}`
+        );
+      }
+
+      const jsonPayload =
+        context.json && typeof context.json === 'object'
+          ? (context.json as Record<string, unknown>)
+          : undefined;
+
+      if (jsonPayload && typeof jsonPayload.error === 'string' && jsonPayload.error.trim()) {
+        details.push(jsonPayload.error.trim());
+      } else if (typeof context.text === 'string' && context.text.trim()) {
+        details.push(context.text.trim());
+      }
+    }
+
+    if (typeof errorRecord.message === 'string' && errorRecord.message.trim()) {
+      details.push(errorRecord.message.trim());
+    }
+
+    const uniqueDetails = [...new Set(details)];
+    return uniqueDetails.length ? uniqueDetails.join(' • ') : fallback;
+  };
+
+  const handleEmailChange = async () => {
+    if (isUpdatingEmail) return;
+
     setEmailError('');
+
+    const normalizedNewEmail = newEmail.trim().toLowerCase();
+    const normalizedConfirmEmail = confirmEmail.trim().toLowerCase();
 
     if (!newEmail || !confirmEmail || !emailPassword) {
       setEmailError('All fields are required');
       return;
     }
 
-    if (newEmail !== confirmEmail) {
+    if (normalizedNewEmail !== normalizedConfirmEmail) {
       setEmailError('Email addresses do not match');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
-      setEmailError('Please enter a valid email address');
+    if (!userProfile?.email) {
+      setEmailError('No user is currently signed in');
       return;
     }
 
-    // TODO: wire to your backend (supabase updateUser) if desired.
-    // For now, just close. Keeping this UI because the web component had it.
-    setShowEmailDialog(false);
-    setNewEmail('');
-    setConfirmEmail('');
-    setEmailPassword('');
-    Alert.alert('Not Implemented', 'Email updates are not wired up yet.');
+    if (normalizedNewEmail === userProfile.email.trim().toLowerCase()) {
+      setEmailError('New email must be different from your current email');
+      return;
+    }
+
+    try {
+      setIsUpdatingEmail(true);
+
+      const { error: signInError } = await signIn(userProfile.email, emailPassword);
+      if (signInError) {
+        setEmailError(signInError.message || 'Current password is incorrect');
+        return;
+      }
+
+      const { data: updateEmailData, error: updateEmailError } = await supabase.auth.updateUser({
+        email: normalizedNewEmail,
+      });
+      if (updateEmailError) {
+        setEmailError(updateEmailError.message || 'Unable to update email address');
+        return;
+      }
+
+      const pendingEmail = updateEmailData?.user?.new_email;
+      if (pendingEmail) {
+        Alert.alert(
+          'Confirm email change',
+          `A confirmation email was sent to ${pendingEmail}. Your email will update after confirmation.`
+        );
+      } else {
+        Alert.alert('Success', 'Email address updated successfully.');
+      }
+
+      await loadUserProfile();
+
+      setShowEmailDialog(false);
+      setNewEmail('');
+      setConfirmEmail('');
+      setEmailPassword('');
+    } catch (error) {
+      console.error('Email change error:', error);
+      setEmailError('An unexpected error occurred while updating your email');
+    } finally {
+      setIsUpdatingEmail(false);
+    }
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     setPasswordError('');
 
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -160,22 +339,130 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       return;
     }
 
-    if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters long');
+    if (newPassword.trim().length < MIN_PASSWORD_LENGTH) {
+      setPasswordError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
       return;
     }
 
-    // TODO: wire to your backend if desired.
-    setShowPasswordDialog(false);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    Alert.alert('Not Implemented', 'Password updates are not wired up yet.');
+    if (!PASSWORD_SPECIAL_CHAR_REGEX.test(newPassword)) {
+      setPasswordError('Password must include at least one special character');
+      return;
+    }
+
+    if (!userProfile?.email) {
+      setPasswordError('No user is currently signed in');
+      return;
+    }
+
+    try {
+      const { error: signInError } = await signIn(userProfile.email, currentPassword);
+      if (signInError) {
+        setPasswordError(signInError.message || 'Current password is incorrect');
+        return;
+      }
+
+      const { error: updatePasswordError } = await resetPassword(newPassword);
+      if (updatePasswordError) {
+        setPasswordError(updatePasswordError.message || 'Unable to update password');
+        return;
+      }
+
+      setShowPasswordDialog(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Password change error:', error);
+      setPasswordError('An unexpected error occurred while updating your password');
+    }
   };
 
-  const handleDeleteAccount = () => {
-    setShowDeleteDialog(false);
-    Alert.alert('Not Implemented', 'Account deletion is not wired up yet.');
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+
+    setDeleteError('');
+
+    if (!deletePassword.trim()) {
+      setDeleteError('Password is required');
+      return;
+    }
+
+    if (!userProfile?.email) {
+      setDeleteError('No user is currently signed in');
+      return;
+    }
+
+    try {
+      setIsDeletingAccount(true);
+
+      const { error: signInError } = await signIn(userProfile.email, deletePassword);
+      if (signInError) {
+        setDeleteError(signInError.message || 'Incorrect password');
+        return;
+      }
+
+      const { error: deleteErrorResponse } = await deleteAccount();
+      if (deleteErrorResponse) {
+        setDeleteError(formatDeleteAccountError(deleteErrorResponse));
+        return;
+      }
+
+      resetDeleteDialog();
+      Alert.alert(
+        'Account Deleted',
+        'Your account was deleted successfully.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              await signOut();
+              onSignOutSuccess();
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    } catch (error) {
+      console.error('Delete account re-auth error:', error);
+      setDeleteError(formatDeleteAccountError(error));
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const handleShowNameOnMapToggle = async (value: boolean) => {
+    if (isUpdatingShowNameOnMap) return;
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
+      Alert.alert('Error', 'Unable to update setting right now. Please try again.');
+      return;
+    }
+
+    const previousValue = showNameOnMap;
+    setShowNameOnMap(value);
+    setIsUpdatingShowNameOnMap(true);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ share_name_on_map: value })
+        .eq('id', session.user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    } catch (error: any) {
+      console.error('Error updating share_name_on_map:', error);
+      setShowNameOnMap(previousValue);
+      Alert.alert('Update failed', error?.message || 'Unable to save this setting.');
+    } finally {
+      setIsUpdatingShowNameOnMap(false);
+    }
   };
 
   return (
@@ -322,10 +609,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <View style={styles.cardBody}>
             <View style={styles.switchRow}>
               <View style={styles.rowLeft}>
+                <Ionicons name="person-outline" size={20} color={TOKENS.primary} />
+                <Text style={styles.rowLabel}>Show my name on map</Text>
+              </View>
+              <Switch
+                value={showNameOnMap}
+                onValueChange={handleShowNameOnMapToggle}
+                disabled={isUpdatingShowNameOnMap}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <View style={styles.rowLeft}>
                 <Ionicons name="moon-outline" size={20} color={TOKENS.primary} />
                 <Text style={styles.rowLabel}>Dark mode</Text>
               </View>
-              <Switch value={isDarkMode} onValueChange={setIsDarkMode} />
+              <Switch value={isDarkMode} onValueChange={handleDarkModeToggle} />
             </View>
           </View>
         </View>
@@ -405,8 +703,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             activeOpacity={0.85}
             style={[styles.button, styles.buttonPrimary]}
             onPress={handleEmailChange}
+            disabled={isUpdatingEmail}
           >
-            <Text style={[styles.buttonText, styles.buttonTextSolid]}>Update Email</Text>
+            <Text style={[styles.buttonText, styles.buttonTextSolid]}>
+              {isUpdatingEmail ? 'Updating...' : 'Update Email'}
+            </Text>
           </TouchableOpacity>
         </View>
       </SheetModal>
@@ -415,7 +716,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <SheetModal
         visible={showPasswordDialog}
         title="Change Password"
-        description="Enter your current password and choose a new one. Passwords must be at least 8 characters long."
+        description="Enter your current password and choose a new one. Passwords must be at least 4 characters long and include at least one special character."
         onClose={() => setShowPasswordDialog(false)}
       >
         <Field label="Current password">
@@ -467,14 +768,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </TouchableOpacity>
         </View>
       </SheetModal>
-
       {/* Delete Account Modal */}
-      <ConfirmModal
+      <DeletePasswordModal
         visible={showDeleteDialog}
-        title="Are you absolutely sure?"
-        description="This action cannot be undone. This will permanently delete your account and remove all your data from our servers, including all journey recordings, observations, photos, and videos."
-        confirmText="Delete Account"
-        onCancel={() => setShowDeleteDialog(false)}
+        password={deletePassword}
+        passwordError={deleteError}
+        isSubmitting={isDeletingAccount}
+        onPasswordChange={handleDeletePasswordChange}
+        onCancel={resetDeleteDialog}
         onConfirm={handleDeleteAccount}
       />
 
@@ -487,10 +788,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       >
         <View style={styles.switchRow}>
           <Text style={styles.fieldLabel}>Disable all notifications</Text>
-          <Switch
-            value={!notificationsEnabled}
-            onValueChange={(checked) => setNotificationsEnabled(!checked)}
-          />
+          <Switch value={!notificationsEnabled} onValueChange={handleDisableNotificationsToggle} />
         </View>
         <View style={styles.modalFooter}>
           <TouchableOpacity
@@ -553,18 +851,20 @@ function SheetModal({
   );
 }
 
-function ConfirmModal({
+function DeletePasswordModal({
   visible,
-  title,
-  description,
-  confirmText,
+  password,
+  passwordError,
+  isSubmitting,
+  onPasswordChange,
   onCancel,
   onConfirm,
 }: {
   visible: boolean;
-  title: string;
-  description: string;
-  confirmText: string;
+  password: string;
+  passwordError: string;
+  isSubmitting: boolean;
+  onPasswordChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -572,15 +872,34 @@ function ConfirmModal({
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdropSolid}>
         <View style={styles.confirmBox}>
-          <Text style={styles.sheetTitle}>{title}</Text>
+          <Text style={styles.sheetTitle}>Delete Account</Text>
           <View style={{ height: 8 }} />
-          <Text style={styles.sheetDesc}>{description}</Text>
+          <Text style={styles.sheetDesc}>
+            Enter your password to permanently delete your account and all related data.
+          </Text>
+          <View style={{ height: 12 }} />
+          <TextInput
+            value={password}
+            onChangeText={onPasswordChange}
+            placeholder="Enter your password"
+            placeholderTextColor={TOKENS.placeholder}
+            secureTextEntry
+            style={styles.input}
+            autoCapitalize="none"
+            editable={!isSubmitting}
+          />
+          {!!passwordError && (
+            <View style={{ marginTop: 8 }}>
+              <ErrorBox message={passwordError} />
+            </View>
+          )}
           <View style={{ height: 16 }} />
           <View style={styles.modalFooter}>
             <TouchableOpacity
               activeOpacity={0.85}
               style={[styles.button, styles.buttonOutline]}
               onPress={onCancel}
+              disabled={isSubmitting}
             >
               <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
             </TouchableOpacity>
@@ -589,8 +908,11 @@ function ConfirmModal({
               activeOpacity={0.85}
               style={[styles.button, styles.buttonDestructive]}
               onPress={onConfirm}
+              disabled={isSubmitting}
             >
-              <Text style={[styles.buttonText, styles.buttonTextSolid]}>{confirmText}</Text>
+              <Text style={[styles.buttonText, styles.buttonTextSolid]}>
+                {isSubmitting ? 'Deleting...' : 'Delete Account'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -28,6 +28,90 @@ import {
 } from '@waterways/shared/src/database/schema';
 
 const DB_NAME = 'waterways.db';
+const LOCAL_SETTINGS_ID = 1;
+
+function isNativeDatabaseNullPointer(error: unknown): boolean {
+  const message = String((error as any)?.message ?? error ?? '');
+  return (
+    message.includes('NativeDatabase.prepareAsync') ||
+    message.includes('NativeDatabase.execAsync') ||
+    message.includes('java.lang.NullPointerException')
+  );
+}
+
+async function closeDatabaseConnection(): Promise<void> {
+  if (!db) return;
+
+  try {
+    await db.closeAsync();
+  } catch (error) {
+    console.warn('Failed to close SQLite connection cleanly:', error);
+  } finally {
+    db = null;
+  }
+}
+
+async function performInitialization(): Promise<void> {
+  await closeDatabaseConnection();
+
+  // Open or create the database file
+  db = await SQLite.openDatabaseAsync(DB_NAME);
+
+  // Enable WAL mode for better concurrent read/write performance
+  await db.execAsync('PRAGMA journal_mode = WAL;');
+
+  // Create all tables and indexes from the shared schema. Each
+  // statement is executed individually so we can surface which
+  // statement fails (if any) during initialization.
+  for (const statement of CREATE_ALL_TABLES) {
+    if (statement.trim()) {
+      await db.execAsync(statement);
+    }
+  }
+
+  // Validate the schema after applying all CREATE statements.
+  const isValid = await validateSchema();
+  if (!isValid) {
+    console.warn('Incorrect Database Schema detected.');
+
+    // Drop all tables to reset the schema
+    console.log('Dropping all tables to reset schema...');
+    for (const dropStmt of DROP_ALL_TABLES) {
+      if (dropStmt.trim()) {
+        await db.execAsync(dropStmt);
+      }
+    }
+
+    // Re-create all tables and indexes
+    console.log('Re-creating all tables...');
+    for (const statement of CREATE_ALL_TABLES) {
+      if (statement.trim()) {
+        await db.execAsync(statement);
+      }
+    }
+  }
+
+  console.log('Database initialized successfully');
+}
+
+async function ensureHealthyConnection(): Promise<void> {
+  if (!db) {
+    await initializeDatabase();
+    return;
+  }
+
+  try {
+    await db.execAsync('SELECT 1;');
+  } catch (error) {
+    if (!isNativeDatabaseNullPointer(error)) {
+      throw error;
+    }
+
+    console.warn('Detected stale native SQLite handle; reinitializing database connection...');
+    await closeDatabaseConnection();
+    await initializeDatabase();
+  }
+}
 
 /**
  * Module-level database reference (singleton pattern).
@@ -35,6 +119,7 @@ const DB_NAME = 'waterways.db';
  * - Once initialized, reused for all subsequent operations
  */
 let db: SQLite.SQLiteDatabase | null = null;
+let dbInitializationPromise: Promise<void> | null = null;
 
 /**
  * Get the database instance, initializing if necessary.
@@ -54,10 +139,86 @@ let db: SQLite.SQLiteDatabase | null = null;
  * ready to accept `runAsync`, `getAllAsync`, and `execAsync` calls.
  */
 export async function getDatabase() {
+  await initializeDatabase();
+  await ensureHealthyConnection();
+
   if (!db) {
-    await initializeDatabase();
+    throw new Error('Database is not initialized');
   }
+
   return db;
+}
+
+export async function getLocalSettings(): Promise<{
+  darkModeEnabled: boolean;
+  notificationsEnabled: boolean;
+}> {
+  const database = await getDatabase();
+
+  await database!.execAsync(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY,
+      dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
+      notifications_enabled INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+
+  await database!.runAsync(
+    `INSERT OR IGNORE INTO settings (id, dark_mode_enabled, notifications_enabled)
+     VALUES (?, ?, ?)`,
+    [LOCAL_SETTINGS_ID, 1, 1]
+  );
+
+  const rows = await database!.getAllAsync<{
+    dark_mode_enabled: number;
+    notifications_enabled: number;
+  }>(`SELECT dark_mode_enabled, notifications_enabled FROM settings WHERE id = ? LIMIT 1`, [
+    LOCAL_SETTINGS_ID,
+  ]);
+
+  const row = rows[0] ?? { dark_mode_enabled: 1, notifications_enabled: 1 };
+  return {
+    darkModeEnabled: row.dark_mode_enabled === 1,
+    notificationsEnabled: row.notifications_enabled === 1,
+  };
+}
+
+export async function updateLocalSettings(
+  updates: Partial<{ darkModeEnabled: boolean; notificationsEnabled: boolean }>
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database!.execAsync(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY,
+      dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
+      notifications_enabled INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+
+  await database!.runAsync(
+    `INSERT OR IGNORE INTO settings (id, dark_mode_enabled, notifications_enabled)
+     VALUES (?, ?, ?)`,
+    [LOCAL_SETTINGS_ID, 1, 1]
+  );
+
+  const setParts: string[] = [];
+  const params: Array<number | string> = [];
+
+  if (updates.darkModeEnabled !== undefined) {
+    setParts.push('dark_mode_enabled = ?');
+    params.push(updates.darkModeEnabled ? 1 : 0);
+  }
+
+  if (updates.notificationsEnabled !== undefined) {
+    setParts.push('notifications_enabled = ?');
+    params.push(updates.notificationsEnabled ? 1 : 0);
+  }
+
+  if (setParts.length === 0) return;
+
+  params.push(LOCAL_SETTINGS_ID);
+  await database!.runAsync(`UPDATE settings SET ${setParts.join(', ')} WHERE id = ?`, params);
 }
 
 /**
@@ -147,47 +308,32 @@ async function validateSchema(): Promise<boolean> {
  * issues during DB setup.
  */
 export async function initializeDatabase(): Promise<void> {
-  try {
-    // Open or create the database file
-    db = await SQLite.openDatabaseAsync(DB_NAME);
-
-    // Enable WAL mode for better concurrent read/write performance
-    await db.execAsync('PRAGMA journal_mode = WAL;');
-
-    // Create all tables and indexes from the shared schema. Each
-    // statement is executed individually so we can surface which
-    // statement fails (if any) during initialization.
-    for (const statement of CREATE_ALL_TABLES) {
-      if (statement.trim()) {
-        await db.execAsync(statement);
+  if (db) {
+    try {
+      await db.execAsync('SELECT 1;');
+      return;
+    } catch (error) {
+      if (!isNativeDatabaseNullPointer(error)) {
+        throw error;
       }
+
+      await closeDatabaseConnection();
     }
-
-    // Validate the schema after applying all CREATE statements.
-    const isValid = await validateSchema();
-    if (!isValid) {
-      console.warn('Incorrect Database Schema detected.');
-
-      // Drop all tables to reset the schema
-      console.log('Dropping all tables to reset schema...');
-      for (const dropStmt of DROP_ALL_TABLES) {
-        if (dropStmt.trim()) {
-          await db.execAsync(dropStmt);
-        }
-      }
-
-      // Re-create all tables and indexes
-      console.log('Re-creating all tables...');
-      for (const statement of CREATE_ALL_TABLES) {
-        if (statement.trim()) {
-          await db.execAsync(statement);
-        }
-      }
-    }
-
-    console.log('Database initialized successfully');
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
   }
+
+  if (!dbInitializationPromise) {
+    dbInitializationPromise = (async () => {
+      try {
+        await performInitialization();
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        await closeDatabaseConnection();
+        throw error;
+      }
+    })().finally(() => {
+      dbInitializationPromise = null;
+    });
+  }
+
+  await dbInitializationPromise;
 }

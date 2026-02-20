@@ -17,7 +17,7 @@ interface SubmittedJourney {
 
 type TripRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
   project_id: string | null;
   start_time: string | null;
   end_time: string | null;

@@ -9,6 +9,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  showNameOnMap: boolean;
   isAdmin: boolean;
   role?: string | null;
   projects?: string[];
@@ -79,8 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // If the lookup fails or times out, fall back to defaults.
     let role: string | null = null;
     let status: string | null = null;
+    let showNameOnMap = true;
     try {
-      const rolePromise = supabase.from('users').select('role, status').eq('id', supabaseUser.id);
+      const rolePromise = supabase
+        .from('users')
+        .select('role, status, share_name_on_map')
+        .eq('id', supabaseUser.id);
       const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('role/status fetch timeout')), 3000)
       );
@@ -89,6 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (currentUser) {
         if (typeof currentUser.role === 'string') role = currentUser.role;
         if (typeof currentUser.status === 'string') status = currentUser.status;
+        if (typeof currentUser.share_name_on_map === 'boolean') {
+          showNameOnMap = currentUser.share_name_on_map;
+        }
       }
     } catch (err: any) {
       // Don't block sign-in on role lookup failures.
@@ -115,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: userId,
       name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
       email: supabaseUser.email || '',
+      showNameOnMap,
       isAdmin,
       role,
       projects: [],

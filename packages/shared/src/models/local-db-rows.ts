@@ -75,3 +75,12 @@ export interface SyncLog {
   timestamp: number;
   error_message: string | null;
 }
+
+/**
+ * Represents app-level settings persisted in local SQLite.
+ */
+export interface LocalSettings {
+  id: string;
+  dark_mode_enabled: number;
+  notifications_enabled: number;
+}

@@ -22,7 +22,7 @@ type TripRow = {
   start_time: string | null;
   end_time: string | null;
   created_at: string;
-  user_id: string;
+  user_id: string | null;
 };
 
 type ObservationUI = {
