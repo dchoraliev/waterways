@@ -3,7 +3,13 @@ import { MapView } from '../components/MapView';
 import { FilterOptions } from '../components/FilterPanel';
 import { ObservationDetails } from '../components/ObservationDetails';
 import { Header } from '../components/Header';
-import { mockObservations } from '../utils/mockData';
+import { DailyReportPopup } from '../components/DailyReportPopup';
+import {
+  fetchObservations,
+  deleteObservation,
+  deleteAllUserObservations,
+} from '../api/observations';
+import { banUser } from '../api/users';
 import { exportToCSV } from '../utils/csvExport';
 import { Observation } from '../types/observation';
 import { toast } from 'sonner';
@@ -12,8 +18,10 @@ import { LoginPage } from './LoginPage';
 
 export function Dashboard() {
   const { user } = useAuth();
+  console.log('Dashboard auth user:', user);
   const [showLogin, setShowLogin] = useState(false);
-  const [observations, setObservations] = useState<Observation[]>(mockObservations);
+  const [observations, setObservations] = useState<Observation[]>([]);
+  const [, setLoading] = useState(true);
   const [bannedUsers, setBannedUsers] = useState<Set<string>>(new Set());
   const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({
@@ -21,10 +29,40 @@ export function Dashboard() {
     month: '',
     types: [],
     keywords: '',
-    myProjects: '',
+    myProjects: 'all',
   });
   const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [dailyReportOpen, setDailyReportOpen] = useState(false);
+
+  // Load observations from Supabase
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await fetchObservations();
+        console.log('Supabase observations:', data);
+
+        if (!cancelled) {
+          // Optional: fall back to mock data if nothing in DB
+          // setObservations(data.length ? data : mockObservations);
+          setObservations(data);
+        }
+      } catch (err) {
+        console.error('Failed to load observations:', err);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reset showLogin when user state changes
   useEffect(() => {
@@ -41,26 +79,66 @@ export function Dashboard() {
   };
 
   // Admin action handlers
-  const handleDeleteObservation = (observationId: string) => {
-    setObservations((prev) => prev.filter((obs) => obs.id !== observationId));
+  const handleDeleteObservation = async (observationId: string) => {
+    try {
+      const res = await deleteObservation(observationId);
+      if (res.success) {
+        setObservations((prev) => prev.filter((obs) => obs.id !== observationId));
+        toast.success('Observation deleted successfully');
+      } else {
+        console.error('Supabase delete failed:', res.error, res.data);
+        toast.error(res.error ?? 'Failed to delete observation');
+      }
+    } catch (err) {
+      console.error('Error deleting observation:', err);
+      toast.error('Error deleting observation');
+    }
   };
 
-  const handleDeleteAllUserObservations = (userId: string) => {
-    setObservations((prev) => prev.filter((obs) => obs.userId !== userId));
+  const handleDeleteAllUserObservations = async (userId: string) => {
+    try {
+      const res = await deleteAllUserObservations(userId);
+      if (res.success) {
+        setObservations((prev) => prev.filter((obs) => obs.userId !== userId));
+        toast.success('All user observations deleted successfully');
+      } else {
+        console.error('Supabase delete all failed:', res.error, res.data);
+        toast.error(res.error ?? 'Failed to delete user observations');
+      }
+    } catch (err) {
+      console.error('Error deleting user observations:', err);
+      toast.error('Error deleting user observations');
+    }
   };
 
   const handleFilterByUser = (userId: string) => {
     setFilteredUserId(userId);
   };
 
-  const handleBanUser = (userId: string) => {
-    setBannedUsers((prev) => new Set([...prev, userId]));
+  const handleBanUser = async (userId: string) => {
+    try {
+      const res = await banUser(userId);
+      if (res.success) {
+        setBannedUsers((prev) => new Set([...prev, userId]));
+        // Optionally remove their observations from view immediately
+        setObservations((prev) => prev.filter((obs) => obs.userId !== userId));
+        //toast.success('User has been banned');
+      } else {
+        console.error('Failed to ban user:', res.error, res.data);
+        toast.error(res.error ?? 'Failed to ban user');
+      }
+    } catch (err) {
+      console.error('Error banning user:', err);
+      toast.error('Error banning user');
+    }
   };
 
   // Get unique observation types
   const observationTypes = useMemo(() => {
     return Array.from(new Set(observations.map((obs) => obs.type))).sort();
   }, [observations]);
+
+  // projects are provided via AuthContext on `user.projects`
 
   // Filter observations based on current filters
   const filteredObservations = useMemo(() => {
@@ -75,10 +153,20 @@ export function Dashboard() {
         return false;
       }
 
-      // My Projects filter (only show observations by logged-in user)
-      if (filters.myProjects && user) {
-        // Match observer name with user name
-        if (obs.observerName.toLowerCase() !== user.name.toLowerCase()) {
+      // Project / My Projects filter
+      if (filters.myProjects === 'my' && user) {
+        const observerNameLower = obs.observerName.toLowerCase();
+        const userNameLower = user.name.toLowerCase();
+        if (!observerNameLower.includes(userNameLower)) {
+          return false;
+        }
+      } else if (
+        filters.myProjects &&
+        filters.myProjects !== 'all' &&
+        filters.myProjects !== 'my'
+      ) {
+        // filter by specific project name
+        if (obs.projectName !== filters.myProjects) {
           return false;
         }
       }
@@ -119,15 +207,6 @@ export function Dashboard() {
         }
       }
 
-      // My Projects filter
-      if (filters.myProjects === 'my' && user) {
-        const observerNameLower = obs.observerName.toLowerCase();
-        const userNameLower = user.name.toLowerCase();
-        if (!observerNameLower.includes(userNameLower)) {
-          return false;
-        }
-      }
-
       return true;
     });
   }, [observations, bannedUsers, filteredUserId, filters, user]);
@@ -154,6 +233,7 @@ export function Dashboard() {
     );
   }
 
+  if (user) console.log('Dashboard passing projects:', user.projects);
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -171,6 +251,8 @@ export function Dashboard() {
             : undefined
         }
         onClearUserFilter={() => setFilteredUserId(null)}
+        onDailyReportClick={() => setDailyReportOpen(true)}
+        projects={user?.projects || []}
       />
 
       <main className="flex-1 relative overflow-hidden">
@@ -186,6 +268,8 @@ export function Dashboard() {
         onFilterByUser={handleFilterByUser}
         onBanUser={handleBanUser}
       />
+
+      <DailyReportPopup open={dailyReportOpen} onClose={() => setDailyReportOpen(false)} />
     </div>
   );
 }

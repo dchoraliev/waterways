@@ -13,7 +13,7 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
-import { Download, User, LogOut, LogIn, ChevronDown } from 'lucide-react';
+import { Download, User, LogOut, LogIn, ChevronDown, CalendarDays } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { SignIn } from '../pages/SignIn';
 import { SignUp } from '../pages/SignUp';
@@ -31,6 +31,8 @@ interface HeaderProps {
   filteredUserId?: string | null;
   filteredUserName?: string;
   onClearUserFilter?: () => void;
+  onDailyReportClick?: () => void;
+  projects?: string[];
 }
 
 type AuthDialog = 'signin' | 'signup' | null;
@@ -52,6 +54,8 @@ const months = [
 
 const years = ['2024', '2025'];
 
+console.log('useAuth user:', User);
+
 export function Header({
   filters,
   onFilterChange,
@@ -63,12 +67,26 @@ export function Header({
   filteredUserId,
   filteredUserName,
   onClearUserFilter,
+  onDailyReportClick,
+  projects,
 }: HeaderProps) {
   const { user, signOut } = useAuth();
+  if (user && (!projects || projects.length === 0)) {
+    console.log('Header: user has no projects in context', user.id, user.name, projects);
+  }
   const [authDialog, setAuthDialog] = useState<AuthDialog>(null);
 
-  const handleFilterChange = (key: keyof FilterOptions, value: string) => {
-    onFilterChange({ ...filters, [key]: value });
+  const handleFilterChange = (key: keyof FilterOptions, value: string | boolean) => {
+    onFilterChange({ ...filters, [key]: value } as FilterOptions);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success('Successfully signed out');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to sign out');
+    }
   };
 
   const handleTypeToggle = (type: string) => {
@@ -133,13 +151,13 @@ export function Header({
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>
+                    <DropdownMenuItem onClick={handleSignOut}>
                       <LogOut className="size-4 mr-2" />
                       Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="outline" size="sm" onClick={signOut}>
+                <Button variant="outline" size="sm" onClick={handleSignOut}>
                   <LogOut className="size-4 mr-2" />
                   Logout
                 </Button>
@@ -244,28 +262,38 @@ export function Header({
                 className="w-[200px] bg-background"
               />
 
-              {user && (
-                <Select
-                  value={filters.myProjects || 'all'}
-                  onValueChange={(value: string) =>
-                    handleFilterChange('myProjects', value === 'all' ? '' : value)
-                  }
-                >
-                  <SelectTrigger className="w-[160px] bg-background">
-                    <SelectValue placeholder="All Projects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    <SelectItem value="my">My Projects</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              <Select
+                value={filters.myProjects || 'all'}
+                onValueChange={(value: string) => handleFilterChange('myProjects', value)}
+              >
+                <SelectTrigger className="w-[160px] bg-background">
+                  <SelectValue placeholder="All Projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects && projects.length > 0 ? (
+                    projects.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No projects yet
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 {filteredCount} of {totalCount} observations
               </div>
+              <Button onClick={onDailyReportClick} variant="outline" size="sm">
+                <CalendarDays className="size-4 mr-2" />
+                Daily Report
+              </Button>
               <Button onClick={handleExportClick} variant="outline" size="sm">
                 <Download className="size-4 mr-2" />
                 Export CSV

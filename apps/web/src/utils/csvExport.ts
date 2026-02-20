@@ -7,8 +7,6 @@ export function exportToCSV(
   const headers = [
     'ID',
     'Project Name',
-    'Journey Start Location',
-    'Location Name',
     'Latitude',
     'Longitude',
     'Date',
@@ -24,8 +22,6 @@ export function exportToCSV(
   const rows = observations.map((obs) => [
     obs.id,
     obs.projectName,
-    obs.journeyStartLocation,
-    obs.location.name,
     obs.location.lat.toString(),
     obs.location.lng.toString(),
     obs.date,

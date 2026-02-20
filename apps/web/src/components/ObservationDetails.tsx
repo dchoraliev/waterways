@@ -34,6 +34,7 @@ export function ObservationDetails({
   const handleBanUser = () => {
     if (window.confirm(`Are you sure you want to ban ${observation.observerName}?`)) {
       onBanUser?.(observation.userId);
+      // Only show the specific user banned toast
       toast.success(`User ${observation.observerName} has been banned`);
       onClose();
     }
@@ -42,7 +43,6 @@ export function ObservationDetails({
   const handleDeletePost = () => {
     if (window.confirm('Are you sure you want to delete this observation?')) {
       onDeleteObservation?.(observation.id);
-      toast.success('Observation deleted successfully');
       onClose();
     }
   };
@@ -60,7 +60,6 @@ export function ObservationDetails({
       )
     ) {
       onDeleteAllUserObservations?.(observation.userId);
-      toast.success(`All observations by ${observation.observerName} have been deleted`);
       onClose();
     }
   };
@@ -106,7 +105,7 @@ export function ObservationDetails({
                 size="sm"
                 variant="outline"
                 onClick={handleDeletePost}
-                className="w-full justify-start text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
               >
                 <Trash2 className="size-4 mr-2" />
                 Delete Post
@@ -151,13 +150,7 @@ export function ObservationDetails({
               <Calendar className="size-4 mt-0.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">Date</p>
-                <p className="text-sm">
-                  {new Date(observation.date).toLocaleDateString('en-GB', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </p>
+                <p className="text-sm">{observation.date}</p>
               </div>
             </div>
 

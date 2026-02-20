@@ -17,7 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@waterways/shared": ["../../../../packages/shared/src"],
+      "./supabaseEnv": ["./src/services/supabaseEnv.vite.ts"]
     }
   },
   "include": ["src"],

@@ -12,13 +12,20 @@ export interface FilterOptions {
   month: string;
   types: string[];
   keywords: string;
-  myProjects: string;
+  myProjects: string; // 'all' | 'my' | projectName
+}
+
+interface Project {
+  id: string;
+  name: string;
+  active?: boolean;
 }
 
 interface FilterPanelProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
   observationTypes: string[];
+  projects: Project[];
 }
 
 const months = [
@@ -36,10 +43,14 @@ const months = [
   'December',
 ];
 
-const years = ['2024', '2025'];
-
-export function FilterPanel({ filters, onFilterChange, observationTypes }: FilterPanelProps) {
+export function FilterPanel({
+  filters,
+  onFilterChange,
+  observationTypes,
+  projects,
+}: FilterPanelProps) {
   // panel open state not required currently
+  console.log('projects data:', projects);
 
   const handleFilterChange = (key: keyof FilterOptions, value: string) => {
     onFilterChange({ ...filters, [key]: value });
@@ -58,7 +69,7 @@ export function FilterPanel({ filters, onFilterChange, observationTypes }: Filte
       month: '',
       types: [],
       keywords: '',
-      myProjects: '',
+      myProjects: 'all',
     });
   };
 
@@ -67,7 +78,7 @@ export function FilterPanel({ filters, onFilterChange, observationTypes }: Filte
     filters.month ||
     filters.types.length > 0 ||
     filters.keywords ||
-    filters.myProjects;
+    filters.myProjects !== 'all';
 
   return (
     <Card className="p-4 space-y-4">
@@ -84,83 +95,89 @@ export function FilterPanel({ filters, onFilterChange, observationTypes }: Filte
         )}
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="year">Year</Label>
-          <Select
-            value={filters.year || 'all'}
-            onValueChange={(value: string) =>
-              handleFilterChange('year', value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger id="year">
-              <SelectValue placeholder="All years" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All years</SelectItem>
-              {years.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Projects */}
+      <div className="space-y-2">
+        <Label htmlFor="projectFilter">Projects</Label>
 
-        <div className="space-y-2">
-          <Label htmlFor="month">Month</Label>
-          <Select
-            value={filters.month || 'all'}
-            onValueChange={(value: string) =>
-              handleFilterChange('month', value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger id="month">
-              <SelectValue placeholder="All months" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All months</SelectItem>
-              {months.map((month, index) => (
-                <SelectItem key={month} value={String(index + 1).padStart(2, '0')}>
-                  {month}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          value={filters.myProjects || 'all'}
+          onValueChange={(value) => handleFilterChange('myProjects', value)}
+        >
+          <SelectTrigger id="projectFilter">
+            <SelectValue placeholder="All projects" />
+          </SelectTrigger>
 
-        <div className="space-y-2">
-          <Label>Observation Types</Label>
-          <div className="space-y-2 border border-input rounded-md p-3 max-h-48 overflow-y-auto">
-            {observationTypes.map((type) => (
-              <div key={type} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`type-${type}`}
-                  checked={filters.types.includes(type)}
-                  onCheckedChange={() => handleTypeToggle(type)}
-                />
-                <label htmlFor={`type-${type}`} className="text-sm cursor-pointer flex-1">
-                  {type}
-                </label>
-              </div>
+          <SelectContent>
+            <SelectItem value="all">All projects</SelectItem>
+
+            {projects.length === 0 ? (
+              <SelectItem value="none" disabled>
+                No projects yet
+              </SelectItem>
+            ) : (
+              projects.map((project) => (
+                <SelectItem key={project.id} value={project.name}>
+                  {project.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="month">Month</Label>
+        <Select
+          value={filters.month || 'all'}
+          onValueChange={(value: string) =>
+            handleFilterChange('month', value === 'all' ? '' : value)
+          }
+        >
+          <SelectTrigger id="month">
+            <SelectValue placeholder="All months" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All months</SelectItem>
+            {months.map((month, index) => (
+              <SelectItem key={month} value={String(index + 1).padStart(2, '0')}>
+                {month}
+              </SelectItem>
             ))}
-          </div>
-          {filters.types.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {filters.types.length} type{filters.types.length !== 1 ? 's' : ''} selected
-            </p>
-          )}
-        </div>
+          </SelectContent>
+        </Select>
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="keywords">Keywords</Label>
-          <Input
-            id="keywords"
-            placeholder="Search observations..."
-            value={filters.keywords}
-            onChange={(e) => handleFilterChange('keywords', e.target.value)}
-          />
+      <div className="space-y-2">
+        <Label>Observation Types</Label>
+        <div className="space-y-2 border border-input rounded-md p-3 max-h-48 overflow-y-auto">
+          {observationTypes.map((type) => (
+            <div key={type} className="flex items-center space-x-2">
+              <Checkbox
+                id={`type-${type}`}
+                checked={filters.types.includes(type)}
+                onCheckedChange={() => handleTypeToggle(type)}
+              />
+              <label htmlFor={`type-${type}`} className="text-sm cursor-pointer flex-1">
+                {type}
+              </label>
+            </div>
+          ))}
         </div>
+        {filters.types.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {filters.types.length} type{filters.types.length !== 1 ? 's' : ''} selected
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="keywords">Keywords</Label>
+        <Input
+          id="keywords"
+          placeholder="Search observations..."
+          value={filters.keywords}
+          onChange={(e) => handleFilterChange('keywords', e.target.value)}
+        />
       </div>
     </Card>
   );

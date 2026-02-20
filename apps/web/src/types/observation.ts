@@ -7,7 +7,11 @@ export interface Observation {
     lng: number;
     name: string;
   };
+  /** ISO 8601 UTC string from the DB (e.g. "2026-02-18T12:00:00+00:00") */
+  createdAt: string;
+  /** Display-friendly local time (e.g. "14:30") */
   timestamp: string;
+  /** Local date string (e.g. "2026-02-18") */
   date: string;
   observation: string;
   observerName: string;

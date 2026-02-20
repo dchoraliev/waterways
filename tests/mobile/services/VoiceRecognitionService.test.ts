@@ -14,11 +14,15 @@ const mockVoiceModule = {
     | ((event: { error?: { code?: number | string; message?: string } }) => void),
 };
 
-jest.mock('@react-native-voice/voice', () => ({
-  __esModule: true,
-  ...mockVoiceModule,
-  default: mockVoiceModule,
-}));
+jest.mock(
+  '@react-native-voice/voice',
+  () => ({
+    __esModule: true,
+    ...mockVoiceModule,
+    default: mockVoiceModule,
+  }),
+  { virtual: true }
+);
 
 import VoiceRecognitionService from '../../../apps/mobile/src/services/VoiceRecognitionService';
 
