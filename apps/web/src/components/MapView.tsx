@@ -1,8 +1,19 @@
 import { useState, useMemo } from 'react';
 import { Map, Marker } from 'pigeon-maps';
 import type { Observation } from '../types/observation';
-import { X, MapPin } from 'lucide-react';
+import { X, MapPin, Satellite, Map as MapIcon } from 'lucide-react';
 import { clusterObservations, type Cluster } from '../utils/clustering';
+
+// ── Tile providers ──────────────────────────────────────────────
+function osmProvider(x: number, y: number, z: number): string {
+  const s = ['a', 'b', 'c'][Math.floor(Math.random() * 3)];
+  return `https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+}
+
+function satelliteProvider(x: number, y: number, z: number): string {
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+}
+// ────────────────────────────────────────────────────────────────
 
 interface MapViewProps {
   observations: Observation[];
@@ -10,13 +21,12 @@ interface MapViewProps {
 }
 
 export function MapView({ observations, onObservationClick }: MapViewProps) {
-  // 🇺🇸 Start centered on the US and don't recenter on filters
   const [center, setCenter] = useState<[number, number]>([39.5, -98.35]);
   const [zoom, setZoom] = useState(4);
   const [, setClickedObservationId] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
+  const [isSatellite, setIsSatellite] = useState(false);
 
-  // No useEffect here – we don't recenter based on observations at all
   const clusters = useMemo(() => {
     return clusterObservations(observations, zoom);
   }, [observations, zoom]);
@@ -38,6 +48,7 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
       <Map
         center={center}
         zoom={zoom}
+        provider={isSatellite ? satelliteProvider : osmProvider}
         onBoundsChanged={({ center, zoom }) => {
           setCenter(center as [number, number]);
           setZoom(zoom);
@@ -76,6 +87,33 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
         ))}
       </Map>
 
+      {/* ── Satellite toggle button ── */}
+      <button
+        onClick={() => setIsSatellite((prev) => !prev)}
+        className={`
+          absolute bottom-6 right-4 z-[1000]
+          flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+          shadow-lg border transition-colors duration-200
+          ${
+            isSatellite
+              ? 'bg-white text-neutral-900 border-gray-300 hover:bg-gray-50'
+              : 'bg-neutral-900 text-white border-neutral-700 hover:bg-neutral-800'
+          }
+        `}
+        title={isSatellite ? 'Switch to Map view' : 'Switch to Satellite view'}
+      >
+        {isSatellite ? (
+          <>
+            <MapIcon className="size-4" /> Map
+          </>
+        ) : (
+          <>
+            <Satellite className="size-4" /> Satellite
+          </>
+        )}
+      </button>
+
+      {/* ── Cluster popup (unchanged) ── */}
       {selectedCluster && (
         <div className="absolute left-4 top-4 w-80 max-h-[500px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-[1000]">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
