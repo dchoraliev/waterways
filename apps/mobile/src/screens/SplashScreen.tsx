@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
-import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 import { useEffect, useState } from 'react';
 import { initializeDatabase } from '../database/db';
-import { getSession } from 'packages/shared/src/supabase/auth';
+import { getSession } from '@waterways/shared/src/supabase/auth';
 import RippleSplash from '../components/RippleSplash';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '../constants/routes';

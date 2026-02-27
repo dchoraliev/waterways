@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SettingsScreen.styles';
 import { signIn, signOut, resetPassword, deleteAccount } from 'packages/shared/src/supabase/auth';
-import { supabase } from 'packages/shared/src/supabase/client';
+import { supabase } from '@waterways/shared/src/supabase/client';
 import { TOKENS } from '../styles/SettingsScreen.styles';
 import { Ionicons } from '@expo/vector-icons';
 import { Switch } from 'react-native';
@@ -456,10 +456,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       if (updateError) {
         throw updateError;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unable to save this setting.';
       console.error('Error updating share_name_on_map:', error);
       setShowNameOnMap(previousValue);
-      Alert.alert('Update failed', error?.message || 'Unable to save this setting.');
+      Alert.alert('Update failed', message);
     } finally {
       setIsUpdatingShowNameOnMap(false);
     }

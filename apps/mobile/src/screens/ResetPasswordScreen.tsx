@@ -5,11 +5,11 @@ import {
   sendResetPasswordEmail,
   verifyResetPasswordOtp,
   resetPassword,
-} from '@shared/supabase/auth';
+} from '@waterways/shared/src/supabase/auth';
 import styles from '../styles/ResetPasswordScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
-import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 
 export interface ResetPasswordScreenProps {
   onPasswordChange: () => void;

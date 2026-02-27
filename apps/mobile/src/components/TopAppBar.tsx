@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
 import styles from '../styles/TopAppBar.styles';
-import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 
 const TopAppBar: React.FC = () => {
   return (

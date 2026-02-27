@@ -9,9 +9,10 @@ dotenv.config({
 
 export default {
   expo: {
-    name: 'mobile',
+    name: 'Waterways',
     scheme: 'waterways',
     slug: 'mobile',
+    owner: 'waterwaysse4330',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -35,6 +36,32 @@ export default {
       predictiveBackGestureEnabled: false,
     },
 
+    ios: {
+      bundleIdentifier: 'com.waterways.mobile',
+      supportsTablet: true,
+      config: {
+        usesNonExemptEncryption: false,
+      },
+      infoPlist: {
+        NSMicrophoneUsageDescription:
+          'Waterways needs microphone access to record and transcribe field observations.',
+        NSSpeechRecognitionUsageDescription:
+          'Waterways needs speech recognition to convert your voice notes into text observations.',
+        NSCameraUsageDescription:
+          'Waterways needs camera access to attach photos to your observations.',
+        NSPhotoLibraryUsageDescription:
+          'Waterways needs photo library access to let you attach existing images to observations.',
+        NSPhotoLibraryAddUsageDescription:
+          'Waterways can save captured photos to your photo library when you choose to.',
+        NSLocationWhenInUseUsageDescription:
+          'Waterways uses your location while the app is in use to tag observation locations accurately.',
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true,
+          NSAllowsLocalNetworking: true,
+        },
+      },
+    },
+
     plugins: ['expo-router', './plugins/withAndroidCompatibility.js'],
 
     experiments: {
@@ -46,7 +73,7 @@ export default {
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       eas: {
-        projectId: 'de247055-1e3a-4887-8d8b-1b633101d7b8',
+        projectId: '5e066005-7d80-4ab3-a8c0-19a219f2b0a6',
       },
       // Ensure Expo Router knows the `src/app` location in this workspace
       router: {

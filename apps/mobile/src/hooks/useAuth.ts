@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../../packages/shared/src/supabase/client'; // Import the client
+import { supabase } from '@waterways/shared/src/supabase/client';
 // You might need to install and import the User type if using TypeScript
 // import { User } from '@supabase/supabase-js';
 

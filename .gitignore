@@ -106,6 +106,8 @@ fastlane/Preview.html
 *.jks
 *.p12
 *.pem
+*.p8
+credentials.json
 serviceAccountKey.json
 *.mobileprovision
 

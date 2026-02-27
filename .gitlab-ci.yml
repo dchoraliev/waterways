@@ -12,6 +12,7 @@ default:
 stages:
   - install
   - verify
+  - build
 
 # Global cache configuration - use push/pull policy for better performance
 cache:
@@ -80,3 +81,45 @@ test:
     paths:
       - coverage/
     expire_in: 30 days
+
+# ──────────────────────────────────────────────
+# Build Stage - EAS iOS Development Build
+# ──────────────────────────────────────────────
+# Triggered manually or on pushes to main/develop.
+# Requires EXPO_TOKEN CI/CD variable set in GitLab
+# (Settings > CI/CD > Variables).
+
+.eas_build_base:
+  stage: build
+  interruptible: false
+  needs:
+    - install_dependencies
+  before_script:
+    - yarn install --frozen-lockfile --prefer-offline
+    - npx eas-cli --version
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+      - apps/*/node_modules/
+      - packages/*/node_modules/
+    policy: pull
+
+# iOS Development Build (device) — manual trigger
+eas_build_ios_development:
+  extends: .eas_build_base
+  script:
+    - cd apps/mobile
+    - EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build
+        --non-interactive
+        --platform ios
+        --profile development
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: always
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "FixMainForIOS"
+      when: manual
+      allow_failure: true
+    - when: never

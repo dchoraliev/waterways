@@ -289,11 +289,32 @@ The Journey screen should show a wake-word status message (`Wake word is startin
 
 See [WAKE_WORD_SYSTEM.md](WAKE_WORD_SYSTEM.md) for design notes.
 
-### Cloud builds with EAS (optional)
+### When Is a Native Rebuild Required?
 
-EAS Build compiles artifacts without local Gradle setup.
+Not every change needs a full native rebuild. Use this table to decide:
 
-> ⚠️ EAS has not been verified for this repo — all builds so far have been done locally. It will likely be needed for Play Store deployment. Validate with the `preview` profile and confirm `eas.json` and plugins before relying on it.
+| What changed | Rebuild needed? | What to do |
+|---|---|---|
+| JS/TS code, React components, styles | **No** | Hot-reload / restart Metro |
+| `app.config.ts` or `app.json` (name, permissions, plugins, bundle ID, etc.) | **Yes** | `yarn prebuild --clean` then rebuild, or trigger an EAS build |
+| `eas.json` (build profiles, environment) | **Yes (EAS only)** | Trigger a new EAS build |
+| `plugins/withAndroidCompatibility.js` or any Expo config plugin | **Yes** | `yarn prebuild --clean` then rebuild |
+| `package.json` if adding/removing a native module (e.g. camera, voice) | **Yes** | `yarn install` then `yarn prebuild --clean` then rebuild |
+| `patches/` (patch-package files) | **Yes** | `yarn install` (applies patches) then `yarn prebuild --clean` then rebuild |
+| Supabase edge functions or migrations | **No** | Deploy via Supabase CLI; no app rebuild needed |
+| `.env` variables used at build time | **Yes** | Rebuild to bake in new values |
+| `.env` variables read at runtime via `Constants.expoConfig.extra` | **No** | Restart the app (values are embedded at build time, so a rebuild is needed if they actually changed) |
+| Android `gradle.properties` or iOS plist changes | **Yes** | `yarn prebuild --clean` then rebuild |
+
+> **Rule of thumb:** if the change touches anything outside `src/`, you probably need a rebuild.
+
+---
+
+### Cloud Builds with EAS
+
+EAS Build compiles native artifacts (iOS and Android) in the cloud without requiring local Xcode or Gradle setup.
+
+#### Local EAS builds (from your machine)
 
 **One-time setup:**
 
@@ -307,11 +328,37 @@ eas build:configure
 **Build commands (from `apps/mobile`):**
 
 ```bash
-eas build --platform android --profile preview      # internal testing
-eas build --platform android --profile production   # Play Store
+eas build --platform ios --profile development       # iOS dev client
+eas build --platform android --profile preview       # Android internal testing
+eas build --platform android --profile production    # Play Store
 ```
 
-Download the APK/AAB from the EAS Dashboard.
+Download artifacts from the [EAS Dashboard](https://expo.dev).
+
+#### CI/CD builds (GitLab pipeline)
+
+The GitLab pipeline can trigger EAS iOS builds automatically. The job `eas_build_ios_development` is defined in `.gitlab-ci.yml`.
+
+**How to trigger a CI build:**
+
+| Trigger | Behavior |
+|---|---|
+| Push to `main` | Job appears as a **manual** play button in the pipeline |
+| Run pipeline from GitLab web UI (**CI/CD → Pipelines → Run pipeline**) | Job runs **automatically** |
+
+**Required setup — `EXPO_TOKEN`:**
+
+EAS CLI authenticates via the `EXPO_TOKEN` environment variable in CI. You must configure it once in GitLab:
+
+1. Generate a token at [expo.dev](https://expo.dev) → **Account Settings → Access Tokens → Create Token**
+2. In your GitLab repo go to **Settings → CI/CD → Variables → Add Variable**:
+   - **Key:** `EXPO_TOKEN`
+   - **Value:** *(paste your token)*
+   - **Mask variable:** ✅ (hides it from job logs)
+   - **Protect variable:** ❌ **leave unchecked** unless the branch is protected — protected variables are only injected into jobs running on **protected** branches
+3. Commit and push — the build job will now authenticate automatically
+
+> **Common pitfall:** if the build fails with `An Expo user account is required to proceed`, the `EXPO_TOKEN` variable is either missing, misspelled, or marked as protected on a non-protected branch. Edit the variable in GitLab and uncheck "Protect variable."
 
 ---
 
