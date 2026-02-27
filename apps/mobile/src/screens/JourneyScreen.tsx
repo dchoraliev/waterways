@@ -86,7 +86,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const [cameraWindowActive, setCameraWindowActive] = useState(false);
   const [cameraWindowSecondsLeft, setCameraWindowSecondsLeft] = useState(0);
   const [lastObservationId, setLastObservationId] = useState<string | null>(null);
-  // eslint-disable-next-line no-undef
+
   const cameraWindowTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
 
   useEffect(() => {

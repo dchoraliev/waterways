@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
-import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 
 export interface SignupScreenProps {
   onSignupSuccess: () => void;

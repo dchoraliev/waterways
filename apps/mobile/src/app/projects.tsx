@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { supabase } from '../../../../packages/shared/src/supabase/client';
+import { supabase } from '@waterways/shared/src/supabase/client';
 import MyProjectScreen from '../screens/MyProjectScreen';
 
 export default function MyProjectsRoute() {

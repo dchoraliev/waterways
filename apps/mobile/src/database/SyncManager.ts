@@ -1,4 +1,4 @@
-import { supabase } from '@shared/supabase/client';
+import { supabase } from '@waterways/shared/src/supabase/client';
 import { getTripById, getTripsBySyncStatus, updateTripById } from './TripManager';
 import { getObservationsByTripId, updateObservationById } from './ObservationManager';
 

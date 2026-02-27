@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signIn } from 'packages/shared/src/supabase/auth';
+import { signIn } from '@waterways/shared/src/supabase/auth';
 import styles from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
-import waterwaysLogo from '../../assets/logo/Waterways Logo.png';
+import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 import { updateAndSyncOfflineDataToCurrentUser } from '../services/OfflineService';
 import { performAutoSyncTaskOnce } from '../services/NetworkService';
 

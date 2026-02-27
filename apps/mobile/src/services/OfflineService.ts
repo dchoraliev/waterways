@@ -1,11 +1,11 @@
-import { getSession } from '@shared/supabase/auth';
+import { getSession } from '@waterways/shared/src/supabase/auth';
 import { Alert } from 'react-native';
 import { getTripsByUserId, updateTripById } from '../database/TripManager';
 import { getObservationsByUserId, updateObservationById } from '../database/ObservationManager';
 import { performAutoSyncTaskOnce } from './NetworkService';
 import { saveAudioObservationForTrip } from './VoiceRecorder';
 import { get } from 'http';
-import { Observation } from '@shared/models/local-db-rows';
+import { Observation } from '@waterways/shared/src/models/local-db-rows';
 
 export const OFFLINE_USER_ID = 'offline-user';
 
