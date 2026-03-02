@@ -15,7 +15,7 @@ import { supabase } from '../../../apps/web/src/services/supabase';
 // Mock Supabase client
 jest.mock('../../../apps/web/src/services/supabase', () => ({
   supabase: {
-    from: jest.fn(),
+    rpc: jest.fn(),
   },
 }));
 
@@ -158,13 +158,7 @@ describe('DailyReportPopup - Component Logic Tests', () => {
         createMockObservationRow({ id: 'obs-2' }),
       ];
 
-      const mockQuery = {
-        select: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: mockData, error: null }),
-      };
-
-      (supabase.from as jest.Mock).mockReturnValue(mockQuery);
+      (supabase.rpc as jest.Mock).mockResolvedValue({ data: mockData, error: null });
 
       const result = await fetchDailyObservations();
 
@@ -182,13 +176,7 @@ describe('DailyReportPopup - Component Logic Tests', () => {
     });
 
     it('should return empty array for empty state display', async () => {
-      const mockQuery = {
-        select: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: [], error: null }),
-      };
-
-      (supabase.from as jest.Mock).mockReturnValue(mockQuery);
+      (supabase.rpc as jest.Mock).mockResolvedValue({ data: [], error: null });
 
       const result = await fetchDailyObservations();
 
@@ -196,13 +184,7 @@ describe('DailyReportPopup - Component Logic Tests', () => {
     });
 
     it('should handle errors gracefully for error state display', async () => {
-      const mockQuery = {
-        select: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: null, error: { message: 'Error' } }),
-      };
-
-      (supabase.from as jest.Mock).mockReturnValue(mockQuery);
+      (supabase.rpc as jest.Mock).mockResolvedValue({ data: null, error: { message: 'Error' } });
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 

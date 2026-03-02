@@ -1,5 +1,13 @@
 /* global setTimeout */
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { supabase } from '../services/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { getUserProjects } from '../api/projects';
@@ -12,7 +20,7 @@ interface User {
   showNameOnMap: boolean;
   isAdmin: boolean;
   role?: string | null;
-  projects?: string[];
+  projects?: Array<{ id: string; name: string }>;
 }
 
 interface AuthContextType {
@@ -28,6 +36,74 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const updateUserFromSupabase = useCallback(async (supabaseUser: SupabaseUser) => {
+    let role: string | null = null;
+    let status: string | null = null;
+    let showNameOnMap = true;
+    try {
+      const rolePromise = supabase
+        .from('users')
+        .select('role, status, share_name_on_map')
+        .eq('id', supabaseUser.id);
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('role/status fetch timeout')), 3000)
+      );
+      const res: any = await Promise.race([rolePromise, timeout]);
+      const currentUser = res?.data?.[0];
+      if (currentUser) {
+        if (typeof currentUser.role === 'string') role = currentUser.role;
+        if (typeof currentUser.status === 'string') status = currentUser.status;
+        if (typeof currentUser.share_name_on_map === 'boolean') {
+          showNameOnMap = currentUser.share_name_on_map;
+        }
+      }
+    } catch (err: any) {
+      console.warn('Could not read user role/status:', err?.message ?? err);
+    }
+
+    if (status === 'banned') {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.warn('Error signing out banned user:', e);
+      }
+      setUser(null);
+      throw new Error('Account banned');
+    }
+
+    const isAdmin = role === 'admin';
+    const userId = supabaseUser.id;
+
+    setUser({
+      id: userId,
+      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
+      email: supabaseUser.email || '',
+      showNameOnMap,
+      isAdmin,
+      role,
+      projects: [],
+    });
+
+    const loadProjects = async () => {
+      try {
+        const projectsPromise = getUserProjects(userId);
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('projects fetch timeout')), 3000)
+        );
+        const res: any = await Promise.race([projectsPromise, timeout]);
+        const projects = (res?.data || []).map((p: { id: string; name: string }) => ({
+          id: p.id,
+          name: p.name,
+        }));
+        setUser((prev) => (prev && prev.id === userId ? { ...prev, projects } : prev));
+      } catch (err) {
+        console.warn('Failed to load user projects in AuthContext:', err);
+      }
+    };
+
+    void loadProjects();
+  }, []);
 
   useEffect(() => {
     // Check for existing session on mount
@@ -72,81 +148,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [updateUserFromSupabase]);
 
-  const updateUserFromSupabase = async (supabaseUser: SupabaseUser) => {
-    console.log('updateUserFromSupabase called with', supabaseUser);
-    // Try to read the user's role from `public.users` with a short timeout.
-    // If the lookup fails or times out, fall back to defaults.
-    let role: string | null = null;
-    let status: string | null = null;
-    let showNameOnMap = true;
-    try {
-      const rolePromise = supabase
-        .from('users')
-        .select('role, status, share_name_on_map')
-        .eq('id', supabaseUser.id);
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('role/status fetch timeout')), 3000)
-      );
-      const res: any = await Promise.race([rolePromise, timeout]);
-      const currentUser = res?.data?.[0];
-      if (currentUser) {
-        if (typeof currentUser.role === 'string') role = currentUser.role;
-        if (typeof currentUser.status === 'string') status = currentUser.status;
-        if (typeof currentUser.share_name_on_map === 'boolean') {
-          showNameOnMap = currentUser.share_name_on_map;
-        }
-      }
-    } catch (err: any) {
-      // Don't block sign-in on role lookup failures.
-      console.warn('Could not read user role/status:', err?.message ?? err);
-    }
-    console.log('role lookup finished, role/status =', role, status);
-
-    // If the user is banned in the DB, immediately sign them out and don't set the user.
-    if (status === 'banned') {
-      console.log('User is banned, signing out...');
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.warn('Error signing out banned user:', e);
-      }
-      setUser(null);
-      throw new Error('Account banned');
-    }
-
-    const isAdmin = role === 'admin';
-    const userId = supabaseUser.id;
-
-    setUser({
-      id: userId,
-      name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
-      email: supabaseUser.email || '',
-      showNameOnMap,
-      isAdmin,
-      role,
-      projects: [],
-    });
-
-    const loadProjects = async () => {
-      try {
-        const projectsPromise = getUserProjects(userId);
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('projects fetch timeout')), 3000)
-        );
-        const res: any = await Promise.race([projectsPromise, timeout]);
-        const projects = (res?.data || []).map((p: { name: string }) => p.name);
-        setUser((prev) => (prev && prev.id === userId ? { ...prev, projects } : prev));
-      } catch (err) {
-        console.warn('Failed to load user projects in AuthContext:', err);
-      }
-    };
-
-    void loadProjects();
-  };
-
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -156,12 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    if (data.user) {
-      await updateUserFromSupabase(data.user);
+    if (!data.user) {
+      throw new Error('Sign in did not return a user session');
     }
-  };
+  }, []);
 
-  const signUp = async (name: string, email: string, password: string) => {
+  const signUp = useCallback(async (name: string, email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -176,20 +180,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    if (data.user) {
-      await updateUserFromSupabase(data.user);
+    if (!data.user) {
+      throw new Error('Sign up did not return a user');
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
     }
     setUser(null);
-  };
+  }, []);
 
-  const value = useMemo(() => ({ user, signIn, signUp, signOut, loading }), [user, loading]);
+  const value = useMemo(
+    () => ({ user, signIn, signUp, signOut, loading }),
+    [user, signIn, signUp, signOut, loading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

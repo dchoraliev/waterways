@@ -18,7 +18,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@waterways/shared": ["../../../../packages/shared/src"],
+      "@waterways/shared": ["../../packages/shared/src/index.ts"],
+      "@waterways/shared/*": ["../../packages/shared/*"],
       "./supabaseEnv": ["./src/services/supabaseEnv.vite.ts"]
     }
   },

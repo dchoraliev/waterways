@@ -87,7 +87,7 @@ export const getUserProjects = async (
 
     const projects =
       (data
-        ?.map((item) => (item as unknown as { project: Project }).project)
+        ?.map((item: unknown) => (item as { project: Project }).project)
         .filter(Boolean) as Project[]) || [];
     return { data: projects, error: null };
   } catch (error: unknown) {

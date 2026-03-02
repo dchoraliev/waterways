@@ -27,6 +27,15 @@ type TripRow = {
   unique_userID_localID_pair: string | null;
 };
 
+type ObservationTripRow = {
+  trip_id: string | null;
+};
+
+type ProjectNameRow = {
+  id: string;
+  name: string;
+};
+
 const ReviewListScreen = () => {
   const router = useRouter();
   const { userId, loading: authLoading } = useAuth();
@@ -71,7 +80,8 @@ const ReviewListScreen = () => {
             .in('trip_id', tripIds)
             .eq('user_id', userId);
 
-          observationCounts = (observationRows ?? []).reduce<Record<string, number>>((acc, row) => {
+          const typedObservationRows = (observationRows ?? []) as ObservationTripRow[];
+          observationCounts = typedObservationRows.reduce<Record<string, number>>((acc, row) => {
             const tripId = row.trip_id;
             if (tripId) {
               acc[tripId] = (acc[tripId] ?? 0) + 1;
@@ -86,7 +96,8 @@ const ReviewListScreen = () => {
             .select('id, name')
             .in('id', projectIds);
 
-          projectNames = (projectRows ?? []).reduce<Record<string, string>>((acc, row) => {
+          const typedProjectRows = (projectRows ?? []) as ProjectNameRow[];
+          projectNames = typedProjectRows.reduce<Record<string, string>>((acc, row) => {
             acc[row.id] = row.name;
             return acc;
           }, {});

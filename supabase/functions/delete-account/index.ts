@@ -70,7 +70,9 @@ serve(async (req: Request): Promise<Response> => {
 
     if (anonymizeObservationsError) {
       return new Response(
-        JSON.stringify({ error: `Failed to anonymize user observations: ${anonymizeObservationsError.message}` }),
+        JSON.stringify({
+          error: `Failed to anonymize user observations: ${anonymizeObservationsError.message}`,
+        }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },

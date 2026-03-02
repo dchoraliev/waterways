@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@waterways/shared/src/supabase/client';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 // You might need to install and import the User type if using TypeScript
 // import { User } from '@supabase/supabase-js';
 
@@ -26,16 +27,18 @@ export function useAuth() {
   // ADDED: Logic to fetch and listen for the authenticated user
   useEffect(() => {
     // 1. Set up the real-time listener for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      const user = session?.user ?? null;
-      setState((s) => ({
-        ...s,
-        userId: user?.id ?? null,
-        isAuthenticated: !!user,
-        loading: false,
-        error: null,
-      }));
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        const user = session?.user ?? null;
+        setState((s) => ({
+          ...s,
+          userId: user?.id ?? null,
+          isAuthenticated: !!user,
+          loading: false,
+          error: null,
+        }));
+      }
+    );
 
     // 2. Initial fetch in case onAuthStateChange doesn't fire immediately
     const checkInitialUser = async () => {

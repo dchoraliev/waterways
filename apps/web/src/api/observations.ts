@@ -1,6 +1,19 @@
 // apps/web/src/api/observations.ts
 import { supabase } from '../services/supabase';
 import type { Observation } from '../types/observation';
+import {
+  buildObservationRpcArgs,
+  deriveHasMore,
+  type ObservationQueryParams,
+  type ObservationBounds,
+} from '@waterways/shared';
+
+export type { ObservationQueryParams, ObservationBounds };
+
+export interface ObservationYearsQueryParams {
+  projectId?: string;
+  myProjectsOnly?: boolean;
+}
 
 // EWKB geography(POINT) comes back from Supabase as a hex string like:
 // "0101000020E6100000BE9F1A2FDD6856C0A089B0E1E95D4540"
@@ -57,124 +70,149 @@ type ObservationRow = {
   observation: string | null;
   categories: string[] | null;
   observation_media: string[] | null;
-
-  trips: {
-    id: string;
-    start_time: string | null;
-    start_location: string | null;
-    project_id: string | null;
-    projects: {
-      id: string;
-      name: string;
-      description: string | null;
-    } | null;
-  } | null;
-
-  users: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string;
-    share_name_on_map: boolean | null;
-  } | null;
+  project_id: string | null;
+  project_name: string | null;
+  project_description: string | null;
+  observer_first_name: string | null;
+  observer_last_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  total_count?: number | string | null;
 };
+
+export interface FetchObservationsResult {
+  observations: Observation[];
+  totalCount: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+  pageSize: number;
+}
+
+function mapRowToObservation(row: ObservationRow): Observation {
+  let lat = row.latitude ?? 0;
+  let lng = row.longitude ?? 0;
+
+  if ((row.latitude == null || row.longitude == null) && row.location) {
+    const parsed = parseEwkbPoint(row.location);
+    lat = parsed.lat;
+    lng = parsed.lng;
+  }
+
+  const projectName = row.project_name ?? 'Untitled Project';
+
+  let observerName = 'Anonymous';
+  if (row.observer_first_name || row.observer_last_name) {
+    observerName = `${row.observer_first_name ?? ''} ${row.observer_last_name ?? ''}`.trim();
+    if (!observerName) observerName = 'Anonymous';
+  } else if (!row.user_id) {
+    observerName = 'Deleted User';
+  }
+
+  const createdRaw = row.created_at ?? '';
+
+  let date = '';
+  let timestamp = '';
+  if (createdRaw) {
+    const created = new Date(createdRaw);
+    date = [
+      created.getFullYear(),
+      String(created.getMonth() + 1).padStart(2, '0'),
+      String(created.getDate()).padStart(2, '0'),
+    ].join('-');
+    timestamp = created.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  const categories = Array.isArray(row.categories) ? row.categories : [];
+  const media = Array.isArray(row.observation_media) ? row.observation_media : [];
+
+  return {
+    id: row.id,
+    projectName,
+    journeyStartLocation: projectName || 'Trip start',
+    location: {
+      lat,
+      lng,
+      name: 'Observation location',
+    },
+    createdAt: createdRaw,
+    timestamp,
+    date,
+    observation: row.observation ?? '',
+    observerName,
+    userId: row.user_id ?? '',
+    photos: media,
+    videos: [],
+    type: categories[0] ?? 'Observation',
+    keywords: categories,
+  };
+}
 
 /**
  * Fetch observations from Supabase and convert them
  * into the Observation shape used by the dashboard.
  */
-export async function fetchObservations(): Promise<Observation[]> {
-  const { data, error } = await supabase.from('observations').select(`
-      id,
-      location,
-      user_id,
-      trip_id,
-      created_at,
-      observation,
-      categories,
-      observation_media,
-      trips (
-        id,
-        start_time,
-        start_location,
-        project_id,
-        projects (
-          id,
-          name,
-          description
-        )
-      ),
-      users (
-        first_name,
-        last_name,
-        email,
-        share_name_on_map
-      )
-    `);
+export async function fetchObservations(
+  params: ObservationQueryParams = {}
+): Promise<FetchObservationsResult> {
+  const rpcArgs = buildObservationRpcArgs(params);
+  const requestedOffset = params.offset ?? 0;
+  const requestedLimit = params.limit ?? 2000;
+
+  if (typeof supabase.rpc !== 'function') {
+    console.error('Supabase RPC client is unavailable for fetchObservations');
+    return {
+      observations: [],
+      totalCount: 0,
+      hasMore: false,
+      nextOffset: null,
+      pageSize: requestedLimit,
+    };
+  }
+
+  const { data, error } = await supabase.rpc(
+    'get_filtered_observations',
+    rpcArgs as unknown as Record<string, string | number | boolean | string[] | null>
+  );
 
   if (error) {
     console.error('Error fetching observations:', error);
-    return [];
+    return {
+      observations: [],
+      totalCount: 0,
+      hasMore: false,
+      nextOffset: null,
+      pageSize: requestedLimit,
+    };
   }
 
-  return (data ?? []).map((row): Observation => {
-    const r = row as unknown as ObservationRow;
-
-    const { lat, lng } = parseEwkbPoint(r.location);
-
-    const projectName = r.trips?.projects?.name ?? 'Untitled Project';
-
-    const observerName = r.users
-      ? r.users.share_name_on_map === false
-        ? 'Anonymous'
-        : `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
-      : 'Deleted User';
-
-    const createdRaw = r.created_at ?? '';
-
-    // Derive date and time from the user's local timezone, not the UTC slice
-    let date = '';
-    let timestamp = '';
-    if (createdRaw) {
-      const created = new Date(createdRaw);
-      // Local date in YYYY-MM-DD format
-      date = [
-        created.getFullYear(),
-        String(created.getMonth() + 1).padStart(2, '0'),
-        String(created.getDate()).padStart(2, '0'),
-      ].join('-');
-      timestamp = created.toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-
-    const categories = Array.isArray(r.categories) ? r.categories : [];
-    const media = Array.isArray(r.observation_media) ? r.observation_media : [];
-
-    const photos: string[] = media;
-    const videos: string[] = [];
-
-    return {
-      id: r.id,
-      projectName,
-      journeyStartLocation: projectName || 'Trip start',
-      location: {
-        lat,
-        lng,
-        name: 'Observation location',
-      },
-      createdAt: createdRaw,
-      timestamp,
-      date,
-      observation: r.observation ?? '',
-      observerName,
-      userId: r.user_id ?? '',
-      photos,
-      videos,
-      type: categories[0] ?? 'Observation',
-      keywords: categories,
-    };
+  const rows = data ?? [];
+  const observations = rows.map(mapRowToObservation);
+  const totalCountRaw = rows[0]?.total_count;
+  const parsedTotalFromString =
+    typeof totalCountRaw === 'string' ? Number.parseInt(totalCountRaw, 10) : Number.NaN;
+  const totalCount =
+    typeof totalCountRaw === 'number'
+      ? totalCountRaw
+      : Number.isFinite(parsedTotalFromString)
+        ? parsedTotalFromString
+        : observations.length;
+  const hasMore = deriveHasMore({
+    requestedLimit,
+    requestedOffset,
+    returnedRows: observations.length,
+    totalCount,
   });
+
+  return {
+    observations,
+    totalCount,
+    hasMore,
+    nextOffset: hasMore ? requestedOffset + observations.length : null,
+    pageSize: requestedLimit,
+  };
 }
 
 /**
@@ -186,103 +224,135 @@ export async function fetchDailyObservations(): Promise<Observation[]> {
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   const oneDayAgoISO = oneDayAgo.toISOString();
 
-  const { data, error } = await supabase
-    .from('observations')
-    .select(
-      `
-      id,
-      location,
-      user_id,
-      trip_id,
-      created_at,
-      observation,
-      categories,
-      observation_media,
-      trips (
-        id,
-        start_time,
-        start_location,
-        project_id,
-        projects (
-          id,
-          name,
-          description
-        )
-      ),
-      users (
-        first_name,
-        last_name,
-        email,
-        share_name_on_map
-      )
-    `
-    )
-    .gte('created_at', oneDayAgoISO)
-    .order('created_at', { ascending: false });
+  const result = await fetchObservations({ since: oneDayAgoISO });
+  return result.observations;
+}
 
-  if (error) {
-    console.error('Error fetching daily observations:', error);
+export async function fetchObservationTypes(): Promise<string[]> {
+  const uniqueTypes = new Set<string>();
+
+  const addType = (value: unknown) => {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    const normalized = value.trim();
+    if (normalized) {
+      uniqueTypes.add(normalized);
+    }
+  };
+
+  const addTypesFromCategories = (categories: unknown) => {
+    if (!Array.isArray(categories)) {
+      return;
+    }
+
+    for (const category of categories) {
+      addType(category);
+    }
+  };
+
+  try {
+    if (typeof supabase.rpc === 'function') {
+      const { data, error } = await supabase.rpc('get_observation_types');
+
+      if (!error && Array.isArray(data)) {
+        for (const row of data) {
+          if (typeof row === 'string') {
+            addType(row);
+            continue;
+          }
+
+          if (row && typeof row === 'object' && 'type' in row) {
+            addType((row as { type?: unknown }).type);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(
+      'get_observation_types RPC unavailable, falling back to direct observation scan:',
+      error
+    );
+  }
+
+  if (uniqueTypes.size === 0) {
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from('observations')
+        .select('categories')
+        .range(from, to);
+
+      if (error) {
+        console.error('Error fetching observation categories from observations:', error);
+        break;
+      }
+
+      const rows = data ?? [];
+
+      for (const row of rows) {
+        addTypesFromCategories((row as { categories?: unknown }).categories);
+      }
+
+      if (rows.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
+    }
+  }
+
+  if (uniqueTypes.size === 0) {
+    const { data, error } = await supabase
+      .from('observation_categories')
+      .select('type, active')
+      .or('active.eq.true,active.is.null')
+      .order('type', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching observation categories:', error);
+      return [];
+    }
+
+    for (const row of data ?? []) {
+      if (!row || typeof row.type !== 'string') {
+        continue;
+      }
+
+      addType(row.type);
+    }
+  }
+
+  return [...uniqueTypes].sort((a, b) => a.localeCompare(b));
+}
+
+export async function fetchObservationYears(
+  params: ObservationYearsQueryParams = {}
+): Promise<string[]> {
+  if (typeof supabase.rpc !== 'function') {
+    console.error('Supabase RPC client is unavailable for fetchObservationYears');
     return [];
   }
 
-  return (data ?? []).map((row): Observation => {
-    const r = row as unknown as ObservationRow;
-
-    const { lat, lng } = parseEwkbPoint(r.location);
-
-    const projectName = r.trips?.projects?.name ?? 'Untitled Project';
-
-    const observerName = r.users
-      ? r.users.share_name_on_map === false
-        ? 'Anonymous'
-        : `${r.users.first_name ?? ''} ${r.users.last_name ?? ''}`.trim() || r.users.email
-      : 'Deleted User';
-
-    const createdRaw = r.created_at ?? '';
-
-    // Derive date and time from the user's local timezone, not the UTC slice
-    let date = '';
-    let timestamp = '';
-    if (createdRaw) {
-      const created = new Date(createdRaw);
-      date = [
-        created.getFullYear(),
-        String(created.getMonth() + 1).padStart(2, '0'),
-        String(created.getDate()).padStart(2, '0'),
-      ].join('-');
-      timestamp = created.toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-
-    const categories = Array.isArray(r.categories) ? r.categories : [];
-    const media = Array.isArray(r.observation_media) ? r.observation_media : [];
-
-    const photos: string[] = media;
-    const videos: string[] = [];
-
-    return {
-      id: r.id,
-      projectName,
-      journeyStartLocation: projectName || 'Trip start',
-      location: {
-        lat,
-        lng,
-        name: 'Observation location',
-      },
-      createdAt: createdRaw,
-      timestamp,
-      date,
-      observation: r.observation ?? '',
-      observerName,
-      userId: r.user_id ?? '',
-      photos,
-      videos,
-      type: categories[0] ?? 'Observation',
-      keywords: categories,
-    };
+  const { data, error } = await supabase.rpc('get_observation_years', {
+    p_project_id: params.projectId && params.projectId !== 'all' ? params.projectId : undefined,
+    p_my_projects_only: params.myProjectsOnly ?? false,
   });
+
+  if (error) {
+    console.error('Error fetching observation years:', error);
+    return [];
+  }
+
+  return (data ?? [])
+    .map((row) => row.year)
+    .filter((value): value is number => typeof value === 'number')
+    .sort((a, b) => b - a)
+    .map((value) => String(value));
 }
 
 /**

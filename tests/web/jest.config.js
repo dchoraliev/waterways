@@ -21,9 +21,7 @@ module.exports = {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {},
-  setupFiles: [
-    '<rootDir>/../setup.ts'
-  ],
+  setupFiles: ['<rootDir>/../setup.ts'],
   collectCoverageFrom: [
     '<rootDir>/../../apps/web/**/*.{ts,tsx}',
     '!**/*.d.ts',

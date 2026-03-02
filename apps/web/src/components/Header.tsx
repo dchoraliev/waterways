@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { FilterOptions } from './FilterPanel';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { FilterOptions } from '@waterways/shared';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -13,55 +14,35 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
-import { Download, User, LogOut, LogIn, ChevronDown, CalendarDays } from 'lucide-react';
+import { Download, User, LogOut, LogIn, ChevronDown, CalendarDays, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { SignIn } from '../pages/SignIn';
 import { SignUp } from '../pages/SignUp';
 import { toast } from 'sonner';
 import { WaveIcon } from './WaveIcon';
+import { DateRangeFilter } from './DateRangeFilter';
 
 interface HeaderProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
   observationTypes: string[];
-  filteredCount: number;
-  totalCount: number;
+  mapAlertMessage?: string;
   onExportCSV: () => void;
   onAccountClick?: () => void;
   filteredUserId?: string | null;
   filteredUserName?: string;
   onClearUserFilter?: () => void;
   onDailyReportClick?: () => void;
-  projects?: string[];
+  projects?: Array<{ id: string; name: string }>;
 }
 
 type AuthDialog = 'signin' | 'signup' | null;
-
-const months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-const years = ['2024', '2025'];
-
-console.log('useAuth user:', User);
 
 export function Header({
   filters,
   onFilterChange,
   observationTypes,
-  filteredCount,
-  totalCount,
+  mapAlertMessage,
   onExportCSV,
   onAccountClick,
   filteredUserId,
@@ -72,10 +53,10 @@ export function Header({
 }: HeaderProps) {
   const { user, signOut } = useAuth();
   const visibleUserName = user?.showNameOnMap === false ? 'Anonymous' : user?.name;
-  if (user && (!projects || projects.length === 0)) {
-    console.log('Header: user has no projects in context', user.id, user.name, projects);
-  }
   const [authDialog, setAuthDialog] = useState<AuthDialog>(null);
+  const [mapAlertOpen, setMapAlertOpen] = useState(false);
+  const [mapAlertStyle, setMapAlertStyle] = useState<globalThis.React.CSSProperties>({});
+  const mapAlertTriggerRef = useRef<globalThis.HTMLButtonElement | null>(null);
 
   const handleFilterChange = (key: keyof FilterOptions, value: string | boolean) => {
     onFilterChange({ ...filters, [key]: value } as FilterOptions);
@@ -118,164 +99,135 @@ export function Header({
     }
   };
 
+  const openMapAlert = () => {
+    if (!mapAlertTriggerRef.current) {
+      setMapAlertOpen(true);
+      return;
+    }
+
+    const rect = mapAlertTriggerRef.current.getBoundingClientRect();
+    setMapAlertStyle({
+      position: 'fixed',
+      top: rect.bottom + 8,
+      left: Math.max(8, rect.left),
+      zIndex: 10000,
+    });
+    setMapAlertOpen(true);
+  };
+
+  const closeMapAlert = () => {
+    setMapAlertOpen(false);
+  };
+
   return (
     <>
       <header className="bg-blue-200 border-b">
-        <div className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-3 flex items-center gap-3 overflow-x-auto">
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
             <WaveIcon className="size-8 text-blue-700" />
-            <h1>Waterways Observation System</h1>
+            <h1 className="whitespace-nowrap">Waterways Observation System</h1>
+            <button
+              ref={mapAlertTriggerRef}
+              type="button"
+              aria-label="Map data status"
+              aria-hidden={!mapAlertMessage}
+              className={
+                mapAlertMessage
+                  ? 'size-8 flex items-center justify-center rounded-md text-amber-600 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
+                  : 'size-8 invisible'
+              }
+              onMouseEnter={mapAlertMessage ? openMapAlert : undefined}
+              onMouseLeave={mapAlertMessage ? closeMapAlert : undefined}
+              onFocus={mapAlertMessage ? openMapAlert : undefined}
+              onBlur={mapAlertMessage ? closeMapAlert : undefined}
+            >
+              <Info className="size-4" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {!user && (
-              <Button variant="default" size="sm" onClick={() => onAccountClick?.()}>
-                <LogIn className="size-4 mr-2" />
-                Login
-              </Button>
-            )}
-
-            {user && (
-              <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <User className="size-4 mr-2" />
-                      {visibleUserName}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 z-[2000]">
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p>{visibleUserName}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      <LogOut className="size-4 mr-2" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="outline" size="sm" onClick={handleSignOut}>
-                  <LogOut className="size-4 mr-2" />
-                  Logout
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="px-4 py-3 border-t bg-muted/30">
-          {filteredUserId && filteredUserName && (
-            <div className="mb-2 flex items-center gap-2">
-              <div className="text-sm bg-blue-100 text-blue-900 px-3 py-1 rounded-full flex items-center gap-2">
+          <div className="flex-1 min-w-0 flex items-center gap-3">
+            {filteredUserId && filteredUserName && (
+              <div className="hidden lg:flex items-center gap-2 text-sm bg-blue-100 text-blue-900 px-3 py-1.5 rounded-md">
                 <User className="size-4" />
-                Filtering by: {filteredUserName}
+                <span className="whitespace-nowrap">Filtering by: {filteredUserName}</span>
                 <button
                   onClick={onClearUserFilter}
-                  className="ml-1 hover:bg-blue-200 rounded-full size-5 flex items-center justify-center"
+                  className="hover:bg-blue-200 rounded-full size-5 flex items-center justify-center"
                 >
                   ×
                 </button>
               </div>
-            </div>
-          )}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Select
-                value={filters.year || 'all'}
-                onValueChange={(value: string) =>
-                  handleFilterChange('year', value === 'all' ? '' : value)
-                }
-              >
-                <SelectTrigger className="w-[140px] bg-background">
-                  <SelectValue placeholder="All years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All years</SelectItem>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            )}
+          </div>
 
-              <Select
-                value={filters.month || 'all'}
-                onValueChange={(value: string) =>
-                  handleFilterChange('month', value === 'all' ? '' : value)
-                }
-              >
-                <SelectTrigger className="w-[140px] bg-background">
-                  <SelectValue placeholder="All months" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All months</SelectItem>
-                  {months.map((month, index) => (
-                    <SelectItem key={month} value={String(index + 1).padStart(2, '0')}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex items-center gap-2 min-w-0">
+            <DateRangeFilter
+              dateFrom={filters.dateFrom}
+              dateTo={filters.dateTo}
+              onChange={({ dateFrom, dateTo }) =>
+                onFilterChange({
+                  ...filters,
+                  dateFrom,
+                  dateTo,
+                })
+              }
+            />
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-[180px] justify-between bg-background font-normal"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-[165px] justify-between bg-background font-normal"
+                >
+                  {getTypeFilterLabel()}
+                  <ChevronDown className="size-4 ml-2 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[200px] z-[9999]" align="start">
+                <DropdownMenuLabel>Observation Types</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {filters.types.length > 0 && (
+                  <>
+                    <DropdownMenuItem onClick={() => onFilterChange({ ...filters, types: [] })}>
+                      Clear selection
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {observationTypes.map((type) => (
+                  <DropdownMenuCheckboxItem
+                    key={type}
+                    checked={filters.types.includes(type)}
+                    onCheckedChange={() => handleTypeToggle(type)}
+                    onSelect={(e: globalThis.Event) => e.preventDefault()}
                   >
-                    {getTypeFilterLabel()}
-                    <ChevronDown className="size-4 ml-2 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[200px]" align="start">
-                  <DropdownMenuLabel>Observation Types</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {observationTypes.map((type) => (
-                    <DropdownMenuCheckboxItem
-                      key={type}
-                      checked={filters.types.includes(type)}
-                      onCheckedChange={() => handleTypeToggle(type)}
-                      onSelect={(e: globalThis.Event) => e.preventDefault()}
-                    >
-                      {type}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  {filters.types.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onFilterChange({ ...filters, types: [] })}>
-                        Clear selection
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {type}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-              <Input
-                placeholder="Search keywords..."
-                value={filters.keywords}
-                onChange={(e) => handleFilterChange('keywords', e.target.value)}
-                className="w-[200px] bg-background"
-              />
+            <Input
+              placeholder="Search keywords..."
+              value={filters.keywords}
+              onChange={(e) => handleFilterChange('keywords', e.target.value)}
+              className="w-[220px] bg-background"
+            />
 
+            {user && (
               <Select
                 value={filters.myProjects || 'all'}
                 onValueChange={(value: string) => handleFilterChange('myProjects', value)}
               >
-                <SelectTrigger className="w-[160px] bg-background">
+                <SelectTrigger className="w-[170px] bg-background">
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[9999]">
                   <SelectItem value="all">All Projects</SelectItem>
                   {projects && projects.length > 0 ? (
                     projects.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
                       </SelectItem>
                     ))
                   ) : (
@@ -285,24 +237,67 @@ export function Header({
                   )}
                 </SelectContent>
               </Select>
-            </div>
+            )}
 
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground whitespace-nowrap">
-                {filteredCount} of {totalCount} observations
-              </div>
-              <Button onClick={onDailyReportClick} variant="outline" size="sm">
-                <CalendarDays className="size-4 mr-2" />
-                Daily Report
+            <Button onClick={onDailyReportClick} variant="outline" size="sm" className="shrink-0">
+              <CalendarDays className="size-4 mr-2" />
+              Daily Report
+            </Button>
+            <Button onClick={handleExportClick} variant="outline" size="sm" className="shrink-0">
+              <Download className="size-4 mr-2" />
+              Export CSV
+            </Button>
+
+            {!user && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onAccountClick?.()}
+                className="shrink-0"
+              >
+                <LogIn className="size-4 mr-2" />
+                Login
               </Button>
-              <Button onClick={handleExportClick} variant="outline" size="sm">
-                <Download className="size-4 mr-2" />
-                Export CSV
-              </Button>
-            </div>
+            )}
+
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="shrink-0">
+                    <User className="size-4 mr-2" />
+                    {visibleUserName}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 z-[9999]">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p>{visibleUserName}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="size-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </header>
+
+      {mapAlertMessage &&
+        mapAlertOpen &&
+        createPortal(
+          <div
+            style={mapAlertStyle}
+            className="w-72 rounded-md bg-gray-900 text-gray-100 text-xs px-3 py-2 shadow-xl whitespace-normal leading-relaxed"
+          >
+            {mapAlertMessage}
+          </div>,
+          document.body
+        )}
 
       {/* Auth Dialogs */}
       <Dialog

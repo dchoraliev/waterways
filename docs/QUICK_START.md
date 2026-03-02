@@ -29,11 +29,11 @@ Setup and development guide for Waterways — an offline-first mobile app with c
 
 Commands in this guide run from one of three directories:
 
-| Directory | Commands |
-|---|---|
-| **repo root** (`waterways/`) | `yarn install`, `yarn mobile`, `yarn web`, `yarn lint`, `yarn test`, `yarn format`, `yarn type-check` |
-| **`apps/mobile/`** | `yarn start`, `yarn prebuild`, `yarn build:apk`, `yarn run:android`, `yarn install:debug`, `yarn start:dev-client` |
-| **`apps/mobile/android/`** | Gradle wrapper commands: `./gradlew assembleRelease`, `./gradlew bundleRelease`, etc. (use `.\gradlew.bat` on Windows) |
+| Directory                    | Commands                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **repo root** (`waterways/`) | `yarn install`, `yarn mobile`, `yarn web`, `yarn lint`, `yarn test`, `yarn format`, `yarn type-check`                  |
+| **`apps/mobile/`**           | `yarn start`, `yarn prebuild`, `yarn build:apk`, `yarn run:android`, `yarn install:debug`, `yarn start:dev-client`     |
+| **`apps/mobile/android/`**   | Gradle wrapper commands: `./gradlew assembleRelease`, `./gradlew bundleRelease`, etc. (use `.\gradlew.bat` on Windows) |
 
 Each command block below includes a `# Run from:` comment when it isn't obvious.
 
@@ -89,13 +89,13 @@ Opens at `http://localhost:5173` (or the next available Vite port).
 
 ## Android Build Options
 
-| Build type | Best for | How to start |
-|---|---|---|
-| **Expo Go** | Fast JS/UI changes — no native rebuild | `yarn mobile` (repo root) |
-| **Dev Client** | Native module work with fast JS reloads | `yarn run:android` then `yarn start:dev-client` (both from `apps/mobile`) |
-| **Debug APK** | QA or sharing with testers | `yarn prebuild && yarn build:apk` (`apps/mobile`) → `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` |
-| **Release APK/AAB** | Pre-release or Play Store submission | See [Release Builds](#release-builds) |
-| **EAS Cloud** | Team builds without local Gradle — not yet verified for this repo | `eas build --platform android --profile preview` (`apps/mobile`) |
+| Build type          | Best for                                                          | How to start                                                                                                        |
+| ------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Expo Go**         | Fast JS/UI changes — no native rebuild                            | `yarn mobile` (repo root)                                                                                           |
+| **Dev Client**      | Native module work with fast JS reloads                           | `yarn run:android` then `yarn start:dev-client` (both from `apps/mobile`)                                           |
+| **Debug APK**       | QA or sharing with testers                                        | `yarn prebuild && yarn build:apk` (`apps/mobile`) → `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` |
+| **Release APK/AAB** | Pre-release or Play Store submission                              | See [Release Builds](#release-builds)                                                                               |
+| **EAS Cloud**       | Team builds without local Gradle — not yet verified for this repo | `eas build --platform android --profile preview` (`apps/mobile`)                                                    |
 
 ### Gradle wrapper note
 
@@ -409,6 +409,7 @@ yarn start --clear
 ### Android SDK not found
 
 **Error:**
+
 ```
 SDK location not found. Define a valid SDK location with an ANDROID_HOME
 environment variable or by setting sdk.dir in local.properties.
@@ -417,6 +418,7 @@ environment variable or by setting sdk.dir in local.properties.
 **Option 1 — Set `ANDROID_HOME` (recommended):**
 
 Find your SDK path:
+
 - Android Studio default on Windows: `C:\Users\<YourUsername>\AppData\Local\Android\Sdk`
 - Or check in Android Studio: **File → Settings → Appearance & Behavior → System Settings → Android SDK**
 

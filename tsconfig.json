@@ -11,6 +11,9 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
+      "@waterways/shared/*": [
+        "packages/shared/*"
+      ],
       "@shared/*": [
         "packages/shared/src/*"
       ]

@@ -6,14 +6,14 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Filter, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  DEFAULT_FILTER_OPTIONS,
+  hasActiveObservationFilters,
+  type FilterOptions,
+} from '@waterways/shared';
 
-export interface FilterOptions {
-  year: string;
-  month: string;
-  types: string[];
-  keywords: string;
-  myProjects: string; // 'all' | 'my' | projectName
-}
+export type { FilterOptions };
 
 interface Project {
   id: string;
@@ -28,27 +28,13 @@ interface FilterPanelProps {
   projects: Project[];
 }
 
-const months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 export function FilterPanel({
   filters,
   onFilterChange,
   observationTypes,
   projects,
 }: FilterPanelProps) {
+  const { user } = useAuth();
   // panel open state not required currently
   console.log('projects data:', projects);
 
@@ -64,21 +50,10 @@ export function FilterPanel({
   };
 
   const clearFilters = () => {
-    onFilterChange({
-      year: '',
-      month: '',
-      types: [],
-      keywords: '',
-      myProjects: 'all',
-    });
+    onFilterChange(DEFAULT_FILTER_OPTIONS);
   };
 
-  const hasActiveFilters =
-    filters.year ||
-    filters.month ||
-    filters.types.length > 0 ||
-    filters.keywords ||
-    filters.myProjects !== 'all';
+  const hasActiveFilters = hasActiveObservationFilters(filters);
 
   return (
     <Card className="p-4 space-y-4">
@@ -96,55 +71,53 @@ export function FilterPanel({
       </div>
 
       {/* Projects */}
-      <div className="space-y-2">
-        <Label htmlFor="projectFilter">Projects</Label>
+      {user && (
+        <div className="space-y-2">
+          <Label htmlFor="projectFilter">Projects</Label>
 
-        <Select
-          value={filters.myProjects || 'all'}
-          onValueChange={(value) => handleFilterChange('myProjects', value)}
-        >
-          <SelectTrigger id="projectFilter">
-            <SelectValue placeholder="All projects" />
-          </SelectTrigger>
+          <Select
+            value={filters.myProjects || 'all'}
+            onValueChange={(value) => handleFilterChange('myProjects', value)}
+          >
+            <SelectTrigger id="projectFilter">
+              <SelectValue placeholder="All projects" />
+            </SelectTrigger>
 
-          <SelectContent>
-            <SelectItem value="all">All projects</SelectItem>
+            <SelectContent>
+              <SelectItem value="all">All projects</SelectItem>
 
-            {projects.length === 0 ? (
-              <SelectItem value="none" disabled>
-                No projects yet
-              </SelectItem>
-            ) : (
-              projects.map((project) => (
-                <SelectItem key={project.id} value={project.name}>
-                  {project.name}
+              {projects.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No projects yet
                 </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
+              ) : (
+                projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-2">
-        <Label htmlFor="month">Month</Label>
-        <Select
-          value={filters.month || 'all'}
-          onValueChange={(value: string) =>
-            handleFilterChange('month', value === 'all' ? '' : value)
-          }
-        >
-          <SelectTrigger id="month">
-            <SelectValue placeholder="All months" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All months</SelectItem>
-            {months.map((month, index) => (
-              <SelectItem key={month} value={String(index + 1).padStart(2, '0')}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label htmlFor="dateFrom">Date range</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            id="dateFrom"
+            type="date"
+            value={filters.dateFrom}
+            onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+          />
+          <Input
+            id="dateTo"
+            type="date"
+            value={filters.dateTo}
+            onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
