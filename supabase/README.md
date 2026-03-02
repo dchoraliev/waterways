@@ -20,11 +20,12 @@ supabase/
    ```bash
    yarn db:link
    ```
-   
 2. **Pull current remote schema** (first time only):
+
    ```bash
    yarn db:pull
    ```
+
    This creates a migration file from your current database state.
 
 3. **Access Supabase Studio:**
@@ -40,9 +41,11 @@ supabase/
    - Execute to apply changes
 
 2. **Capture changes as migration:**
+
    ```bash
    yarn db:pull
    ```
+
    This generates a migration file from the remote schema changes.
 
 3. **Review and commit:**
@@ -57,6 +60,7 @@ supabase/
 ### Method 2: Migration File First (Recommended for Complex Changes)
 
 1. **Create a new migration file:**
+
    ```bash
    yarn db:migration:new add_feature_name
    ```
@@ -66,6 +70,7 @@ supabase/
    - Write your SQL changes
 
 3. **Push to remote database:**
+
    ```bash
    yarn db:push
    ```
@@ -85,26 +90,25 @@ Shows which migrations have been applied to your remote database.
 
 ## 🗃️ Database Commands Cheat Sheet
 
-
 ### Database Migrations
 
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `yarn db:link` | Link to remote Supabase project | Initial setup only |
-| `yarn db:migration:new <name>` | Create a new migration file | Before making schema changes |
-| `yarn db:migration:list` | List all migrations and their status | Check what's been applied |
-| `yarn db:push` | Apply local migrations to remote | After creating migration file |
-| `yarn db:pull` | Pull remote schema into new migration | After making changes in SQL Editor |
-| `yarn types:generate` | Generate TypeScript types from schema | After any schema change |
+| Command                        | Description                           | When to Use                        |
+| ------------------------------ | ------------------------------------- | ---------------------------------- |
+| `yarn db:link`                 | Link to remote Supabase project       | Initial setup only                 |
+| `yarn db:migration:new <name>` | Create a new migration file           | Before making schema changes       |
+| `yarn db:migration:list`       | List all migrations and their status  | Check what's been applied          |
+| `yarn db:push`                 | Apply local migrations to remote      | After creating migration file      |
+| `yarn db:pull`                 | Pull remote schema into new migration | After making changes in SQL Editor |
+| `yarn types:generate`          | Generate TypeScript types from schema | After any schema change            |
 
 ### Edge Functions
 
-| Command | Description | When to Use |
-|---------|-------------|-------------|
-| `yarn db:function:new <name>` | Create a new edge function | Starting new server-side logic |
+| Command                          | Description                  | When to Use                     |
+| -------------------------------- | ---------------------------- | ------------------------------- | ------------------------------------------------------ |
+| `yarn db:function:new <name>`    | Create a new edge function   | Starting new server-side logic  |
 | `yarn db:function:deploy [name]` | Deploy function(s) to remote | After writing/updating function |
-| `yarn db:function:serve` | Run functions locally | Testing before deployment |
-| `yarn db:function:logs <name>` | View function logs | Debugging deployed functions |'s automatically run when you execute `yarn db:reset`.
+| `yarn db:function:serve`         | Run functions locally        | Testing before deployment       |
+| `yarn db:function:logs <name>`   | View function logs           | Debugging deployed functions    | 's automatically run when you execute `yarn db:reset`. |
 
 ## 📋 Migration Best Practices
 
@@ -125,6 +129,7 @@ Shows which migrations have been applied to your remote database.
 Edge Functions are server-side TypeScript functions for custom business logic, API integrations, and data processing. See [functions/README.md](functions/README.md) for detailed documentation.
 
 **Quick start:**
+
 ```bash
 # Create new function
 yarn db:function:new my-function
@@ -134,6 +139,7 @@ yarn db:function:deploy my-function
 ```
 
 Common use cases:
+
 - Send emails/notifications
 - Process uploaded images
 - Integrate with external APIs
@@ -158,6 +164,7 @@ The `observation-media` bucket stores user-uploaded photos and videos. Storage p
 ### Adding a New Table
 
 1. Create migration:
+
 ## 🔄 Common Workflows
 
 ### Workflow A: Quick Changes (SQL Editor First)
@@ -167,6 +174,7 @@ The `observation-media` bucket stores user-uploaded photos and videos. Storage p
 1. **Open Supabase Dashboard** → SQL Editor
 
 2. **Write and test your SQL:**
+
    ```sql
    ALTER TABLE trips ADD COLUMN notes TEXT;
    ```
@@ -174,11 +182,13 @@ The `observation-media` bucket stores user-uploaded photos and videos. Storage p
 3. **Execute the SQL** to apply changes immediately
 
 4. **Capture as migration:**
+
    ```bash
    yarn db:pull
    ```
 
 5. **Generate types:**
+
    ```bash
    yarn types:generate
    ```
@@ -194,6 +204,7 @@ The `observation-media` bucket stores user-uploaded photos and videos. Storage p
 **Best for:** Major schema changes, multiple related changes, team collaboration
 
 1. **Create migration:**
+
    ```bash
    yarn db:migration:new add_project_members
    ```
@@ -203,21 +214,28 @@ The `observation-media` bucket stores user-uploaded photos and videos. Storage p
    -- supabase/migrations/20241111123456_add_project_members.sql
    CREATE TABLE project_members (
      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+   ```
+
 ## 🐛 Troubleshooting
 
 ### "Project not linked"
+
 ```bash
 yarn db:link
 ```
+
 Follow the prompts to authenticate and select your project.
 
 ### Migrations Out of Sync
+
 If migrations get out of order or you need to start fresh:
+
 1. Go to Supabase Dashboard → Database → Migrations
 2. Review applied migrations
 3. Use `yarn db:migration:list` to compare with local
 
 ### Migration Failed During Push
+
 1. Check the error message carefully
 2. Fix the SQL in your migration file
 3. May need to manually fix the remote DB in SQL Editor

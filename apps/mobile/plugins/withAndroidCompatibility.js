@@ -47,7 +47,8 @@ const withAndroidCompatibility = (config) => {
   config = withAppBuildGradle(config, (gradleConfig) => {
     const dynamicEntryLine =
       '    entryFile = file(["node", "-e", "require(\'expo/scripts/resolveAppEntry\')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())';
-    const staticEntryBlock = '    root = file("../../../..")\n    entryFile = file("../../index.ts")';
+    const staticEntryBlock =
+      '    root = file("../../../..")\n    entryFile = file("../../index.ts")';
 
     if (gradleConfig.modResults.contents.includes(dynamicEntryLine)) {
       gradleConfig.modResults.contents = gradleConfig.modResults.contents.replace(

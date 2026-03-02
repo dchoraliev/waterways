@@ -28,39 +28,36 @@ This creates a new directory with a template `index.ts` file.
 Edit `supabase/functions/function-name/index.ts`:
 
 ```typescript
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 serve(async (req) => {
   try {
     // Get authorization header
-    const authHeader = req.headers.get('Authorization')
-    
+    const authHeader = req.headers.get('Authorization');
+
     // Create Supabase client with user's auth
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader! } } }
-    )
+    );
 
     // Your logic here
-    const { data, error } = await supabase
-      .from('trips')
-      .select('*')
+    const { data, error } = await supabase.from('trips').select('*');
 
-    if (error) throw error
+    if (error) throw error;
 
-    return new Response(
-      JSON.stringify({ data }),
-      { headers: { 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ data }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-})
+});
 ```
 
 ## 📤 Deploying Functions
@@ -114,7 +111,7 @@ npx supabase secrets list
 ### Access in Function
 
 ```typescript
-const secretValue = Deno.env.get('SECRET_NAME')
+const secretValue = Deno.env.get('SECRET_NAME');
 ```
 
 ## 🔧 Debugging

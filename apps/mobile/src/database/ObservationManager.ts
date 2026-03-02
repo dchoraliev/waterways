@@ -236,7 +236,7 @@ export async function updateObservationById(
 ): Promise<void> {
   const db = await getDatabase();
 
-  type UpdatableKey = keyof Omit<Observation, 'id'>;
+  type UpdatableKey = Extract<keyof Omit<Observation, 'id'>, string>;
 
   const allowedKeys: UpdatableKey[] = [
     'user_id',

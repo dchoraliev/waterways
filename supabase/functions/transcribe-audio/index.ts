@@ -1,83 +1,73 @@
 /// @ts-nocheck
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req: Request): Promise<Response> => {
   // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
-  if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      {
-        status: 405,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
       },
-    );
+    });
   }
 
   if (!OPENAI_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "OPENAI_API_KEY is not set" }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+    return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
       },
-    );
+    });
   }
 
   try {
-    const contentType = req.headers.get("content-type") ?? "";
+    const contentType = req.headers.get('content-type') ?? '';
 
-    if (!contentType.toLowerCase().includes("application/json")) {
+    if (!contentType.toLowerCase().includes('application/json')) {
       return new Response(
         JSON.stringify({
           error:
-            "Invalid content-type, expected application/json with audioBase64, filename, and mimeType.",
+            'Invalid content-type, expected application/json with audioBase64, filename, and mimeType.',
         }),
         {
           status: 400,
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             ...corsHeaders,
           },
-        },
+        }
       );
     }
 
     const body = await req.json();
     const audioBase64 = body.audioBase64 as string | undefined;
-    const filename = (body.filename as string | undefined) ?? "audio.m4a";
-    const mimeType = (body.mimeType as string | undefined) ?? "audio/m4a";
-    const language = (body.language as string | undefined) ?? "en";
+    const filename = (body.filename as string | undefined) ?? 'audio.m4a';
+    const mimeType = (body.mimeType as string | undefined) ?? 'audio/m4a';
+    const language = (body.language as string | undefined) ?? 'en';
 
     if (!audioBase64) {
-      return new Response(
-        JSON.stringify({ error: "Missing audioBase64 in request body" }),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
+      return new Response(JSON.stringify({ error: 'Missing audioBase64 in request body' }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
         },
-      );
+      });
     }
 
     // Decode base64 into bytes
@@ -93,67 +83,64 @@ serve(async (req: Request): Promise<Response> => {
 
     // Build multipart/form-data for OpenAI Whisper
     const openaiForm = new FormData();
-    openaiForm.append("file", file);
-    openaiForm.append("model", "whisper-1");
-    openaiForm.append("language", language);
+    openaiForm.append('file', file);
+    openaiForm.append('model', 'whisper-1');
+    openaiForm.append('language', language);
 
-    const openaiRes = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: openaiForm,
+    const openaiRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
-    );
+      body: openaiForm,
+    });
 
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
-      console.error("OpenAI error:", openaiRes.status, errText);
+      console.error('OpenAI error:', openaiRes.status, errText);
       return new Response(
         JSON.stringify({
-          error: "Failed to transcribe audio",
+          error: 'Failed to transcribe audio',
           status: openaiRes.status,
           details: errText,
         }),
         {
           status: 502,
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             ...corsHeaders,
           },
-        },
+        }
       );
     }
 
-    const data = await openaiRes.json() as { text?: string };
+    const data = (await openaiRes.json()) as { text?: string };
 
     return new Response(
       JSON.stringify({
-        text: data.text ?? "",
+        text: data.text ?? '',
       }),
       {
         status: 200,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...corsHeaders,
         },
-      },
+      }
     );
   } catch (err) {
-    console.error("Unexpected error in transcribe-audio:", err);
+    console.error('Unexpected error in transcribe-audio:', err);
     return new Response(
       JSON.stringify({
-        error: "Unexpected error in edge function",
+        error: 'Unexpected error in edge function',
       }),
       {
         status: 500,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           ...corsHeaders,
         },
-      },
+      }
     );
   }
 });

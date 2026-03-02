@@ -31,18 +31,14 @@ jest.mock('expo-sqlite', () => ({
 jest.mock(
   'expo-location',
   () => ({
-    requestForegroundPermissionsAsync: jest
-      .fn()
-      .mockResolvedValue({ status: 'granted' }),
-    getForegroundPermissionsAsync: jest
-      .fn()
-      .mockResolvedValue({ status: 'granted' }),
+    requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+    getForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
     getCurrentPositionAsync: jest.fn().mockResolvedValue({
       coords: { latitude: 0, longitude: 0, accuracy: 10 },
       timestamp: Date.now(),
     }),
   }),
-  { virtual: true },
+  { virtual: true }
 );
 
 // Mock AsyncStorage

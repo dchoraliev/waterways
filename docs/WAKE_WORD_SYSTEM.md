@@ -79,12 +79,12 @@ flowchart LR
 
 ### Example mapping table
 
-| Example phrase | Intent | Parameters |
-|---|---|---|
-| "take a video" | `media.capture` | `mode=video` |
-| "take a photo" | `media.capture` | `mode=photo` |
-| "stop recording" | `observation.stop` | none |
-| "tag as algae" | `observation.tag` | `category=algae` |
+| Example phrase   | Intent             | Parameters       |
+| ---------------- | ------------------ | ---------------- |
+| "take a video"   | `media.capture`    | `mode=video`     |
+| "take a photo"   | `media.capture`    | `mode=photo`     |
+| "stop recording" | `observation.stop` | none             |
+| "tag as algae"   | `observation.tag`  | `category=algae` |
 
 ## Recommended implementation phases
 
@@ -117,4 +117,3 @@ Notes & rationale
 - The `check:release-config` script performs the basic safety checks listed above and fails the build process if mismatches are detected.
 
 If you want this repository to support the New Architecture in the future, the long-term fix is to update or replace the voice/native speech module with a TurboModule-compatible implementation and add appropriate ProGuard/Turbomodule keep rules.
-

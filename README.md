@@ -41,4 +41,3 @@ yarn type-check
 # supabase types
 yarn types:generate
 ```
-

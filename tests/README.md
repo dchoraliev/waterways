@@ -32,17 +32,21 @@ npm run test:coverage
 ## Writing Tests
 
 ### Mobile Tests
+
 Place mobile app tests in `tests/mobile/`. These use `jest-expo` preset and can test React Native components.
 
 ### Web Tests
+
 Place web app tests in `tests/web/`. These use `jsdom` environment and can test React components.
 
 ### Shared Tests
+
 Place shared package tests in `tests/shared/`. These use Node environment for testing utilities, schemas, and shared logic.
 
 ## Configuration
 
 Each test directory has its own `jest.config.js`:
+
 - `tests/mobile/jest.config.js` - Mobile configuration
 - `tests/web/jest.config.js` - Web configuration
 - `tests/shared/jest.config.js` - Shared configuration

@@ -5,8 +5,10 @@ import { X, MapPin, Satellite, Map as MapIcon } from 'lucide-react';
 import { clusterObservations, type Cluster } from '../utils/clustering';
 
 // ── Tile providers ──────────────────────────────────────────────
+const OSM_SUBDOMAINS = ['a', 'b', 'c'] as const;
+
 function osmProvider(x: number, y: number, z: number): string {
-  const s = ['a', 'b', 'c'][Math.floor(Math.random() * 3)];
+  const s = OSM_SUBDOMAINS[Math.abs((x + y + z) % OSM_SUBDOMAINS.length)];
   return `https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
 }
 
@@ -17,13 +19,24 @@ function satelliteProvider(x: number, y: number, z: number): string {
 
 interface MapViewProps {
   observations: Observation[];
+  isTruncated?: boolean;
   onObservationClick: (observation: Observation) => void;
+  onBoundsChange?: (view: { ne: [number, number]; sw: [number, number]; zoom: number }) => void;
+  loading?: boolean;
+  zoomTooLow?: boolean;
 }
 
-export function MapView({ observations, onObservationClick }: MapViewProps) {
+export function MapView({
+  observations,
+  onObservationClick,
+  onBoundsChange,
+  loading = false,
+  zoomTooLow = false,
+  isTruncated = false,
+}: MapViewProps) {
+  // 🇺🇸 Start centered on the US and don't recenter on filters
   const [center, setCenter] = useState<[number, number]>([39.5, -98.35]);
   const [zoom, setZoom] = useState(4);
-  const [, setClickedObservationId] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [isSatellite, setIsSatellite] = useState(false);
 
@@ -33,14 +46,23 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
 
   const handleMarkerClick = (cluster: Cluster) => {
     if (cluster.isCluster) {
+      if (zoom < 10) {
+        const nextZoom = Math.min(zoom + 2, 18);
+        setCenter([cluster.lat, cluster.lng]);
+        setZoom(nextZoom);
+        return;
+      }
       setSelectedCluster(cluster);
-      setClickedObservationId(null);
     } else {
       const observation = cluster.observations[0];
-      setClickedObservationId(observation.id);
       setSelectedCluster(null);
       onObservationClick(observation);
     }
+  };
+
+  const getClusterLabel = (cluster: Cluster) => {
+    const countText = String(cluster.observations.length);
+    return isTruncated && cluster.isCluster ? `${countText}+` : countText;
   };
 
   return (
@@ -49,42 +71,49 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
         center={center}
         zoom={zoom}
         provider={isSatellite ? satelliteProvider : osmProvider}
-        onBoundsChanged={({ center, zoom }) => {
+        onBoundsChanged={({ center, zoom, bounds }) => {
           setCenter(center as [number, number]);
           setZoom(zoom);
+          onBoundsChange?.({
+            ne: bounds.ne,
+            sw: bounds.sw,
+            zoom,
+          });
         }}
       >
-        {clusters.map((cluster) => (
-          <Marker
-            key={cluster.id}
-            anchor={[cluster.lat, cluster.lng]}
-            onClick={() => handleMarkerClick(cluster)}
-          >
-            {cluster.isCluster ? (
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
-                <div
-                  className={`
-                    flex items-center justify-center rounded-full
-                    bg-destructive text-destructive-foreground
-                    shadow-lg cursor-pointer transition-transform duration-200
-                    ${cluster.observations.length >= 10 ? 'size-14' : 'size-12'}
-                  `}
-                >
-                  <span className="font-semibold">{cluster.observations.length}</span>
+        {clusters.map((cluster) => {
+          return (
+            <Marker
+              key={cluster.id}
+              anchor={[cluster.lat, cluster.lng]}
+              onClick={() => handleMarkerClick(cluster)}
+            >
+              {cluster.isCluster ? (
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
+                  <div
+                    className={`
+                      flex items-center justify-center rounded-full
+                      bg-destructive text-destructive-foreground
+                      shadow-lg cursor-pointer transition-transform duration-200
+                      ${cluster.observations.length >= 10 ? 'size-14' : 'size-12'}
+                    `}
+                  >
+                    <span className="font-semibold">{getClusterLabel(cluster)}</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="pointer-events-none">
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-auto">
-                  <MapPin
-                    className="size-8 text-destructive drop-shadow-lg cursor-pointer transition-colors"
-                    fill="currentColor"
-                  />
+              ) : (
+                <div className="pointer-events-none">
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-auto">
+                    <MapPin
+                      className="size-8 text-destructive drop-shadow-lg cursor-pointer transition-colors"
+                      fill="currentColor"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-          </Marker>
-        ))}
+              )}
+            </Marker>
+          );
+        })}
       </Map>
 
       {/* ── Satellite toggle button ── */}
@@ -113,7 +142,18 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
         )}
       </button>
 
-      {/* ── Cluster popup (unchanged) ── */}
+      {zoomTooLow && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[900] bg-white/95 border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-700 shadow">
+          Zoom in to load observations
+        </div>
+      )}
+
+      {loading && !zoomTooLow && (
+        <div className="absolute top-3 right-3 z-[900] bg-white/60 rounded-md px-2 py-1 text-xs text-gray-500">
+          Loading observations…
+        </div>
+      )}
+
       {selectedCluster && (
         <div className="absolute left-4 top-4 w-80 max-h-[500px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-[1000]">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
@@ -133,7 +173,6 @@ export function MapView({ observations, onObservationClick }: MapViewProps) {
               <button
                 key={obs.id}
                 onClick={() => {
-                  setClickedObservationId(obs.id);
                   setSelectedCluster(null);
                   onObservationClick(obs);
                 }}

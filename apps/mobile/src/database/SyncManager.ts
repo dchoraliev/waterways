@@ -264,8 +264,8 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
         created_at: parseDateTime(obs.created_at),
         location: parseLocationAsEWKT(obs.longitude, obs.latitude),
         observation: obs.observation ?? undefined,
+        categories: obs.category_id ? [obs.category_id] : null,
         observation_media: observationMediaUrls,
-        // category_ids: null                     TODO: need to insert the observation as array of index
       };
       console.log(`Sycing observation - `, payload);
       const { error } = await supabase
