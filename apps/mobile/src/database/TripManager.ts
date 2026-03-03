@@ -277,3 +277,8 @@ export async function removeTripById(id: string): Promise<void> {
   const db = await getDatabase();
   await db!.runAsync(`DELETE FROM trips WHERE id = ?`, [id]);
 }
+
+export async function removeSyncedTrips(): Promise<void> {
+  const db = await getDatabase();
+  await db!.runAsync(`DELETE FROM trips WHERE sync_status = ?`, [SyncStatus.SYNCED]);
+}

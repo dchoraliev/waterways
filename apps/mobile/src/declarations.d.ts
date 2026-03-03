@@ -42,7 +42,7 @@ declare namespace NodeJS {
       regExp?: RegExp
     ): {
       keys(): string[];
-      (id: string): any;
+      (id: string): string;
       <T>(id: string): T;
       resolve(id: string): string;
       id: string;

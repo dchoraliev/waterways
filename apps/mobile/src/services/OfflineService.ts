@@ -1,10 +1,7 @@
 import { getSession } from '@waterways/shared/src/supabase/auth';
-import { Alert } from 'react-native';
 import { getTripsByUserId, updateTripById } from '../database/TripManager';
 import { getObservationsByUserId, updateObservationById } from '../database/ObservationManager';
 import { performAutoSyncTaskOnce } from './NetworkService';
-import { saveAudioObservationForTrip } from './VoiceRecorder';
-import { get } from 'http';
 import { Observation } from '@waterways/shared/src/models/local-db-rows';
 
 export const OFFLINE_USER_ID = 'offline-user';
@@ -16,13 +13,13 @@ export async function updateAndSyncOfflineDataToCurrentUser(): Promise<void> {
 
     // If there's an error fetching the session, we can't proceed with updating the offline data
     if (error) {
-      console.error('Error fetching session:', error);
+      console.error('[OfflineService] Error fetching session:', error);
       return;
     }
 
     // We have a valid session, we can proceed with updating the offline data
-    console.log('Login successful! User ID:', data.session?.user?.id);
     const currentUserId = data.session?.user?.id;
+    console.log('[OfflineService] Converting offline data to current user ID:', currentUserId);
     // TODO: If we have pending offline data, we should trigger a sync here before navigating to the home screen
     const trips = await getTripsByUserId(OFFLINE_USER_ID);
     ///////////////// Temp Block start
@@ -35,7 +32,9 @@ export async function updateAndSyncOfflineDataToCurrentUser(): Promise<void> {
         await updateTripById(trip.id, { user_id: currentUserId! });
       }
     }
-    console.log('Offline trips updated to current user account');
+    console.log(
+      `[OfflineService] Successfully updated ${trips.length} offline trips to current user.`
+    );
 
     const observations: Observation[] = await getObservationsByUserId(OFFLINE_USER_ID);
     ///////////////// Temp Block start
@@ -48,12 +47,17 @@ export async function updateAndSyncOfflineDataToCurrentUser(): Promise<void> {
         await updateObservationById(obs.id, { user_id: currentUserId! });
       }
     }
-    console.log('Offline observations updated to current user account');
+    console.log(
+      `[OfflineService] Successfully updated ${observations.length} offline observations to current user.`
+    );
 
     // After updating the offline data to the current user, triger a one time sync for pending data
     performAutoSyncTaskOnce();
   } catch (_error) {
     // FIX: Renamed 'error' to '_error'
-    console.error('An unexpected error occurred while fetching the session:', _error);
+    console.error(
+      '[OfflineService] An unexpected error occurred while fetching the session:',
+      _error
+    );
   }
 }

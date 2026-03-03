@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { useDraftJourneys, JourneyDraft } from '../hooks/useDraftJourneys';
-import { classifyObservation } from '../services/ObservationClassifier';
+import { classifyObservation, CATEGORIES } from '../services/ObservationClassifier';
 import styles from '../styles/ReviewScreen.styles';
 
 export default function EditObservationScreen() {
@@ -35,15 +35,8 @@ export default function EditObservationScreen() {
 
   const index = Number(observationIndex);
 
-  // Available categories
-  const categories = [
-    { label: 'None', value: null },
-    { label: 'Infrastructure', value: 'Infrastructure' },
-    { label: 'Environmental', value: 'Environmental' },
-    { label: 'Wildlife', value: 'Wildlife' },
-    { label: 'Hazards', value: 'Hazards' },
-    { label: 'General', value: 'General' },
-  ];
+  // Dynamic categories loaded from CATEGORIES mapping (fallback handled below)
+  const categoryEntries = Object.entries(CATEGORIES);
 
   // FIX 1: Added getDraftByTripId and index to dependency array
   useEffect(() => {
@@ -54,24 +47,35 @@ export default function EditObservationScreen() {
       if (obs) {
         setDescription(obs.description);
         setLocation(obs.location || '');
-        setCategory(obs.category || null);
+        // if the observation has no category, use fallback from CATEGORIES
+        const fallback =
+          Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
+        setCategory(obs.category ?? fallback);
         setKeyword(obs.keyword || '');
         setDraft(loadedDraft);
       }
     })();
+    // intentionally not depending on CATEGORIES (it's a mutable module-level object)
   }, [tripId, observationIndex, getDraftByTripId, index]);
 
   // FIX 2: Moved classification logic into the description change handler
   // instead of using a useEffect with setState calls
-  const handleDescriptionChange = useCallback((text: string) => {
+  function handleDescriptionChange(text: string) {
     setDescription(text);
 
     if (text) {
       const result = classifyObservation(text);
       setKeyword(result.keyword || '');
-      setCategory(result.category === 'Unclassified' ? null : result.category);
+      // if classifier returns 'OTHERS', map to the fallback category
+      if (result.category === 'OTHERS') {
+        const fallback =
+          Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
+        setCategory(fallback);
+      } else {
+        setCategory(result.category);
+      }
     }
-  }, []);
+  }
 
   const handleSave = async () => {
     if (!draft) return;
@@ -143,29 +147,39 @@ export default function EditObservationScreen() {
 
             <Text style={editStyles.label}>Category</Text>
             <View style={editStyles.categoryGrid}>
-              {categories.map((cat) => {
-                const isSelected = category === cat.value;
-                return (
-                  <TouchableOpacity
-                    key={cat.value || 'none'}
-                    style={[
-                      editStyles.categoryButton,
-                      isSelected && editStyles.categoryButtonSelected,
-                    ]}
-                    onPress={() => setCategory(cat.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
+              {/* removed DEFAULT option; users must choose a category or fallback will be used */}
+
+              {/* Category tiles from CATEGORIES */}
+              {categoryEntries.map(
+                ([catName, data]: [
+                  string,
+                  { is_fallback: boolean; color: string; keywords: string[] },
+                ]) => {
+                  const isSelected = category === catName;
+                  const borderColor = data?.color ?? '#374151';
+                  return (
+                    <TouchableOpacity
+                      key={catName}
                       style={[
-                        editStyles.categoryButtonText,
-                        isSelected && editStyles.categoryButtonTextSelected,
+                        editStyles.categoryButton,
+                        { borderColor },
+                        isSelected && { backgroundColor: borderColor, borderColor },
                       ]}
+                      onPress={() => setCategory(catName)}
+                      activeOpacity={0.7}
                     >
-                      {cat.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <Text
+                        style={[
+                          editStyles.categoryButtonText,
+                          isSelected && editStyles.categoryButtonTextSelected,
+                        ]}
+                      >
+                        {catName}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
+              )}
             </View>
 
             <Text style={editStyles.label}>Keyword</Text>

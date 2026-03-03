@@ -23,6 +23,11 @@ let getAllAsyncMock: jest.Mock;
 describe('MediaManager', () => {
   const NOW = 1700000000000;
 
+  type DbLike = {
+    runAsync: jest.Mock;
+    getAllAsync: jest.Mock;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
@@ -31,10 +36,14 @@ describe('MediaManager', () => {
     runAsyncMock = jest.fn().mockResolvedValue(undefined);
     getAllAsyncMock = jest.fn().mockResolvedValue([]);
 
-    mockGetDatabase.mockResolvedValue({
+    const db: DbLike = {
       runAsync: runAsyncMock,
       getAllAsync: getAllAsyncMock,
-    } as any);
+    };
+
+    mockGetDatabase.mockResolvedValue(
+      db as unknown as Awaited<ReturnType<typeof dbModule.getDatabase>>
+    );
   });
 
   afterEach(() => {
@@ -114,7 +123,7 @@ describe('MediaManager', () => {
       last_synced_at: 0,
     };
 
-    getAllAsyncMock.mockImplementation(async (sql: string, params?: any[]) => {
+    getAllAsyncMock.mockImplementation(async (sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT * FROM observation_media WHERE id')) {
         expect(params).toEqual(['media-1']);
         return [row];

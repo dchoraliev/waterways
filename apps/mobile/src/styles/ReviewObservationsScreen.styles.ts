@@ -1,5 +1,4 @@
 import { StyleSheet } from 'react-native';
-import { classifierTagPalette } from './colors';
 
 const styles = StyleSheet.create({
   root: {

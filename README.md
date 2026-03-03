@@ -37,6 +37,7 @@ yarn web
 yarn test
 yarn lint
 yarn type-check
+yarn format
 
 # supabase types
 yarn types:generate

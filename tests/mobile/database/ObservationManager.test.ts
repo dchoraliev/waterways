@@ -1,5 +1,3 @@
-// tests/mobile/database/ObservationManager.test.ts
-
 jest.mock('@waterways/mobile/src/database/db');
 jest.mock('@waterways/mobile/src/services/LocationService', () => ({
   getCurrentCoordinates: jest.fn().mockResolvedValue({
@@ -21,6 +19,25 @@ import { SyncStatus } from '@waterways/mobile/src/database/SyncManager';
 
 const mockGetDatabase = dbModule.getDatabase as jest.MockedFunction<typeof dbModule.getDatabase>;
 
+// Define proper type for observation row
+interface ObservationRow {
+  id: string;
+  user_id: string;
+  trip_id: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  created_at: number;
+  audio_media_id?: string | null;
+  audio_transcribed?: number | null;
+  observation?: string | null;
+  category_id?: string | null;
+  direction?: string | null;
+  local_media_id?: string | null;
+  sync_status?: string | null;
+  multimedia_url?: string | null;
+  last_synced_at?: number | null;
+}
+
 let runAsyncMock: jest.Mock;
 let getAllAsyncMock: jest.Mock;
 
@@ -34,10 +51,11 @@ describe('ObservationManager', () => {
     runAsyncMock = jest.fn().mockResolvedValue(undefined);
     getAllAsyncMock = jest.fn().mockResolvedValue([]);
 
+    // Cast through unknown to bypass type checking for mocks
     mockGetDatabase.mockResolvedValue({
       runAsync: runAsyncMock,
       getAllAsync: getAllAsyncMock,
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof dbModule.getDatabase>>);
   });
 
   afterEach(() => {
@@ -112,14 +130,14 @@ describe('ObservationManager', () => {
   });
 
   test('getObservationById returns row when found', async () => {
-    const row = {
+    const row: ObservationRow = {
       id: 'obs-1',
       user_id: 'user-1',
       trip_id: 'trip-1',
       created_at: NOW,
-    } as any;
+    };
 
-    getAllAsyncMock.mockImplementation(async (sql: string, params?: any[]) => {
+    getAllAsyncMock.mockImplementation(async (sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT * FROM observations WHERE id')) {
         expect(params).toEqual(['obs-1']);
         return [row];
@@ -149,12 +167,12 @@ describe('ObservationManager', () => {
   });
 
   test('getObservationsByTripId returns all rows for a trip', async () => {
-    const rows = [
-      { id: 'obs-1', trip_id: 'trip-1' },
-      { id: 'obs-2', trip_id: 'trip-1' },
-    ] as any[];
+    const rows: ObservationRow[] = [
+      { id: 'obs-1', user_id: 'user-1', trip_id: 'trip-1', created_at: NOW },
+      { id: 'obs-2', user_id: 'user-1', trip_id: 'trip-1', created_at: NOW },
+    ];
 
-    getAllAsyncMock.mockImplementation(async (sql: string, params?: any[]) => {
+    getAllAsyncMock.mockImplementation(async (sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT * FROM observations WHERE trip_id')) {
         expect(params).toEqual(['trip-1']);
         return rows;

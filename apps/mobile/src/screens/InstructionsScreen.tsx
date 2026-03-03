@@ -1,7 +1,5 @@
-// apps/mobile/src/screens/InstructionsScreen.tsx (The main file)
-
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import styles from '../styles/InstructionsScreen.styles';
 import Accordion from '../components/instruction/Accodian';
 import InstructionRow from '../components/instruction/InstuctionRow';

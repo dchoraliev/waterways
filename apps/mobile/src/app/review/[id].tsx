@@ -5,5 +5,5 @@ import ReviewScreen from '../../screens/ReviewScreen';
 export default function ReviewRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  return <ReviewScreen tripId={id ?? 'unknown'} />;
+  return <ReviewScreen tripId={id} />;
 }

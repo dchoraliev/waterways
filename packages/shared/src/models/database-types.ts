@@ -10,23 +10,26 @@ export type Database = {
     Tables: {
       observation_categories: {
         Row: {
-          active: boolean | null;
           color: string | null;
           id: number;
+          is_active: boolean | null;
+          is_fallback: boolean;
           keywords: string[] | null;
           type: string;
         };
         Insert: {
-          active?: boolean | null;
           color?: string | null;
           id?: number;
+          is_active?: boolean | null;
+          is_fallback?: boolean;
           keywords?: string[] | null;
           type: string;
         };
         Update: {
-          active?: boolean | null;
           color?: string | null;
           id?: number;
+          is_active?: boolean | null;
+          is_fallback?: boolean;
           keywords?: string[] | null;
           type?: string;
         };

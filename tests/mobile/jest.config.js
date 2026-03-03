@@ -6,16 +6,9 @@ module.exports = {
   rootDir: '.',
 
   moduleNameMapper: {
-    // shared alias, used by TranscriptionService, SyncManager, etc.
     '^@shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
-
-    // mobile alias (in case you use @waterways/mobile/src/… in tests)
     '^@waterways/mobile/src/(.*)$': '<rootDir>/../../apps/mobile/src/$1',
-
-    // older imports that may still exist
     '^@waterways/shared/src/(.*)$': '<rootDir>/../../packages/shared/src/$1',
-
-    // generic apps alias
     '^apps/(.*)$': '<rootDir>/../../apps/$1',
   },
 
@@ -26,21 +19,27 @@ module.exports = {
         presets: ['babel-preset-expo'],
       },
     ],
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          jsx: 'react',
+        },
+      },
+    ],
   },
+
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)',
   ],
+
   collectCoverageFrom: [
     '<rootDir>/../../apps/mobile/**/*.{ts,tsx}',
     '!**/*.d.ts',
     '!**/node_modules/**',
   ],
+
   testEnvironment: 'node',
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        jsx: 'react',
-      },
-    },
-  },
+
+  // REMOVE globals section entirely
 };
