@@ -47,6 +47,7 @@ export const EXPECTED_SCHEMA: Record<string, string[]> = {
     'last_synced_at',
   ],
   settings: ['id', 'dark_mode_enabled', 'notifications_enabled'],
+  categories: ['id', 'name', 'is_fallback', 'color', 'keywords'],
 };
 
 // ============================================
@@ -116,6 +117,20 @@ CREATE TABLE IF NOT EXISTS observation_media (
 `;
 
 // ============================================
+// LOCAL CATEGORIES TABLE
+// ============================================
+
+export const CREATE_CATEGORIES_TABLE = `
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  is_fallback INTEGER DEFAULT 0,
+  color TEXT,
+  keywords TEXT
+);
+`;
+
+// ============================================
 // INDEXES
 // ============================================
 
@@ -147,6 +162,7 @@ export const CREATE_ALL_TABLES = [
   CREATE_TRIPS_TABLE,
   CREATE_OBSERVATIONS_TABLE,
   CREATE_OBSERVATION_MEDIA_TABLE,
+  CREATE_CATEGORIES_TABLE,
   CREATE_OBSERVATIONS_TRIP_ID_INDEX,
   CREATE_OBSERVATION_MEDIA_OBSERVATION_ID_INDEX,
   CREATE_SETTINGS_TABLE,
@@ -159,5 +175,6 @@ export const DROP_ALL_TABLES = [
   `DROP TABLE IF EXISTS observation_media;`,
   `DROP TABLE IF EXISTS observations;`,
   `DROP TABLE IF EXISTS trips;`,
+  `DROP TABLE IF EXISTS categories;`,
   `DROP TABLE IF EXISTS settings;`,
 ];

@@ -1,16 +1,17 @@
 // networkService.ts
 import * as Network from 'expo-network';
 import { syncAllFailedTrips, syncAllReviewedTrips } from '../database/SyncManager';
-import { on } from 'events';
+import { syncCategoriesFromSupabase } from '../database/CategoryManager';
+import { prepareCategoryKeywordMapping } from './ObservationClassifier';
 
 // File states to prevent overlapping syncs if network flaps rapidly
 let inSyncingFlight: boolean = false;
 let subscription: { remove: () => void } | null = null;
 let lastIsOnline: boolean | null = null;
 
-export function performAutoSyncTaskOnce(): void {
-  console.log('Performing one-time auto-sync task...');
-  onNetworkOnline();
+export async function performAutoSyncTaskOnce(): Promise<void> {
+  console.log('[NetworkServices] Performing one-time auto-sync task...');
+  await onNetworkOnline();
 }
 
 /**
@@ -18,7 +19,7 @@ export function performAutoSyncTaskOnce(): void {
  * Example ideas: pause sync queue, show toast/banner, mark app state offline, etc.
  */
 function onNetworkOffline(): void {
-  console.log('Network went offline...');
+  console.log('[NetworkServices] Network went offline...');
   // TODO: implement
 }
 
@@ -26,21 +27,27 @@ function onNetworkOffline(): void {
  * TODO: Implement what your app should do when it comes back online.
  * Example ideas: resume sync queue, trigger background sync, hide banner, etc.
  */
-function onNetworkOnline(): void {
-  console.log('Network is online! Starting auto-sync process...');
+async function onNetworkOnline(): Promise<void> {
+  console.log('[NetworkServices] Network is online! Starting auto-sync process...');
   // Avoid triggering multiple syncs if we rapidly toggle online/offline
   if (inSyncingFlight) return;
 
   // Set a flag to prevent overlapping syncs if network flaps
   inSyncingFlight = true;
 
+  // Sync categories from supabase to local DB
+  await syncCategoriesFromSupabase();
+
+  // Update the CategoryKeywordMapping
+  await prepareCategoryKeywordMapping();
+
   // TODO: Transcribe pending audios recordings
 
   // Sync pending trips data
-  syncAllReviewedTrips();
+  await syncAllReviewedTrips();
 
   // Sync failed trips data
-  syncAllFailedTrips();
+  await syncAllFailedTrips();
 
   // Clear the flag
   inSyncingFlight = false;

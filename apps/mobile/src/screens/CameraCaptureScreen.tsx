@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import * as FileSystem from 'expo-file-system/legacy'; // Use legacy API during transition
+import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { styles } from '../styles/CameraCaptureScreen.styles';
@@ -39,12 +39,59 @@ export default function CameraCaptureScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
   const [mode, setMode] = useState<Mode>('picture');
-  const [busy, setBusy] = useState(false);
+  const [_busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  // Animation for capture button press
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Animation for recording pulse
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const cameraRef = useRef<CameraView>(null);
 
   const canUseCamera = useMemo(() => cameraPermission?.granted === true, [cameraPermission]);
+
+  // Animate button press
+  const animatePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Start recording pulse animation
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  // Stop recording pulse animation
+  const stopPulseAnimation = () => {
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+  };
 
   async function ensureCameraPermission() {
     if (cameraPermission?.granted) return true;
@@ -72,6 +119,8 @@ export default function CameraCaptureScreen() {
 
     try {
       setBusy(true);
+      setProcessing(true);
+      animatePress();
 
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
       if (!photo?.uri) {
@@ -91,7 +140,6 @@ export default function CameraCaptureScreen() {
         fileSize: size,
       });
 
-      // Mark this observation as having media attached
       markObservationHasMedia(observationId);
 
       showToast('Photo attached');
@@ -101,6 +149,7 @@ export default function CameraCaptureScreen() {
       showToast('Photo failed');
     } finally {
       setBusy(false);
+      setProcessing(false);
     }
   }
 
@@ -123,18 +172,25 @@ export default function CameraCaptureScreen() {
     }
 
     try {
-      setBusy(true);
       setRecording(true);
+      setBusy(true);
+      startPulseAnimation();
 
-      const video = await cameraRef.current?.recordAsync({ maxDuration: 30 });
+      // Start recording (this will wait until stopRecording is called)
+      const vid = await cameraRef.current?.recordAsync();
 
-      if (!video?.uri) {
-        showToast('No video captured.');
+      // Recording has stopped, now process the video
+      stopPulseAnimation();
+      setRecording(false);
+      setProcessing(true);
+
+      if (!vid?.uri) {
+        showToast('No video recorded.');
         return;
       }
 
       const { destUri, size } = await persistToDocuments(
-        video.uri,
+        vid.uri,
         `obs_${observationId}_${Date.now()}.mp4`
       );
 
@@ -145,7 +201,6 @@ export default function CameraCaptureScreen() {
         fileSize: size,
       });
 
-      // Mark this observation as having media attached
       markObservationHasMedia(observationId);
 
       showToast('Video attached');
@@ -153,15 +208,19 @@ export default function CameraCaptureScreen() {
     } catch (e) {
       console.warn(e);
       showToast('Video failed');
+      stopPulseAnimation();
     } finally {
       setRecording(false);
       setBusy(false);
+      setProcessing(false);
     }
   }
 
   function stopVideo() {
     try {
+      console.log('[Camera] Stopping video recording...');
       cameraRef.current?.stopRecording();
+      // Note: cleanup happens in startVideo's finally block after recordAsync resolves
     } catch (e) {
       console.warn('Stop recording error:', e);
     }
@@ -169,71 +228,99 @@ export default function CameraCaptureScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Capture</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-          <Text style={styles.closeText}>Close</Text>
+        <Pressable
+          onPress={() => {
+            // If recording, stop it first
+            if (recording) {
+              stopVideo();
+            }
+            // Go back to previous screen (journey screen)
+            router.back();
+          }}
+          style={styles.closeBtn}
+        >
+          <Text style={styles.closeText}>✕</Text>
         </Pressable>
+        <Text style={styles.title}>Camera</Text>
+        <View style={styles.placeholder} />
       </View>
 
       {!canUseCamera ? (
         <View style={styles.permissionWrap}>
           <Text style={styles.permissionText}>Camera access is required.</Text>
           <Pressable onPress={requestCameraPermission} style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Grant permission</Text>
+            <Text style={styles.primaryBtnText}>Grant Permission</Text>
           </Pressable>
         </View>
       ) : (
         <View style={styles.cameraWrap}>
+          {/* Camera View */}
           <CameraView ref={cameraRef} style={styles.camera} facing="back" mode={mode} />
 
+          {/* Bottom Controls */}
           <View style={styles.controls}>
-            <View style={styles.modeRow}>
+            {/* Mode Labels */}
+            <View style={styles.modeLabelRow}>
               <Pressable
                 onPress={() => setMode('picture')}
-                style={[styles.modeBtn, mode === 'picture' ? styles.modeBtnActive : null]}
-                disabled={busy || recording}
+                disabled={recording || processing}
+                style={styles.modeLabelBtn}
               >
-                <Text style={styles.modeBtnText}>Photo</Text>
+                <Text style={[styles.modeLabelText, mode === 'picture' && styles.modeLabelActive]}>
+                  PHOTO
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setMode('video')}
-                style={[styles.modeBtn, mode === 'video' ? styles.modeBtnActive : null]}
-                disabled={busy || recording}
+                disabled={recording || processing}
+                style={styles.modeLabelBtn}
               >
-                <Text style={styles.modeBtnText}>Video</Text>
+                <Text style={[styles.modeLabelText, mode === 'video' && styles.modeLabelActive]}>
+                  VIDEO
+                </Text>
               </Pressable>
             </View>
 
-            {mode === 'picture' ? (
-              <Pressable
-                disabled={busy || recording}
-                onPress={takePhoto}
-                style={[styles.captureBtn, busy || recording ? { opacity: 0.6 } : null]}
-              >
-                <Text style={styles.captureBtnText}>{busy ? 'Working…' : 'Take Photo'}</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.videoRow}>
-                <Pressable
-                  disabled={busy}
-                  onPress={startVideo}
-                  style={[styles.captureBtn, busy ? { opacity: 0.6 } : null]}
-                >
-                  <Text style={styles.captureBtnText}>
-                    {recording ? 'Recording…' : busy ? 'Working…' : 'Start Video'}
-                  </Text>
-                </Pressable>
+            {/* Capture Buttons */}
+            <View style={styles.captureRow}>
+              {/* Left spacer */}
+              <View style={styles.sideSpace} />
 
-                <Pressable
-                  onPress={stopVideo}
-                  style={[styles.secondaryBtn, !recording ? { opacity: 0.6 } : null]}
-                  disabled={!recording}
+              {/* Main Capture Button */}
+              <Pressable
+                disabled={processing}
+                onPress={mode === 'picture' ? takePhoto : recording ? stopVideo : startVideo}
+                style={styles.captureButtonContainer}
+              >
+                <Animated.View
+                  style={[
+                    styles.captureButtonOuter,
+                    mode === 'video' && recording && styles.recordingOuter,
+                    { transform: [{ scale: mode === 'picture' ? scaleAnim : pulseAnim }] },
+                  ]}
                 >
-                  <Text style={styles.secondaryBtnText}>Stop</Text>
-                </Pressable>
+                  <View
+                    style={[
+                      styles.captureButtonInner,
+                      mode === 'video' && recording && styles.recordingInner,
+                    ]}
+                  />
+                </Animated.View>
+              </Pressable>
+
+              {/* Right side - Mode indicator */}
+              <View style={styles.sideSpace}>
+                {mode === 'video' && recording && (
+                  <View style={styles.recordingIndicator}>
+                    <View style={styles.recordingDot} />
+                    <Text style={styles.recordingText}>REC</Text>
+                  </View>
+                )}
+                {processing && <Text style={styles.processingText}>Saving...</Text>}
               </View>
-            )}
+            </View>
           </View>
         </View>
       )}

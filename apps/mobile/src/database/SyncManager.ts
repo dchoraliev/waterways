@@ -74,6 +74,8 @@ async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
   }
 
   const fsModule = await import('expo-file-system/legacy');
+
+  // Read file as base64
   const base64 = await fsModule.readAsStringAsync(uri, {
     encoding: fsModule.EncodingType.Base64,
   });
@@ -134,13 +136,14 @@ export const parseLocationAsEWKT = (
 
 export async function syncAllReviewedTrips(): Promise<void> {
   // Get all trips with pending sync status
-  const pendingTrips = await getTripsBySyncStatus(SyncStatus.PENDING);
-  console.log(`Found ${pendingTrips.length} trips pending sync. Starting sync process...`);
+  const pendingTrips = await getTripsBySyncStatus(SyncStatus.REVIEWED);
+  console.log(`[SyncManager] Found ${pendingTrips.length} submitted trips with pending sync.`);
   for (const trip of pendingTrips) {
     try {
+      console.log(`[SyncManager] Syncing trip ${trip.id}...`);
       await syncTrip(trip.id);
     } catch (error) {
-      console.error(`Error syncing trip ${trip.id}:`, error);
+      console.error(`[SyncManager] Error syncing trip ${trip.id}:`, error);
     }
   }
 }
@@ -148,12 +151,13 @@ export async function syncAllReviewedTrips(): Promise<void> {
 export async function syncAllFailedTrips(): Promise<void> {
   // Get all trips with error sync status
   const failedTrips = await getTripsBySyncStatus(SyncStatus.ERROR);
-  console.log(`Found ${failedTrips.length} trips with failed sync. Starting retry process...`);
+  console.log(`[SyncManager] Found ${failedTrips.length} trips with failed sync.`);
   for (const trip of failedTrips) {
     try {
+      console.log(`[SyncManager] Retrying sync for trip ${trip.id}...`);
       await syncTrip(trip.id);
     } catch (error) {
-      console.error(`Error retrying sync for trip ${trip.id}:`, error);
+      console.error(`[SyncManager] Error retrying sync for trip ${trip.id}:`, error);
     }
   }
 }
@@ -177,7 +181,7 @@ export async function syncTrip(tripId: string): Promise<void> {
       start_location: parseLocationAsEWKT(tripRecord.start_longitude, tripRecord.start_latitude),
       end_location: parseLocationAsEWKT(tripRecord.end_longitude, tripRecord.end_latitude),
     };
-    console.log('Syncing trip - ', payload);
+    console.log('[SyncManager] Preparing to sync trip - ', payload);
     const { data, error } = await supabase
       .from('trips')
       .upsert(payload, { onConflict: 'unique_userID_localID_pair' })
@@ -193,19 +197,21 @@ export async function syncTrip(tripId: string): Promise<void> {
       const success = await syncObservations(tripId, supabaseTripId);
       if (success) {
         // All the trip observation synced successful, resolved the trip to be synced.
-        console.log(`Trip synced - ${tripId}`);
+        console.log(`[SyncManager] Trip synced - ${tripId}`);
         await updateTripById(tripId, {
           sync_status: SyncStatus.SYNCED,
           last_synced_at: Date.now(),
         });
       } else {
         // Block the trip sync due to observation sync failure
-        console.error(`Sync blocked for trip ${tripId} due to failed observations upload`);
+        console.error(
+          `[SyncManager] Sync blocked for trip ${tripId} due to failed observations upload`
+        );
         await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
       }
     } else {
       // Error occured during trip sync
-      console.error(`Sync failed for Trip ${tripId}. ERROR: `, error);
+      console.error(`[SyncManager] Sync failed for Trip ${tripId} due to unknown error: `, error);
       await updateTripById(tripId, { sync_status: SyncStatus.ERROR });
     }
   }
@@ -217,14 +223,14 @@ export async function syncTrip(tripId: string): Promise<void> {
 async function syncObservations(tripId: string, supabaseTripId: string): Promise<boolean> {
   // Get all observations for the trip
   const observations = await getObservationsByTripId(tripId);
-  console.log(`Syncing ${observations.length} observations for trip ${tripId}`);
+  console.log(`[SyncManager] Syncing ${observations.length} observations for trip ${tripId}`);
   let failure_encountered = false;
 
   // Check if the received supabase_id is a valid uuid to trust it (must be 36 length)
   if (!supabaseTripId || supabaseTripId.length !== 36) {
     // Mark each obs failed sync, because the supabase trip id is invalid
     console.error(
-      `Sync observations for trip ID ${tripId} failed: Invaild supabase trip id was provided.`
+      `[SyncManager] Sync observations for trip ID ${tripId} failed: Invalid supabase trip id was provided.`
     );
     for (const obs of observations) {
       await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
@@ -234,7 +240,7 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
 
   // Update the trip id and sync the observation as well as the media.
   console.warn(
-    `Updating the observations trip ID from ${tripId} to supabase trip ID ${supabaseTripId}`
+    `[SyncManager] Updating the observations trip ID from ${tripId} to supabase trip ID ${supabaseTripId}`
   );
   for (const obs of observations) {
     await updateObservationById(obs.id, { supabase_trip_id: supabaseTripId });
@@ -267,7 +273,7 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
         categories: obs.category_id ? [obs.category_id] : null,
         observation_media: observationMediaUrls,
       };
-      console.log(`Sycing observation - `, payload);
+      console.log(`[SyncManager] Preparing to sync observation - `, payload);
       const { error } = await supabase
         .from('observations')
         .upsert(payload, { onConflict: 'unique_userID_localID_pair' });
@@ -275,11 +281,14 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
       if (error) {
         // Error encountered
         failure_encountered = true;
-        console.error(`Sync failed for observation id ${obs.id}. ERROR: `, error);
+        console.error(
+          `[SyncManager] Sync failed for observation id ${obs.id} due to unknown error: `,
+          error
+        );
         await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
       } else {
         // Update the sync status on success
-        console.log(`Observation synced - ${obs.id}`);
+        console.log(`[SyncManager] Observation synced - ${obs.id}`);
         await updateObservationById(obs.id, {
           sync_status: SyncStatus.SYNCED,
           last_synced_at: Date.now(),
@@ -288,7 +297,9 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
     } else {
       // Mark the current observation as failed due to media upload failure
       failure_encountered = true;
-      console.error(`Sync blocked for observations ${obs.id} due to failed media upload`);
+      console.error(
+        `[SyncManager] Sync blocked for observations ${obs.id} due to failed media upload`
+      );
       await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
     }
   }
@@ -303,7 +314,7 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
 async function syncMedia(mediaId: string): Promise<{ success: boolean; url: string | null }> {
   const media = await getMediaById(mediaId);
   if (!media) {
-    console.error(`Sync failed: media ${mediaId} was not found in local database`);
+    console.error(`[SyncManager] Sync failed: media ${mediaId} was not found in local database`);
     return { success: false, url: null };
   }
 
@@ -322,7 +333,7 @@ async function syncMedia(mediaId: string): Promise<{ success: boolean; url: stri
     });
 
     if (uploadError) {
-      console.error(`Sync failed: upload error for media ${mediaId}`, uploadError);
+      console.error(`[SyncManager] Sync failed: upload error for media ${mediaId}`, uploadError);
       await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
       return { success: false, url: null };
     }
@@ -366,7 +377,10 @@ async function syncMedia(mediaId: string): Promise<{ success: boolean; url: stri
 
     return { success: true, url: publicUrl ?? path };
   } catch (error) {
-    console.error(`Sync failed: unexpected error while uploading media ${mediaId}`, error);
+    console.error(
+      `[SyncManager] Sync failed: unexpected error while uploading media ${mediaId}`,
+      error
+    );
     await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
     return { success: false, url: null };
   }

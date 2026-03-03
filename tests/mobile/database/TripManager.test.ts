@@ -37,6 +37,13 @@ import { SyncStatus } from '@waterways/mobile/src/database/SyncManager';
 describe('TripManager', () => {
   const NOW = 1700000000000;
 
+  // local minimal shape for the row used in this test file
+  type TripRowMinimal = {
+    id: string;
+    user_id: string;
+    created_at: number;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
@@ -107,13 +114,13 @@ describe('TripManager', () => {
   });
 
   test('getTripById returns row when found', async () => {
-    const row = {
+    const row: TripRowMinimal = {
       id: 'trip-1',
       user_id: 'user-1',
       created_at: NOW,
-    } as any;
+    };
 
-    getAllAsyncMock.mockImplementationOnce(async (sql: string, params?: any[]) => {
+    getAllAsyncMock.mockImplementationOnce(async (sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT * FROM trips WHERE id')) {
         expect(params).toEqual(['trip-1']);
         return [row];

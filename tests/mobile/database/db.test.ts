@@ -3,7 +3,7 @@
 // --- Mock expo-sqlite with a factory that exposes its mocks --- //
 jest.mock('expo-sqlite', () => {
   const execAsyncMock = jest.fn().mockResolvedValue(undefined);
-  const getAllAsyncMock = jest.fn().mockResolvedValue([] as any[]);
+  const getAllAsyncMock = jest.fn().mockResolvedValue([]);
   const runAsyncMock = jest.fn().mockResolvedValue(undefined);
 
   const openDatabaseAsyncMock = jest.fn(async () => ({
@@ -52,24 +52,35 @@ jest.mock('@waterways/shared/src/database/schema', () => ({
 // Handles to the mocks inside expo-sqlite
 let execAsyncMock: jest.Mock;
 let getAllAsyncMock: jest.Mock;
-let runAsyncMock: jest.Mock;
 let openDatabaseAsyncMock: jest.Mock;
 
 // Helpers to configure schema behavior ---------------------------------
 
+type SqlParams = unknown[] | undefined;
+
+// minimal typing for the expo-sqlite mock module we created above
+type ExpoSqliteMockModule = {
+  __mocks__: {
+    execAsyncMock: jest.Mock;
+    getAllAsyncMock: jest.Mock;
+    runAsyncMock: jest.Mock;
+    openDatabaseAsyncMock: jest.Mock;
+  };
+};
+
 function mockValidSchema() {
-  getAllAsyncMock.mockImplementation(async (sql: string, params?: any[]) => {
+  getAllAsyncMock.mockImplementation(async (sql: string, params?: SqlParams) => {
     // Table exists?
     if (sql.startsWith('SELECT name FROM sqlite_master')) {
-      const tableName = params?.[0];
+      const tableName = (params?.[0] as string | undefined) ?? '';
       return [{ name: tableName }];
     }
 
     // PRAGMA table_info(table)
     if (sql.startsWith('PRAGMA table_info(')) {
       const match = sql.match(/PRAGMA table_info\((.+)\);/);
-      const tableName = match?.[1];
-      const cols = EXPECTED_SCHEMA_MOCK[tableName ?? ''] ?? [];
+      const tableName = match?.[1] ?? '';
+      const cols = EXPECTED_SCHEMA_MOCK[tableName] ?? [];
       return cols.map((name) => ({ name }));
     }
 
@@ -79,10 +90,10 @@ function mockValidSchema() {
 }
 
 function mockInvalidSchema() {
-  getAllAsyncMock.mockImplementation(async (sql: string, params?: any[]) => {
+  getAllAsyncMock.mockImplementation(async (sql: string, params?: SqlParams) => {
     // Tables "exist"
     if (sql.startsWith('SELECT name FROM sqlite_master')) {
-      const tableName = params?.[0];
+      const tableName = (params?.[0] as string | undefined) ?? '';
       return [{ name: tableName }];
     }
 
@@ -105,11 +116,9 @@ describe('database/db.ts', () => {
 
     // Re-require expo-sqlite so we can grab the mocks from __mocks__
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const SQLite = require('expo-sqlite');
+    const SQLite = require('expo-sqlite') as ExpoSqliteMockModule;
 
-    ({ execAsyncMock, getAllAsyncMock, runAsyncMock, openDatabaseAsyncMock } = (
-      SQLite as any
-    ).__mocks__);
+    ({ execAsyncMock, getAllAsyncMock, openDatabaseAsyncMock } = SQLite.__mocks__);
   });
 
   test('getDatabase initializes once and returns a singleton', async () => {

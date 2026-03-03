@@ -45,7 +45,7 @@ async function closeDatabaseConnection(): Promise<void> {
   try {
     await db.closeAsync();
   } catch (error) {
-    console.warn('Failed to close SQLite connection cleanly:', error);
+    console.warn('[Database] Failed to close SQLite connection cleanly:', error);
   } finally {
     db = null;
   }
@@ -72,10 +72,10 @@ async function performInitialization(): Promise<void> {
   // Validate the schema after applying all CREATE statements.
   const isValid = await validateSchema();
   if (!isValid) {
-    console.warn('Incorrect Database Schema detected.');
+    console.warn('[Database] Incorrect Database Schema detected.');
 
     // Drop all tables to reset the schema
-    console.log('Dropping all tables to reset schema...');
+    console.log('[Database] Dropping all tables to reset schema...');
     for (const dropStmt of DROP_ALL_TABLES) {
       if (dropStmt.trim()) {
         await db.execAsync(dropStmt);
@@ -83,7 +83,7 @@ async function performInitialization(): Promise<void> {
     }
 
     // Re-create all tables and indexes
-    console.log('Re-creating all tables...');
+    console.log('[Database] Re-creating all tables...');
     for (const statement of CREATE_ALL_TABLES) {
       if (statement.trim()) {
         await db.execAsync(statement);
@@ -91,7 +91,7 @@ async function performInitialization(): Promise<void> {
     }
   }
 
-  console.log('Database initialized successfully');
+  console.log('[Database] Database initialized successfully');
 }
 
 async function ensureHealthyConnection(): Promise<void> {
@@ -107,7 +107,9 @@ async function ensureHealthyConnection(): Promise<void> {
       throw error;
     }
 
-    console.warn('Detected stale native SQLite handle; reinitializing database connection...');
+    console.warn(
+      '[Database] Detected stale native SQLite handle; reinitializing database connection...'
+    );
     await closeDatabaseConnection();
     await initializeDatabase();
   }
@@ -250,13 +252,13 @@ async function tableExists(tableName: string): Promise<boolean> {
  * - Table missing → INVALID
  */
 async function validateSchema(): Promise<boolean> {
-  console.log('Validating SQLite schema...');
+  console.log('[Database] Validating SQLite schema...');
 
   for (const [tableName, expectedColumns] of Object.entries(EXPECTED_SCHEMA)) {
     // Table missing = invalid schema
     const exists = await tableExists(tableName);
     if (!exists) {
-      console.warn(`Table missing: ${tableName}`);
+      console.warn(`[Database] Table missing: ${tableName}`);
       return false;
     }
 
@@ -266,7 +268,7 @@ async function validateSchema(): Promise<boolean> {
     // Missing required column
     for (const col of expectedColumns) {
       if (!actualColumns.includes(col)) {
-        console.warn(`Missing column '${col}' in '${tableName}'`);
+        console.warn(`[Database] Missing column '${col}' in '${tableName}'`);
         return false;
       }
     }
@@ -274,7 +276,7 @@ async function validateSchema(): Promise<boolean> {
     // Extra leftover column
     for (const col of actualColumns) {
       if (!expectedColumns.includes(col)) {
-        console.warn(`Extra column '${col}' found in '${tableName}'`);
+        console.warn(`[Database] Extra column '${col}' found in '${tableName}'`);
         return false;
       }
     }
@@ -326,7 +328,7 @@ export async function initializeDatabase(): Promise<void> {
       try {
         await performInitialization();
       } catch (error) {
-        console.error('Failed to initialize database:', error);
+        console.error('[Database] Failed to initialize database:', error);
         await closeDatabaseConnection();
         throw error;
       }

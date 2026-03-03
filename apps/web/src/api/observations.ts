@@ -309,8 +309,8 @@ export async function fetchObservationTypes(): Promise<string[]> {
   if (uniqueTypes.size === 0) {
     const { data, error } = await supabase
       .from('observation_categories')
-      .select('type, active')
-      .or('active.eq.true,active.is.null')
+      .select('type, is_active')
+      .or('is_active.eq.true,is_active.is.null')
       .order('type', { ascending: true });
 
     if (error) {

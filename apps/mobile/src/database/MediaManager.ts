@@ -236,3 +236,8 @@ export async function removeMedia(id: string): Promise<void> {
   const db = await getDatabase();
   await db!.runAsync(`DELETE FROM observation_media WHERE id = ?`, [id]);
 }
+
+export async function removeSyncedMedia(): Promise<void> {
+  const db = await getDatabase();
+  await db!.runAsync(`DELETE FROM observation_media WHERE sync_status = ?`, [SyncStatus.SYNCED]);
+}

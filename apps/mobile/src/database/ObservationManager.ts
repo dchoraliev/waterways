@@ -303,3 +303,8 @@ export async function removeObservationById(id: string): Promise<void> {
   const db = await getDatabase();
   await db!.runAsync(`DELETE FROM observations WHERE id = ?`, [id]);
 }
+
+export async function removeSyncedObservations(): Promise<void> {
+  const db = await getDatabase();
+  await db!.runAsync(`DELETE FROM observations WHERE sync_status = ?`, [SyncStatus.SYNCED]);
+}

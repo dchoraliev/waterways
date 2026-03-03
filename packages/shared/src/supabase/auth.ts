@@ -1,3 +1,4 @@
+// packages/shared/src/supabase/auth.ts
 import { supabase } from './client';
 
 export const signIn = async (email: string, password: string) => {
@@ -50,6 +51,15 @@ export const resetEmail = async (newEmail: string) => {
   return await supabase.auth.updateUser({ email: newEmail });
 };
 
+type ErrorContext = {
+  status?: number;
+  statusText?: string;
+  clone?: () => {
+    json?: () => Promise<unknown>;
+    text?: () => Promise<string>;
+  };
+};
+
 export const deleteAccount = async () => {
   const result = await supabase.functions.invoke('delete-account', {
     body: {},
@@ -59,25 +69,27 @@ export const deleteAccount = async () => {
     return result;
   }
 
-  const originalError = result.error as any;
-  const context = originalError?.context as
-    | {
-        status?: number;
-        statusText?: string;
-        clone?: () => { json?: () => Promise<any>; text?: () => Promise<string> };
-      }
-    | undefined;
+  const originalError = result.error as unknown;
+  const context = (originalError as { context?: unknown })?.context as ErrorContext | undefined;
 
   let detailedMessage =
-    typeof originalError?.message === 'string' && originalError.message.trim()
-      ? originalError.message
+    typeof (originalError as { message?: unknown })?.message === 'string' &&
+    (originalError as { message: string }).message.trim()
+      ? (originalError as { message: string }).message.trim()
       : 'Unable to delete account.';
 
   if (context?.clone) {
     try {
       const jsonPayload = await context.clone().json?.();
-      if (jsonPayload && typeof jsonPayload.error === 'string' && jsonPayload.error.trim()) {
-        detailedMessage = jsonPayload.error.trim();
+
+      if (
+        jsonPayload &&
+        typeof jsonPayload === 'object' &&
+        'error' in jsonPayload &&
+        typeof (jsonPayload as { error?: unknown }).error === 'string' &&
+        (jsonPayload as { error: string }).error.trim()
+      ) {
+        detailedMessage = (jsonPayload as { error: string }).error.trim();
       }
     } catch {
       try {
@@ -103,7 +115,7 @@ export const deleteAccount = async () => {
   return {
     data: result.data,
     error: {
-      name: originalError?.name,
+      name: (originalError as { name?: unknown })?.name,
       message: statusPart ? `${statusPart} • ${detailedMessage}` : detailedMessage,
     },
   };

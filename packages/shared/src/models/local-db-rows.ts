@@ -84,3 +84,14 @@ export interface LocalSettings {
   dark_mode_enabled: number;
   notifications_enabled: number;
 }
+
+/**
+ * Represents a category record in the local SQLite database.
+ */
+export interface Category {
+  id: number;
+  name: string;
+  is_fallback: boolean;
+  color: string | null;
+  keywords: string | null;
+}

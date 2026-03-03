@@ -1,112 +1,100 @@
 import { StyleSheet } from 'react-native';
 
-const styles = StyleSheet.create({
+export default StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#111827',
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 24,
+    padding: 16,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#F9FAFB',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#9CA3AF',
   },
-  projectCard: {
-    borderRadius: 16,
+  // ✅ ADD NEW STYLES HERE:
+  activeJourneyBanner: {
+    backgroundColor: '#1E40AF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#111827',
-    backgroundColor: '#020617',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 8,
-    marginBottom: 16,
+    borderColor: '#3B82F6',
   },
-  projectTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F9FAFB',
+  activeJourneyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activeJourneyIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  activeJourneyTextContainer: {
+    flex: 1,
+  },
+  activeJourneyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
-  projectSubtitle: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 12,
-  },
-  projectDropdown: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#111827',
-    backgroundColor: '#020617',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  projectDropdownText: {
+  activeJourneySubtitle: {
     fontSize: 13,
-    color: '#6B7280',
-  },
-  projectButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    columnGap: 8,
-  },
-  secondaryButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  secondaryButtonText: {
-    fontSize: 12,
     color: '#BFDBFE',
+    lineHeight: 18,
   },
+  continueJourneyButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  continueJourneyText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // ... rest of your existing styles
   offlineBanner: {
-    borderRadius: 10,
-    backgroundColor: '#92400E',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
+    backgroundColor: '#374151',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
   },
   offlineBannerText: {
-    fontSize: 12,
-    color: '#FEF3C7',
+    color: '#D1D5DB',
+    fontSize: 13,
+    lineHeight: 18,
   },
   bottomButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    columnGap: 12,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 20,
   },
   saveDraftButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#111827',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    backgroundColor: '#020617',
+    flex: 1,
+    backgroundColor: '#374151',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   saveDraftText: {
-    fontSize: 13,
-    color: '#E5E7EB',
+    color: '#F9FAFB',
+    fontSize: 16,
+    fontWeight: '600',
   },
   submitButton: {
-    borderRadius: 999,
-    paddingHorizontal: 20,
+    flex: 1,
   },
 });
-
-export default styles;
