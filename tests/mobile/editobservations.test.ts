@@ -507,3 +507,177 @@ describe('Edit Observation - hasMedia preserved on save', () => {
     expect(updated.hasMedia).toBe(true);
   });
 });
+
+// ═════════════════════════════════════════════
+// OBSERVATION CARD - video vs photo icon selection
+// ═════════════════════════════════════════════
+
+describe('ObservationCard - mediaType icon selection', () => {
+  // Mirrors component logic:
+  // source={mediaType === 'video' ? videoIcon : mediaIcon}
+  const iconType = (obs: Observation): 'video' | 'photo' | 'none' => {
+    if (obs.hasMedia !== true) return 'none';
+    return obs.mediaType === 'video' ? 'video' : 'photo';
+  };
+
+  // ------------------------------------------------------
+  // 33. Video icon selected when mediaType = video
+  // ------------------------------------------------------
+  test('Video icon is selected when hasMedia=true and mediaType=video', () => {
+    const obs = makeObservation({ hasMedia: true, mediaType: 'video' });
+    expect(iconType(obs)).toBe('video');
+  });
+
+  // ------------------------------------------------------
+  // 34. Photo icon selected when mediaType = photo
+  // ------------------------------------------------------
+  test('Photo icon is selected when hasMedia=true and mediaType=photo', () => {
+    const obs = makeObservation({ hasMedia: true, mediaType: 'photo' });
+    expect(iconType(obs)).toBe('photo');
+  });
+
+  // ------------------------------------------------------
+  // 35. Defaults to photo icon when mediaType is null/undefined
+  // ------------------------------------------------------
+  test('Defaults to photo icon when hasMedia=true and mediaType is null', () => {
+    const obs = makeObservation({ hasMedia: true, mediaType: null });
+    expect(iconType(obs)).toBe('photo');
+  });
+
+  // ------------------------------------------------------
+  // 36. No icon selected when hasMedia=false (even if mediaType is video)
+  // ------------------------------------------------------
+  test('No media icon is selected when hasMedia=false', () => {
+    const obs = makeObservation({ hasMedia: false, mediaType: 'video' });
+    expect(iconType(obs)).toBe('none');
+  });
+});
+
+// ═════════════════════════════════════════════
+// OBSERVATION CARD - view button + open behavior (logic-level)
+// ═════════════════════════════════════════════
+
+describe('ObservationCard - view media button + behavior', () => {
+  // Mirrors: hasValidMedia = hasMedia === true && !!mediaFilePath
+  const hasValidMedia = (obs: Observation): boolean => obs.hasMedia === true && !!obs.mediaFilePath;
+
+  // Mirrors:
+  // {isPhoto ? 'View Photo' : isVideo ? 'View Video' : 'View Media'}
+  const viewLabel = (obs: Observation): 'View Photo' | 'View Video' | 'View Media' => {
+    if (obs.mediaType === 'photo') return 'View Photo';
+    if (obs.mediaType === 'video') return 'View Video';
+    return 'View Media';
+  };
+
+  // Mirrors the onPress branching in the component:
+  const simulatePress = (obs: Observation) => {
+    const isPhoto = obs.mediaType === 'photo';
+    const isVideo = obs.mediaType === 'video';
+
+    return {
+      opensPhotoModal: isPhoto,
+      showsVideoAlert: isVideo,
+      showsUnknownAlert: !isPhoto && !isVideo,
+    };
+  };
+
+  // ------------------------------------------------------
+  // 37. View button only shows with hasMedia AND mediaFilePath
+  // ------------------------------------------------------
+  test('View button is shown only when hasMedia=true and mediaFilePath exists', () => {
+    const a = makeObservation({
+      hasMedia: true,
+      mediaType: 'photo',
+      mediaFilePath: null,
+    });
+    const b = makeObservation({
+      hasMedia: true,
+      mediaType: 'photo',
+      mediaFilePath: 'file:///tmp/photo.jpg',
+    });
+
+    expect(hasValidMedia(a)).toBe(false);
+    expect(hasValidMedia(b)).toBe(true);
+  });
+
+  // ------------------------------------------------------
+  // 38. View button label is View Photo for photos
+  // ------------------------------------------------------
+  test('View button label is "View Photo" when mediaType=photo', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: 'photo',
+      mediaFilePath: 'file:///tmp/photo.jpg',
+    });
+    expect(viewLabel(obs)).toBe('View Photo');
+  });
+
+  // ------------------------------------------------------
+  // 39. View button label is View Video for videos
+  // ------------------------------------------------------
+  test('View button label is "View Video" when mediaType=video', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: 'video',
+      mediaFilePath: 'file:///tmp/video.mp4',
+    });
+    expect(viewLabel(obs)).toBe('View Video');
+  });
+
+  // ------------------------------------------------------
+  // 40. View button label falls back to View Media for unknown type
+  // ------------------------------------------------------
+  test('View button label is "View Media" when mediaType is null/unknown', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: null,
+      mediaFilePath: 'file:///tmp/file.bin',
+    });
+    expect(viewLabel(obs)).toBe('View Media');
+  });
+
+  // ------------------------------------------------------
+  // 41. Pressing View Photo opens the photo modal path
+  // ------------------------------------------------------
+  test('Pressing View Photo triggers the photo modal path', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: 'photo',
+      mediaFilePath: 'file:///tmp/photo.jpg',
+    });
+    const result = simulatePress(obs);
+    expect(result.opensPhotoModal).toBe(true);
+    expect(result.showsVideoAlert).toBe(false);
+    expect(result.showsUnknownAlert).toBe(false);
+  });
+
+  // ------------------------------------------------------
+  // 42. Pressing View Video triggers the video alert path
+  // ------------------------------------------------------
+  test('Pressing View Video triggers the video alert path', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: 'video',
+      mediaFilePath: 'file:///tmp/video.mp4',
+    });
+    const result = simulatePress(obs);
+    expect(result.opensPhotoModal).toBe(false);
+    expect(result.showsVideoAlert).toBe(true);
+    expect(result.showsUnknownAlert).toBe(false);
+  });
+
+  // ------------------------------------------------------
+  // 43. Unknown media type triggers the unknown alert path
+  // ------------------------------------------------------
+  test('Unknown media type triggers the unknown alert path', () => {
+    const obs = makeObservation({
+      hasMedia: true,
+      mediaType: null,
+      mediaFilePath: 'file:///tmp/file.bin',
+    });
+    const result = simulatePress(obs);
+    expect(result.opensPhotoModal).toBe(false);
+    expect(result.showsVideoAlert).toBe(false);
+    expect(result.showsUnknownAlert).toBe(true);
+  });
+});
