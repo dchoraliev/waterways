@@ -31,8 +31,12 @@ async function persistToDocuments(srcUri: string, fileName: string) {
 
 export default function CameraCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ observationId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    observationId?: string | string[];
+    secondsElapsed?: string | string[];
+  }>();
   const observationId = normalizeParam(params.observationId);
+  const secondsElapsed = Number(normalizeParam(params.secondsElapsed) ?? '0');
   const { markObservationHasMedia } = useDraftJourneys();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -140,7 +144,7 @@ export default function CameraCaptureScreen() {
         fileSize: size,
       });
 
-      markObservationHasMedia(observationId);
+      markObservationHasMedia(observationId, secondsElapsed, 'photo');
 
       showToast('Photo attached');
       router.back();
@@ -201,7 +205,7 @@ export default function CameraCaptureScreen() {
         fileSize: size,
       });
 
-      markObservationHasMedia(observationId);
+      markObservationHasMedia(observationId, secondsElapsed, 'video');
 
       showToast('Video attached');
       router.back();

@@ -88,6 +88,11 @@ export default function EditObservationScreen() {
       category,
       keyword,
       manuallyEdited: true,
+      // Preserve media fields
+      hasMedia: updated[index].hasMedia,
+      mediaType: updated[index].mediaType,
+      mediaTimestamp: updated[index].mediaTimestamp,
+      mediaFilePath: updated[index].mediaFilePath,
     };
 
     await saveDraft({

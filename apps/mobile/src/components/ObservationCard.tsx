@@ -1,9 +1,26 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  Linking,
+  Alert,
+  Share,
+  Platform,
+  ScrollView,
+  //Dimensions,
+  ShareContent,
+} from 'react-native';
 import TagPill from './TagPill';
 import locationIcon from '../assets/icons/location-pin.png';
 import editIcon from '../assets/icons/edit.png';
 import mediaIcon from '../assets/icons/media_attached_icon.png';
+import videoIcon from '../assets/icons/video_attached.png';
 
 export type ObservationStatus = 'Offline' | 'Synced' | 'Error';
 
@@ -11,13 +28,16 @@ export interface Observation {
   id: string;
   time: string;
   location?: string;
-  description: string; // transcription text
+  description: string;
   tags: string[];
   hasAudio?: boolean;
-  hasMedia?: boolean; // true if a photo or video was attached
+  hasMedia?: boolean;
+  mediaType?: 'photo' | 'video' | null;
+  mediaTimestamp?: number | null;
+  mediaFilePath?: string | null; // Local file path or URL
   status?: ObservationStatus;
-  category?: string | null; // used ONLY for color coding
-  keyword?: string | null; // shown as text: "Keyword: <keyword>"
+  category?: string | null;
+  keyword?: string | null;
   manuallyEdited?: boolean;
 }
 
@@ -26,29 +46,103 @@ interface ObservationCardProps {
   onEdit?: () => void;
 }
 
+function ensureUri(path: string): string {
+  if (/^[a-zA-Z]+:\/\//.test(path)) return path;
+  return `file://${path}`;
+}
+
+async function openVideoExternally(path: string) {
+  const uri = encodeURI(ensureUri(path));
+
+  // 1) Try direct open
+  try {
+    const canOpen = await Linking.canOpenURL(uri);
+    if (canOpen) {
+      await Linking.openURL(uri);
+      return;
+    }
+  } catch {
+    // ignore and fall back
+  }
+
+  // 2) Fallback: Share sheet (built-in, no installs)
+  try {
+    const content: ShareContent = Platform.OS === 'ios' ? { url: uri } : { message: uri };
+
+    await Share.share(content);
+  } catch (e) {
+    console.warn('[ObservationCard] Failed to open video externally', e);
+    Alert.alert(
+      'Unable to open video',
+      'Your device could not open this video file. If this is a local file, try saving it to Photos/Files first.'
+    );
+  }
+}
+
+const ZoomableImageIOS: React.FC<{ uri: string }> = ({ uri }) => {
+  //const { width, height } = Dimensions.get('window');
+
+  // iOS-only native zoom support
+  if (Platform.OS !== 'ios') {
+    return (
+      <View style={styles.zoomRoot}>
+        <Image source={{ uri }} style={styles.zoomImage} resizeMode="contain" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.zoomRoot}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.zoomScrollContent}
+        minimumZoomScale={1}
+        maximumZoomScale={4}
+        bouncesZoom
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        centerContent
+      >
+        <Image source={{ uri }} style={styles.zoomImageIOS} resizeMode="contain" />
+      </ScrollView>
+
+      <View style={styles.zoomHintWrap} pointerEvents="none">
+        <Text style={styles.zoomHintText}>Pinch to zoom • Drag to pan</Text>
+      </View>
+    </View>
+  );
+};
+
 const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }) => {
   const { time, location, description, tags, status } = observation;
+
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
 
   function getCategoryColor(cat: string): string {
     switch (cat) {
       case 'Infrastructure':
-        return '#3B82F6'; // blue
+        return '#3B82F6';
       case 'Environmental':
-        return '#10B981'; // green
+        return '#10B981';
       case 'Wildlife':
-        return '#F59E0B'; // amber
+        return '#F59E0B';
       case 'Hazards':
-        return '#EF4444'; // red
+        return '#EF4444';
       case 'General':
-        return '#9CA3AF'; // gray
+        return '#9CA3AF';
       default:
-        return '#6B7280'; // neutral gray (Unclassified)
+        return '#6B7280';
     }
   }
 
+  const hasValidMedia = observation.hasMedia === true && !!observation.mediaFilePath;
+  const mediaUri = hasValidMedia ? ensureUri(observation.mediaFilePath as string) : null;
+
+  const isPhoto = observation.mediaType === 'photo';
+  const isVideo = observation.mediaType === 'video';
+
   return (
     <View style={styles.card}>
-      {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.timeLocationCol}>
           <Text style={styles.timeText}>{time}</Text>
@@ -68,22 +162,25 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
             </View>
           )}
 
-          {/* Media attached icon - only shows when hasMedia is true */}
-          {observation.hasMedia === true && <Image source={mediaIcon} style={styles.mediaIcon} />}
+          {observation.hasMedia === true && (
+            <View style={styles.mediaRow}>
+              <Image
+                testID="media-icon"
+                source={observation.mediaType === 'video' ? videoIcon : mediaIcon}
+                style={styles.mediaIcon}
+              />
+            </View>
+          )}
 
-          <View style={styles.editRow}>
-            <TouchableOpacity style={styles.editRow} onPress={onEdit}>
-              <Image source={editIcon} style={styles.editIcon} />
-              <Text style={styles.editText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.editRow} onPress={onEdit}>
+            <Image source={editIcon} style={styles.editIcon} />
+            <Text style={styles.editText}>Edit</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Transcription text */}
       <Text style={styles.description}>{description}</Text>
 
-      {/* Tags */}
       {tags.length > 0 && (
         <View style={styles.tagsRow}>
           {tags.map((tag) => (
@@ -94,7 +191,6 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
 
       {(observation.category || observation.keyword) && (
         <View style={styles.classificationRow}>
-          {/* Category with small color dot */}
           {observation.category && observation.category !== 'Unclassified' && (
             <View style={styles.categoryRow}>
               <View
@@ -107,7 +203,6 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
             </View>
           )}
 
-          {/* Keyword text */}
           {observation.keyword && (
             <Text style={styles.keywordText}>
               <Text style={styles.keywordLabel}>Keyword: </Text>
@@ -115,6 +210,60 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
             </Text>
           )}
         </View>
+      )}
+
+      {/* View Media Button */}
+      {hasValidMedia && (
+        <View style={styles.mediaSection}>
+          <TouchableOpacity
+            style={styles.viewMediaButton}
+            onPress={() => {
+              if (isPhoto) {
+                setPhotoModalVisible(true);
+              } else if (isVideo) {
+                Alert.alert(
+                  'Video preview not available',
+                  'This build does not include an in-app video player. You can open the video in your device player instead.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Open Video',
+                      onPress: () => openVideoExternally(observation.mediaFilePath as string),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Media type unknown', 'Cannot preview this media.');
+              }
+            }}
+          >
+            <Text style={styles.viewMediaText}>
+              {isPhoto ? 'View Photo' : isVideo ? 'View Video' : 'View Media'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* In-app photo viewer modal */}
+      {isPhoto && mediaUri && (
+        <Modal
+          visible={photoModalVisible}
+          animationType="fade"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setPhotoModalVisible(false)}
+        >
+          <SafeAreaView style={styles.modalRoot}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setPhotoModalVisible(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.modalBody}>
+              <ZoomableImageIOS uri={mediaUri} />
+            </View>
+          </SafeAreaView>
+        </Modal>
       )}
     </View>
   );
@@ -175,6 +324,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#F9FAFB',
   },
+  mediaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   mediaIcon: {
     width: 18,
     height: 18,
@@ -209,14 +363,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 4,
   },
-  classificationText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  classificationLabel: {
-    fontWeight: '600',
-    color: '#D1D5DB',
-  },
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,6 +386,77 @@ const styles = StyleSheet.create({
   keywordLabel: {
     fontWeight: '600',
     color: '#D1D5DB',
+  },
+  mediaSection: {
+    marginTop: 12,
+    alignItems: 'flex-end',
+  },
+  viewMediaButton: {
+    backgroundColor: '#1E40AF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  viewMediaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  zoomScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomImageIOS: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // Modal styles
+  modalRoot: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  modalHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  closeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  closeButtonText: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  modalBody: {
+    flex: 1,
+  },
+
+  // Zoom viewer styles
+  zoomRoot: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  zoomImage: {
+    width: '100%',
+    height: '100%',
+  },
+  zoomHintWrap: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  zoomHintText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 
