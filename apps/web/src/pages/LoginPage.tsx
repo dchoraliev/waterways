@@ -27,8 +27,9 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       await signIn(email, password);
       toast.success('Successfully signed in!');
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in. Please try again.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -42,8 +43,9 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       await signUp(name, email, password);
       toast.success('Account created successfully! Please check your email for verification.');
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create account. Please try again.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -63,8 +65,9 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       toast.success('Password reset link sent to your email!');
       setIsForgotPassword(false);
       setEmail('');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send reset link. Please try again.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to send reset link. Please try again.');
     } finally {
       setLoading(false);
     }

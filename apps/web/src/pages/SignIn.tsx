@@ -25,8 +25,9 @@ export function SignIn({ onNavigateToSignUp, onSuccess }: SignInProps) {
       await signIn(email, password);
       toast.success('Successfully signed in!');
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in. Please try again.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
     }

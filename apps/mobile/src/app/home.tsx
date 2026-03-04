@@ -34,7 +34,7 @@ export default function HomeRoute() {
             onStartJourney={() => router.push(ROUTES.journey)}
             onViewRecordings={() => {
               // Navigate to the list of previous journeys
-              router.push(ROUTES.review);
+              router.push('/review' as any);
             }}
             onViewDrafts={() => router.push(ROUTES.drafts)}
           />
