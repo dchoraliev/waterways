@@ -45,7 +45,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabPress, routes })
     <View style={styles.root}>
       {makeTab('home', '🏠', 'Home')}
       {makeTab('map', '🗺️', 'Map')}
-      {makeTab('instruction', '📘', 'Instruction')}
+      {makeTab('instruction', '📘', 'Instructions')}
       {makeTab('settings', '⚙️', 'Settings')}
     </View>
   );

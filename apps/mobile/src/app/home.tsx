@@ -9,6 +9,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import InstructionsScreen from '../screens/InstructionsScreen';
 import { ROUTES } from '../constants/routes';
+import MapScreen from '../screens/MapScreen';
 
 export default function HomeRoute() {
   const [currentTab, setCurrentTab] = useState<BottomTabKey>('home');
@@ -39,18 +40,7 @@ export default function HomeRoute() {
           />
         );
       case 'map':
-        return (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#020617',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#F9FAFB' }}>Map screen coming soon</Text>
-          </View>
-        );
+        return <MapScreen />;
       case 'instruction':
         return <InstructionsScreen />;
       case 'settings':
