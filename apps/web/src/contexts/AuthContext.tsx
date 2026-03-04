@@ -49,7 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('role/status fetch timeout')), 3000)
       );
-      const res: any = await Promise.race([rolePromise, timeout]);
+      const res = (await Promise.race([rolePromise, timeout])) as {
+        data?: Array<{ role?: string; status?: string; share_name_on_map?: boolean }>;
+      };
       const currentUser = res?.data?.[0];
       if (currentUser) {
         if (typeof currentUser.role === 'string') role = currentUser.role;
@@ -58,8 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           showNameOnMap = currentUser.share_name_on_map;
         }
       }
-    } catch (err: any) {
-      console.warn('Could not read user role/status:', err?.message ?? err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.warn('Could not read user role/status:', message);
     }
 
     if (status === 'banned') {
@@ -91,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const timeout = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('projects fetch timeout')), 3000)
         );
-        const res: any = await Promise.race([projectsPromise, timeout]);
+        const res = (await Promise.race([projectsPromise, timeout])) as {
+          data?: Array<{ id: string; name: string }>;
+        };
         const projects = (res?.data || []).map((p: { id: string; name: string }) => ({
           id: p.id,
           name: p.name,

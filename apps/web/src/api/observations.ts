@@ -228,6 +228,57 @@ export async function fetchDailyObservations(): Promise<Observation[]> {
   return result.observations;
 }
 
+export async function fetchObservationCategories(): Promise<
+  Array<{
+    id: number;
+    type: string;
+    color: string | null;
+    keywords: string[] | null;
+    is_fallback: boolean;
+  }>
+> {
+  const { data, error } = await supabase
+    .from('observation_categories')
+    .select('id, type, color, keywords, is_fallback')
+    .eq('is_active', true)
+    .order('type');
+
+  if (error) {
+    console.error('Error fetching observation categories:', error);
+    return [];
+  }
+
+  console.log('Raw category data from database:', data);
+
+  // Process the data to ensure keywords are properly parsed
+  const processedData = (data || []).map((category) => ({
+    ...category,
+    keywords: (() => {
+      if (!category.keywords) return null;
+      if (Array.isArray(category.keywords)) return category.keywords;
+
+      // If keywords is a string, try to parse it as JSON
+      if (typeof category.keywords === 'string') {
+        try {
+          const parsed = JSON.parse(category.keywords);
+          return Array.isArray(parsed) ? parsed : null;
+        } catch {
+          // If not valid JSON, split by comma
+          return (category.keywords as string)
+            .split(',')
+            .map((k: string) => k.trim())
+            .filter((k: string) => k.length > 0);
+        }
+      }
+
+      return null;
+    })(),
+  }));
+
+  console.log('Processed category data:', processedData);
+  return processedData;
+}
+
 export async function fetchObservationTypes(): Promise<string[]> {
   const uniqueTypes = new Set<string>();
 

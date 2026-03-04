@@ -465,7 +465,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     await wakeWordStopRef.current();
 
     router.push({
-      pathname: '/camera-capture',
+      pathname: '/camera-capture' as any,
       params: { observationId: lastObservationId },
     });
   }, [lastObservationId, router]);

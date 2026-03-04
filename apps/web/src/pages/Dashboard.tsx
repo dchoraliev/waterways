@@ -101,39 +101,42 @@ export function Dashboard() {
     return 3;
   };
 
-  const buildCacheKey = (
-    bounds: ObservationBounds,
-    zoom: number,
-    activeFilters: FilterOptions,
-    mode: 'aggregate' | 'detailed',
-    requestLimit: number
-  ): string => {
-    const precision = getBoundsPrecision(zoom);
-    const normalizedBounds = {
-      ne: [toFixedCoord(bounds.ne[0], precision), toFixedCoord(bounds.ne[1], precision)] as [
-        number,
-        number,
-      ],
-      sw: [toFixedCoord(bounds.sw[0], precision), toFixedCoord(bounds.sw[1], precision)] as [
-        number,
-        number,
-      ],
-    };
+  const buildCacheKey = useCallback(
+    (
+      bounds: ObservationBounds,
+      zoom: number,
+      activeFilters: FilterOptions,
+      mode: 'aggregate' | 'detailed',
+      requestLimit: number
+    ): string => {
+      const precision = getBoundsPrecision(zoom);
+      const normalizedBounds = {
+        ne: [toFixedCoord(bounds.ne[0], precision), toFixedCoord(bounds.ne[1], precision)] as [
+          number,
+          number,
+        ],
+        sw: [toFixedCoord(bounds.sw[0], precision), toFixedCoord(bounds.sw[1], precision)] as [
+          number,
+          number,
+        ],
+      };
 
-    return JSON.stringify({
-      mode,
-      requestLimit,
-      precision,
-      bounds: normalizedBounds,
-      filters: {
-        dateFrom: activeFilters.dateFrom,
-        dateTo: activeFilters.dateTo,
-        types: [...activeFilters.types].sort(),
-        keywords: activeFilters.keywords.trim().toLowerCase(),
-        myProjects: activeFilters.myProjects,
-      },
-    });
-  };
+      return JSON.stringify({
+        mode,
+        requestLimit,
+        precision,
+        bounds: normalizedBounds,
+        filters: {
+          dateFrom: activeFilters.dateFrom,
+          dateTo: activeFilters.dateTo,
+          types: [...activeFilters.types].sort(),
+          keywords: activeFilters.keywords.trim().toLowerCase(),
+          myProjects: activeFilters.myProjects,
+        },
+      });
+    },
+    []
+  );
 
   // Load category list for the type filter
   useEffect(() => {
@@ -259,7 +262,7 @@ export function Dashboard() {
       cancelled = true;
       globalThis.clearTimeout(timer);
     };
-  }, [mapBounds, filters, mapZoom, setLoading]);
+  }, [mapBounds, filters, mapZoom, setLoading, buildCacheKey]);
 
   // Reset showLogin when user state changes
   useEffect(() => {

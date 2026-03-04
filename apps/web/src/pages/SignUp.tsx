@@ -33,8 +33,9 @@ export function SignUp({ onNavigateToSignIn, onSuccess }: SignUpProps) {
       await signUp(name, email, password);
       toast.success('Account created successfully! Please check your email for verification.');
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create account. Please try again.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
