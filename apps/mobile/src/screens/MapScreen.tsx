@@ -41,30 +41,76 @@ interface Cluster {
 // ─────────────────────────────────────────────────────────────────────────────
 // Clustering
 // ─────────────────────────────────────────────────────────────────────────────
+function getPixelDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+  zoom: number
+): number {
+  const scale = 256 * Math.pow(2, zoom);
+  const x1 = (lng1 + 180) * (scale / 360);
+  const y1 =
+    ((1 -
+      Math.log(Math.tan((lat1 * Math.PI) / 180) + 1 / Math.cos((lat1 * Math.PI) / 180)) / Math.PI) /
+      2) *
+    scale;
+  const x2 = (lng2 + 180) * (scale / 360);
+  const y2 =
+    ((1 -
+      Math.log(Math.tan((lat2 * Math.PI) / 180) + 1 / Math.cos((lat2 * Math.PI) / 180)) / Math.PI) /
+      2) *
+    scale;
+  return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+}
+
 function clusterObservations(observations: Observation[], zoom: number): Cluster[] {
-  const radius = Math.max(0.5, 8 - zoom * 0.3);
-  const used = new Set<string>();
+  const clusterRadius = zoom >= 12 ? 40 : zoom >= 9 ? 60 : zoom >= 6 ? 80 : 100;
   const clusters: Cluster[] = [];
+  const processed = new Set<string>();
 
   observations.forEach((obs) => {
-    if (used.has(obs.id)) return;
-    const nearby = observations.filter((o) => {
-      if (used.has(o.id)) return false;
-      const dist = Math.sqrt(
-        Math.pow(o.latitude - obs.latitude, 2) + Math.pow(o.longitude - obs.longitude, 2)
-      );
-      return dist < radius;
-    });
-    nearby.forEach((o) => used.add(o.id));
-    const avgLat = nearby.reduce((s, o) => s + o.latitude, 0) / nearby.length;
-    const avgLng = nearby.reduce((s, o) => s + o.longitude, 0) / nearby.length;
-    clusters.push({
+    if (processed.has(obs.id)) return;
+
+    const cluster: Cluster = {
       id: obs.id,
-      lat: avgLat,
-      lng: avgLng,
-      isCluster: nearby.length > 1,
-      observations: nearby,
+      lat: obs.latitude,
+      lng: obs.longitude,
+      observations: [obs],
+      isCluster: false,
+    };
+
+    observations.forEach((other) => {
+      if (processed.has(other.id) || obs.id === other.id) return;
+
+      const distance = getPixelDistance(
+        obs.latitude,
+        obs.longitude,
+        other.latitude,
+        other.longitude,
+        zoom
+      );
+
+      if (distance < clusterRadius) {
+        cluster.observations.push(other);
+        processed.add(other.id);
+      }
     });
+
+    if (cluster.observations.length > 1) {
+      cluster.lat =
+        cluster.observations.reduce((s, o) => s + o.latitude, 0) / cluster.observations.length;
+      cluster.lng =
+        cluster.observations.reduce((s, o) => s + o.longitude, 0) / cluster.observations.length;
+      cluster.isCluster = true;
+      cluster.id = cluster.observations
+        .map((o) => o.id)
+        .sort()
+        .join('-');
+    }
+
+    processed.add(obs.id);
+    clusters.push(cluster);
   });
 
   return clusters;
@@ -104,6 +150,7 @@ const MapScreen: React.FC = () => {
   const [zoom, setZoom] = useState(4);
   const [isSatellite, setIsSatellite] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
+  const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
 
   // ── Fetch from Supabase using get_filtered_observations RPC ──
   useEffect(() => {
@@ -155,6 +202,24 @@ const MapScreen: React.FC = () => {
     fetchObservations();
   }, []);
 
+  useEffect(() => {
+    async function fetchCategories() {
+      const { data } = await supabase
+        .from('observation_categories')
+        .select('type, color')
+        .eq('is_active', true);
+
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach((row: { type: string; color: string | null }) => {
+          if (row.color) map[row.type.toUpperCase()] = row.color;
+        });
+        setCategoryColors(map);
+      }
+    }
+    fetchCategories();
+  }, []);
+
   const clusters = useMemo(() => clusterObservations(observations, zoom), [observations, zoom]);
 
   const handleRegionChangeComplete = (region: Region) => {
@@ -163,12 +228,28 @@ const MapScreen: React.FC = () => {
   };
 
   const handleMarkerPress = (cluster: Cluster) => {
-    if (cluster.isCluster) {
-      setSelectedCluster(cluster);
+    if (cluster.isCluster && cluster.observations.length > 10) {
+      const nextZoom = Math.min(zoom + 2, 18);
+      const latDelta = 360 / Math.pow(2, nextZoom);
+      const lngDelta = 360 / Math.pow(2, nextZoom);
+      mapRef.current?.animateToRegion(
+        {
+          latitude: cluster.lat,
+          longitude: cluster.lng,
+          latitudeDelta: latDelta,
+          longitudeDelta: lngDelta,
+        },
+        400
+      );
     } else {
       setSelectedCluster(cluster);
     }
   };
+
+  function getCategoryColor(type: string): string {
+    const upper = type.toUpperCase();
+    return categoryColors[upper] ?? '#38BDF8';
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['left', 'right', 'top']}>
@@ -234,9 +315,17 @@ const MapScreen: React.FC = () => {
                   key={cluster.id}
                   coordinate={{ latitude: cluster.lat, longitude: cluster.lng }}
                   onPress={() => handleMarkerPress(cluster)}
-                  pinColor={TOKENS.destructive}
                   tracksViewChanges={false}
-                />
+                >
+                  <View
+                    style={[
+                      styles.singleMarker,
+                      { backgroundColor: getCategoryColor(cluster.observations[0].type) },
+                    ]}
+                  >
+                    <Ionicons name="location" size={12} color="#fff" />
+                  </View>
+                </Marker>
               )
             )}
           </MapView>
@@ -383,6 +472,21 @@ const styles = StyleSheet.create({
   obsRowLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
   obsRowLabel: { fontSize: 14, fontWeight: '500', color: TOKENS.text, marginBottom: 2 },
   obsSubLabel: { fontSize: 12, color: TOKENS.mutedText, marginTop: 2 },
+
+  singleMarker: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+  },
 });
 
 export default MapScreen;
