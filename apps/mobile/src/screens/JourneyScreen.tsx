@@ -1,17 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  AppState,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RecentObservationItem } from '../components/RecentObservationItem';
-import { styles } from '../styles/JourneyScreen.styles';
+import { createJourneyScreenStyles } from '../styles/JourneyScreen.styles';
 
 import { updateTripById } from '../database/TripManager';
 import { getObservationsByTripId } from '../database/ObservationManager';
@@ -22,12 +14,6 @@ import { getCurrentCoordinates, stopLocationTracking } from '../services/Locatio
 import { transcribeTripAudio } from '../services/TranscriptionService';
 import { showToast } from '../utils/toast';
 import { isExpoGo } from '../utils/platformDetection';
-import {
-  startAutoSave,
-  stopAutoSave,
-  markJourneyEnding,
-  autoSaveTripState,
-} from '../services/TripRecoveryService';
 
 // expo-audio (NOT expo-av)
 import {
@@ -39,12 +25,12 @@ import {
 } from 'expo-audio';
 
 import { saveAudioObservationForTrip } from '../services/VoiceRecorder';
-import { observationHasMedia } from '../services/CameraMediaService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMediaCountsForTrip } from '../services/MediaQueries';
 import { useWakeWord } from '../hooks/useWakeWord';
 import type { WakeWordMatch } from '../utils/stringMatching';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -72,6 +58,8 @@ interface JourneyScreenProps {
 
 export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createJourneyScreenStyles(colors), [colors]);
   const journeyStartRef = useRef<number>(Date.now());
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
@@ -90,6 +78,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const [recordingCountdown, setRecordingCountdown] = useState(0); // 0 = not recording, 1-15 = countdown
   const recordingCountdownRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
   const processingWakeWordRef = useRef(false);
+  const stopObservationRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const loadObservationsRef = useRef<((activeTripId: string) => Promise<void>) | null>(null);
+  const startCameraWindowRef = useRef<((observationId: string) => void) | null>(null);
 
   // --- Wake word state ---
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
@@ -103,9 +94,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const [lastObservationId, setLastObservationId] = useState<string | null>(null);
 
   const cameraWindowTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
-
-  // --- Auto-save state ---
-  const autoSaveIntervalRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -141,42 +129,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     return () => globalThis.clearInterval(t);
   }, []);
 
-  // --- Start 30-second auto-save when journey starts ---
-  useEffect(() => {
-    if (!tripId) return;
-
-    console.log('[JourneyScreen] Starting 30-second auto-save for trip:', tripId);
-
-    // Start auto-save (every 30 seconds)
-    const interval = startAutoSave(tripId);
-    autoSaveIntervalRef.current = interval;
-
-    // Cleanup: Stop auto-save when component unmounts
-    return () => {
-      if (autoSaveIntervalRef.current) {
-        console.log('[JourneyScreen] Stopping auto-save');
-        stopAutoSave(autoSaveIntervalRef.current);
-        autoSaveIntervalRef.current = null;
-      }
-    };
-  }, [tripId]);
-
-  // --- Save immediately when app goes to background ---
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        console.log('[JourneyScreen] App going to background, auto-saving...');
-        if (tripId) {
-          void autoSaveTripState(tripId);
-        }
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [tripId]);
-
   // --- Wake word integration ---
   const configureIdleAudioMode = useCallback(async () => {
     try {
@@ -189,160 +141,20 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     }
   }, []);
 
-  // DEFINE THESE FIRST (before they're used by other callbacks)
-
-  const loadObservations = useCallback(async (activeTripId: string) => {
-    setLoadingObservations(true);
-    try {
-      const rows = await getObservationsByTripId(activeTripId);
-      const normalized: ObservationRow[] = (rows ?? []).map((r: DBObservationRow) => ({
-        id: r.id,
-        created_at: r.created_at ?? null,
-      }));
-
-      normalized.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
-      setObservations(normalized);
-
-      const counts = await getMediaCountsForTrip(activeTripId);
-      setPhotoCount(counts.photoCount);
-      setVideoCount(counts.videoCount);
-    } catch (e) {
-      console.warn('Failed to load observations:', e);
-    } finally {
-      setLoadingObservations(false);
-    }
-  }, []);
-
-  const startCameraWindow = useCallback(async (observationId: string) => {
-    const hasMedia = await observationHasMedia(observationId);
-
-    if (hasMedia) {
-      console.log('[JourneyScreen] Observation already has media, not starting camera window');
-      showToast('This observation already has media attached');
-      return;
-    }
-
-    if (cameraWindowTimerRef.current) {
-      globalThis.clearInterval(cameraWindowTimerRef.current);
-    }
-
-    setLastObservationId(observationId);
-    setCameraWindowActive(true);
-    setCameraWindowSecondsLeft(10);
-
-    cameraWindowTimerRef.current = globalThis.setInterval(() => {
-      setCameraWindowSecondsLeft((prev) => {
-        if (prev <= 1) {
-          if (cameraWindowTimerRef.current) {
-            globalThis.clearInterval(cameraWindowTimerRef.current);
-            cameraWindowTimerRef.current = null;
-          }
-          setCameraWindowActive(false);
-          setLastObservationId(null);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  // NOW define stopObservationRecording (uses loadObservations and startCameraWindow)
-  const stopObservationRecording = useCallback(async () => {
-    if (recordingCountdownRef.current) {
-      globalThis.clearInterval(recordingCountdownRef.current);
-      recordingCountdownRef.current = null;
-    }
-    setRecordingCountdown(0);
-
-    try {
-      await recorder.stop();
-
-      const fileUri = recorder.uri;
-      if (!fileUri) {
-        showToast('Recording failed');
-        processingWakeWordRef.current = false;
-        return;
-      }
-
-      const userId = await getCurrentUserId();
-      if (!userId) {
-        showToast('Not logged in');
-        processingWakeWordRef.current = false;
-        return;
-      }
-
-      const observationId = await saveAudioObservationForTrip(tripId, userId, fileUri);
-      await loadObservations(tripId);
-
-      if (observationId) {
-        await startCameraWindow(observationId);
-      }
-    } catch (e) {
-      console.error('[JourneyScreen] Failed to save observation:', e);
-      showToast('Failed to save observation');
-    } finally {
-      await configureIdleAudioMode();
-      processingWakeWordRef.current = false;
-    }
-  }, [tripId, recorder, configureIdleAudioMode, loadObservations, startCameraWindow]);
-
-  // NOW define startObservationRecording (uses stopObservationRecording)
-  const startObservationRecording = useCallback(async () => {
-    if (!tripId || processingWakeWordRef.current || isRecording) return;
-
-    processingWakeWordRef.current = true;
-
-    try {
-      const perm = await requestRecordingPermissionsAsync();
-      if (!perm.granted) {
-        showToast('Microphone permission required');
-        processingWakeWordRef.current = false;
-        return;
-      }
-
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      });
-
-      try {
-        await recorder.stop();
-      } catch {
-        // Ignore
-      }
-
-      await recorder.prepareToRecordAsync();
-      await recorder.record();
-
-      setRecordingCountdown(15);
-      recordingCountdownRef.current = globalThis.setInterval(() => {
-        setRecordingCountdown((prev) => {
-          if (prev <= 1) {
-            void stopObservationRecording();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (e) {
-      console.error('[JourneyScreen] Failed to start recording:', e);
-      showToast('Failed to start recording');
-      processingWakeWordRef.current = false;
-      setRecordingCountdown(0);
-    }
-  }, [tripId, isRecording, recorder, stopObservationRecording]);
-
   const wakeWord = useWakeWord({
     wakeWord: 'hey wade start recording',
     threshold: 0.85,
     locale: 'en-US',
     continuous: true,
-    recordingDelayMs: 0,
-    recordingDurationMs: 0,
+    recordingDelayMs: 0, // We handle recording ourselves with expo-audio
+    recordingDurationMs: 0, // Disable useWakeWord's built-in recording
     onWakeWordDetected: (_match: WakeWordMatch) => {
+      // Only process if not already recording
       if (processingWakeWordRef.current || isRecording || recordingCountdown > 0) {
         return;
       }
+
+      // Start 15-second recording countdown
       startObservationRecording();
     },
     onError: (error) => {
@@ -350,9 +162,12 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         console.error('[JourneyScreen] Wake word error:', error);
       }
     },
-    onStateChange: () => {},
+    onStateChange: () => {
+      // State changes handled internally
+    },
   });
 
+  // Store wake word control functions in refs to avoid dependency issues
   const wakeWordStartRef = useRef(wakeWord.startListening);
   const wakeWordStopRef = useRef(wakeWord.stop);
 
@@ -404,6 +219,103 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     }, [wakeWord.isAvailable, configureIdleAudioMode])
   );
 
+  // Start observation recording with 15-second countdown
+  const startObservationRecording = useCallback(async () => {
+    if (!tripId || processingWakeWordRef.current || isRecording) return;
+
+    processingWakeWordRef.current = true;
+
+    try {
+      // Check permissions
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        showToast('Microphone permission required');
+        processingWakeWordRef.current = false;
+        return;
+      }
+
+      // Set audio mode
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+
+      // Reset recorder
+      try {
+        await recorder.stop();
+      } catch {
+        // Ignore
+      }
+
+      await recorder.prepareToRecordAsync();
+      await recorder.record();
+
+      // Start 15-second countdown
+      setRecordingCountdown(15);
+      recordingCountdownRef.current = globalThis.setInterval(() => {
+        setRecordingCountdown((prev) => {
+          if (prev <= 1) {
+            // Countdown finished, stop recording
+            void stopObservationRecordingRef.current?.();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (e) {
+      console.error('[JourneyScreen] Failed to start recording:', e);
+      showToast('Failed to start recording');
+      processingWakeWordRef.current = false;
+      setRecordingCountdown(0);
+    }
+  }, [tripId, isRecording, recorder]);
+
+  // Stop observation recording and save
+  const stopObservationRecording = useCallback(async () => {
+    // Clear countdown timer
+    if (recordingCountdownRef.current) {
+      globalThis.clearInterval(recordingCountdownRef.current);
+      recordingCountdownRef.current = null;
+    }
+    setRecordingCountdown(0);
+
+    try {
+      await recorder.stop();
+
+      const fileUri = recorder.uri;
+      if (!fileUri) {
+        showToast('Recording failed');
+        processingWakeWordRef.current = false;
+        return;
+      }
+
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        showToast('Not logged in');
+        processingWakeWordRef.current = false;
+        return;
+      }
+
+      const observationId = await saveAudioObservationForTrip(tripId, userId, fileUri);
+      await loadObservationsRef.current?.(tripId);
+
+      if (observationId) {
+        startCameraWindowRef.current?.(observationId);
+      }
+    } catch (e) {
+      console.error('[JourneyScreen] Failed to save observation:', e);
+      showToast('Failed to save observation');
+    } finally {
+      await configureIdleAudioMode();
+      processingWakeWordRef.current = false;
+    }
+  }, [tripId, recorder, configureIdleAudioMode]);
+
+  useEffect(() => {
+    stopObservationRecordingRef.current = stopObservationRecording;
+  }, [stopObservationRecording]);
+
+  // Cleanup countdown timer on unmount
   useEffect(() => {
     return () => {
       if (recordingCountdownRef.current) {
@@ -412,36 +324,71 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     };
   }, []);
 
+  const loadObservations = useCallback(async (activeTripId: string) => {
+    setLoadingObservations(true);
+    try {
+      const rows = await getObservationsByTripId(activeTripId);
+      const normalized: ObservationRow[] = (rows ?? []).map((r: DBObservationRow) => ({
+        id: r.id,
+        created_at: r.created_at ?? null,
+      }));
+
+      normalized.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+      setObservations(normalized);
+
+      // Load media counts
+      const counts = await getMediaCountsForTrip(activeTripId);
+      setPhotoCount(counts.photoCount);
+      setVideoCount(counts.videoCount);
+    } catch (e) {
+      console.warn('Failed to load observations:', e);
+    } finally {
+      setLoadingObservations(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadObservationsRef.current = loadObservations;
+  }, [loadObservations]);
+
   useEffect(() => {
     if (!tripId) return;
     void loadObservations(tripId);
   }, [tripId, loadObservations]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!tripId) return;
+  // Start 10-second camera window
+  const startCameraWindow = useCallback((observationId: string) => {
+    // Clear any existing timer
+    if (cameraWindowTimerRef.current) {
+      globalThis.clearInterval(cameraWindowTimerRef.current);
+    }
 
-      void loadObservations(tripId);
+    setLastObservationId(observationId);
+    setCameraWindowActive(true);
+    setCameraWindowSecondsLeft(10);
 
-      if (lastObservationId && cameraWindowActive) {
-        void observationHasMedia(lastObservationId).then((hasMedia) => {
-          if (hasMedia) {
-            console.log('[JourneyScreen] Observation has media, closing camera window');
-
-            if (cameraWindowTimerRef.current) {
-              globalThis.clearInterval(cameraWindowTimerRef.current);
-              cameraWindowTimerRef.current = null;
-            }
-
-            setCameraWindowActive(false);
-            setLastObservationId(null);
-            setCameraWindowSecondsLeft(0);
+    // Countdown timer
+    cameraWindowTimerRef.current = globalThis.setInterval(() => {
+      setCameraWindowSecondsLeft((prev) => {
+        if (prev <= 1) {
+          if (cameraWindowTimerRef.current) {
+            globalThis.clearInterval(cameraWindowTimerRef.current);
+            cameraWindowTimerRef.current = null;
           }
-        });
-      }
-    }, [tripId, lastObservationId, cameraWindowActive, loadObservations])
-  );
+          setCameraWindowActive(false);
+          setLastObservationId(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
 
+  useEffect(() => {
+    startCameraWindowRef.current = startCameraWindow;
+  }, [startCameraWindow]);
+
+  // Cleanup camera window timer on unmount
   useEffect(() => {
     return () => {
       if (cameraWindowTimerRef.current) {
@@ -450,14 +397,18 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     };
   }, []);
 
+  // Start observation button
   const onStartObservationPress = useCallback(async () => {
     if (recordingCountdown > 0) {
+      // Stop recording early
       await stopObservationRecording();
     } else {
+      // Start recording
       await startObservationRecording();
     }
   }, [recordingCountdown, startObservationRecording, stopObservationRecording]);
 
+  // Open camera for the last observation
   const onOpenCameraPress = useCallback(async () => {
     if (!lastObservationId) return;
 
@@ -465,23 +416,24 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     await wakeWordStopRef.current();
 
     router.push({
-      pathname: '/camera-capture' as any,
+      pathname: '/camera-capture',
       params: { observationId: lastObservationId },
     });
   }, [lastObservationId, router]);
 
+  // End journey button
   const onEndJourneyPress = useCallback(async () => {
-    if (!tripId || endingJourney) return;
+    if (!tripId) {
+      showToast('No active journey to end.');
+      return;
+    }
+
+    if (endingJourney) {
+      return;
+    }
 
     try {
       setEndingJourney(true);
-
-      // Stop auto-save
-      if (autoSaveIntervalRef.current) {
-        stopAutoSave(autoSaveIntervalRef.current);
-        autoSaveIntervalRef.current = null;
-      }
-
       showToast('Ending journey and transcribing audio...');
 
       const endCoordinates = await getCurrentCoordinates();
@@ -492,14 +444,13 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         end_longitude: endCoordinates.longitude,
       });
 
+      // Stop location tracking when journey ends, regardless of success or failure
       stopLocationTracking();
 
-      // Mark as graceful ending
-      await markJourneyEnding();
-
-      await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
-
       await transcribeTripAudio(tripId);
+
+      // Clear the active trip from storage so a new one can be created next time
+      await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
 
       showToast('Journey ended. Transcriptions complete!');
       router.push(`/review/${tripId}`);
@@ -520,7 +471,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       : !wakeWord.isAvailable
         ? 'Wake word unavailable in this build/device'
         : wakeWordEnabled
-          ? '💡 Say "Hey Wade, Start Recording"'
+          ? '💡 Say “Hey Wade, Start Recording”'
           : wakeWord.lastError
             ? `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`
             : 'Wake word is starting…';
@@ -528,13 +479,14 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Current Journey</Text>
           <Text style={styles.timerText}>{formatDuration(secondsElapsed)}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#55A7FF' }]}>{obsCount}</Text>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{obsCount}</Text>
               <Text style={styles.statLabel}>Observations</Text>
             </View>
 
@@ -544,18 +496,20 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
             </View>
 
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#FFB020' }]}>{videoCount}</Text>
+              <Text style={[styles.statValue, { color: '#F59E0B' }]}>{videoCount}</Text>
               <Text style={styles.statLabel}>Videos</Text>
             </View>
           </View>
         </View>
 
+        {/* Wake word listening tooltip */}
         {shouldRenderWakeWordStatus && (
           <View style={styles.wakeWordStatusBanner}>
             <Text style={styles.wakeWordStatusText}>{wakeWordStatusText}</Text>
           </View>
         )}
 
+        {/* Recording countdown timer */}
         {recordingCountdown > 0 && (
           <View style={styles.recordingCountdownCard}>
             <Text style={styles.recordingCountdownNumber}>{recordingCountdown}</Text>
@@ -566,6 +520,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
           </View>
         )}
 
+        {/* Start Observation button */}
         <Pressable
           onPress={onStartObservationPress}
           disabled={processingWakeWordRef.current && recordingCountdown === 0}
@@ -583,6 +538,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
           </Text>
         </Pressable>
 
+        {/* Camera card - only visible for 10 seconds after observation */}
         {cameraWindowActive && (
           <Pressable
             onPress={onOpenCameraPress}
@@ -600,6 +556,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
           </Pressable>
         )}
 
+        {/* End Journey button */}
         <Pressable
           onPress={onEndJourneyPress}
           disabled={endingJourney || recordingCountdown > 0}
@@ -615,11 +572,12 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
           </Text>
         </Pressable>
 
+        {/* Recent Observations */}
         <Text style={styles.sectionTitle}>Recent Observations</Text>
 
         {loadingObservations ? (
           <View style={{ paddingVertical: 16 }}>
-            <ActivityIndicator />
+            <ActivityIndicator color={colors.textMuted} />
           </View>
         ) : (
           <>

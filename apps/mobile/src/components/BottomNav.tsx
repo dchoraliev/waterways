@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import styles from '../styles/BottomNav.styles';
+import { createBottomNavStyles } from '../styles/BottomNav.styles';
 import { ROUTES } from '../constants/routes';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type BottomTabKey = 'home' | 'map' | 'instruction' | 'settings';
 
@@ -19,6 +20,9 @@ const TAB_ROUTES: Record<BottomTabKey, keyof typeof ROUTES> = {
 };
 
 const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabPress, routes }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createBottomNavStyles(colors), [colors]);
+
   const makeTab = (key: BottomTabKey, icon: string, label: string) => {
     const active = currentTab === key;
     const routeKey = TAB_ROUTES[key];

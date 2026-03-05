@@ -11,7 +11,8 @@ import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from '
 import * as Notifications from 'expo-notifications';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import styles from '../styles/PermissionsScreen.styles';
+import { createPermissionsScreenStyles } from '../styles/PermissionsScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 type PermissionState = 'prompt' | 'granted' | 'denied';
 type ExpoPermissionStatus = 'undetermined' | 'granted' | 'denied';
@@ -20,6 +21,8 @@ const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed_v1';
 
 const PermissionsScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createPermissionsScreenStyles(colors), [colors]);
 
   const [micPermission, setMicPermission] = useState<PermissionState>('prompt');
   const [locationPermission, setLocationPermission] = useState<PermissionState>('prompt');
@@ -132,7 +135,7 @@ const PermissionsScreen: React.FC = () => {
           }}
         >
           <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: '#6b7280' }}>Preparing your app…</Text>
+          <Text style={{ marginTop: 8, color: colors.textMuted }}>Preparing your app…</Text>
         </View>
       </SafeAreaView>
     );
@@ -143,7 +146,7 @@ const PermissionsScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <View style={styles.iconWrapper}>
-            <Info size={24} />
+            <Info size={24} color={colors.primary} />
           </View>
           <Text style={styles.title}>Enable permissions</Text>
           <Text style={styles.subtitle}>
@@ -153,7 +156,8 @@ const PermissionsScreen: React.FC = () => {
 
         {/* Location */}
         <PermissionCard
-          icon={<MapPin size={20} />}
+          styles={styles}
+          icon={<MapPin size={20} color={colors.primary} />}
           title="Location"
           description="Needed to map your observations along the waterway."
           state={locationPermission}
@@ -164,7 +168,8 @@ const PermissionsScreen: React.FC = () => {
 
         {/* Microphone */}
         <PermissionCard
-          icon={<Mic size={20} />}
+          styles={styles}
+          icon={<Mic size={20} color={colors.primary} />}
           title="Microphone"
           description="Record spoken observations during your journey."
           state={micPermission}
@@ -175,7 +180,8 @@ const PermissionsScreen: React.FC = () => {
 
         {/* Camera (optional) */}
         <PermissionCard
-          icon={<CameraIcon size={20} />}
+          styles={styles}
+          icon={<CameraIcon size={20} color={colors.primary} />}
           title="Camera"
           description="Capture photos and short clips of your surroundings."
           state={cameraPermission}
@@ -186,6 +192,7 @@ const PermissionsScreen: React.FC = () => {
 
         {/* Notifications (optional) */}
         <PermissionCard
+          styles={styles}
           icon={<Info size={20} />}
           title="Notifications"
           description="Get reminders to review and submit draft journeys."
@@ -216,6 +223,7 @@ const PermissionsScreen: React.FC = () => {
 /* ---- Reusable Components ---- */
 
 interface PermissionCardProps {
+  styles: ReturnType<typeof createPermissionsScreenStyles>;
   icon: React.ReactNode;
   title: string;
   description: string;
@@ -226,6 +234,7 @@ interface PermissionCardProps {
 }
 
 const PermissionCard: React.FC<PermissionCardProps> = ({
+  styles,
   icon,
   title,
   description,
@@ -247,12 +256,12 @@ const PermissionCard: React.FC<PermissionCardProps> = ({
             <Text style={styles.cardDescription}>{description}</Text>
           </View>
         </View>
-        <StatusBadge state={state} required={required} />
+        <StatusBadge styles={styles} state={state} required={required} />
       </View>
 
       <View style={styles.cardBodyRow}>
         <View style={styles.statusIndicator}>
-          <IconComp size={16} />
+          <IconComp size={16} color={isGranted ? '#16A34A' : '#6B7280'} />
           <Text style={styles.statusIndicatorText}>{label}</Text>
         </View>
 
@@ -265,11 +274,12 @@ const PermissionCard: React.FC<PermissionCardProps> = ({
 };
 
 interface StatusBadgeProps {
+  styles: ReturnType<typeof createPermissionsScreenStyles>;
   state: PermissionState;
   required?: boolean;
 }
 
-const StatusBadge: React.FC<StatusBadgeProps> = ({ state, required = true }) => {
+const StatusBadge: React.FC<StatusBadgeProps> = ({ styles, state, required = true }) => {
   const isGranted = state === 'granted';
   const label = isGranted ? 'Granted' : state === 'denied' ? 'Denied' : 'Not set';
 

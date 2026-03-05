@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { styles } from '../styles/RecentObservationItem.styles';
+import { createRecentObservationItemStyles } from '../styles/RecentObservationItem.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type RecentObservationItemProps = {
   title: string;
@@ -9,6 +10,9 @@ export type RecentObservationItemProps = {
 };
 
 export function RecentObservationItem({ title, subtitle, onPress }: RecentObservationItemProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createRecentObservationItemStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}

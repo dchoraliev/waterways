@@ -10,13 +10,13 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import styles from '../styles/SettingsScreen.styles';
-import { signIn, signOut, resetPassword, deleteAccount } from 'packages/shared/src/supabase/auth';
+import { createSettingsStyles, createSettingsTokens } from '../styles/SettingsScreen.styles';
+import { signIn, signOut, resetPassword, deleteAccount } from '@waterways/shared/src/supabase/auth';
 import { supabase } from '@waterways/shared/src/supabase/client';
-import { TOKENS } from '../styles/SettingsScreen.styles';
 import { Ionicons } from '@expo/vector-icons';
 import { Switch } from 'react-native';
 import { getLocalSettings, updateLocalSettings } from '../database/db';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface UserProfile {
   name: string;
@@ -34,6 +34,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 }) => {
   const MIN_PASSWORD_LENGTH = 8;
   const PASSWORD_SPECIAL_CHAR_REGEX = /[^A-Za-z0-9]/;
+  const { mode, setMode, colors } = useTheme();
+  const tokens = useMemo(() => createSettingsTokens(colors), [colors]);
+  const styles = useMemo(() => createSettingsStyles(tokens), [tokens]);
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,7 +64,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Toggles
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showNameOnMap, setShowNameOnMap] = useState(true);
 
@@ -129,7 +131,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const loadLocalSettings = async () => {
     try {
       const localSettings = await getLocalSettings();
-      setIsDarkMode(localSettings.darkModeEnabled);
       setNotificationsEnabled(localSettings.notificationsEnabled);
     } catch (error) {
       console.warn('Failed to load local settings:', error);
@@ -143,13 +144,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   }, []);
 
   const handleDarkModeToggle = async (value: boolean) => {
-    setIsDarkMode(value);
-
-    try {
-      await updateLocalSettings({ darkModeEnabled: value });
-    } catch (error) {
-      console.warn('Failed to persist dark mode setting:', error);
-    }
+    await setMode(value ? 'dark' : 'light');
   };
 
   const handleDisableNotificationsToggle = async (disabled: boolean) => {
@@ -508,7 +503,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onPress={handleSignOut}
                 disabled={loading}
               >
-                <Ionicons name="log-out-outline" size={18} color={TOKENS.text} />
+                <Ionicons name="log-out-outline" size={18} color={tokens.text} />
                 <Text style={[styles.buttonText, styles.buttonTextOutline]}>
                   {loading ? 'Signing out...' : 'Sign Out'}
                 </Text>
@@ -526,13 +521,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
             >
               <View style={styles.navLeft}>
-                <Ionicons name="folder-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="folder-outline" size={20} color={tokens.primary} />
                 <View>
                   <Text style={styles.navLabel}>My Projects</Text>
                   <Text style={styles.navSubLabel}>View and manage your research projects.</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={TOKENS.mutedText} />
+              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
             </Pressable>
           </View>
         </View>
@@ -543,7 +538,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <View style={styles.cardBody}>
             <View style={styles.rowBetween}>
               <View style={styles.rowLeft}>
-                <Ionicons name="mail-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="mail-outline" size={20} color={tokens.primary} />
                 <Text style={styles.rowLabel}>Change email address</Text>
               </View>
               <TouchableOpacity
@@ -557,7 +552,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
             <View style={styles.rowBetween}>
               <View style={styles.rowLeft}>
-                <Ionicons name="lock-closed-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="lock-closed-outline" size={20} color={tokens.primary} />
                 <Text style={styles.rowLabel}>Change password</Text>
               </View>
               <TouchableOpacity
@@ -573,8 +568,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
             <View style={styles.rowBetween}>
               <View style={styles.rowLeft}>
-                <Ionicons name="trash-outline" size={20} color={TOKENS.destructive} />
-                <Text style={[styles.rowLabel, { color: TOKENS.destructive }]}>Delete account</Text>
+                <Ionicons name="trash-outline" size={20} color={tokens.destructive} />
+                <Text style={[styles.rowLabel, { color: tokens.destructive }]}>Delete account</Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -596,10 +591,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
             >
               <View style={styles.navLeft}>
-                <Ionicons name="notifications-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="notifications-outline" size={20} color={tokens.primary} />
                 <Text style={styles.navLabel}>Customize notifications</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={TOKENS.mutedText} />
+              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
             </Pressable>
           </View>
         </View>
@@ -610,7 +605,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <View style={styles.cardBody}>
             <View style={styles.switchRow}>
               <View style={styles.rowLeft}>
-                <Ionicons name="person-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="person-outline" size={20} color={tokens.primary} />
                 <Text style={styles.rowLabel}>Show my name on map</Text>
               </View>
               <Switch
@@ -621,10 +616,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             <View style={styles.switchRow}>
               <View style={styles.rowLeft}>
-                <Ionicons name="moon-outline" size={20} color={TOKENS.primary} />
+                <Ionicons name="moon-outline" size={20} color={tokens.primary} />
                 <Text style={styles.rowLabel}>Dark mode</Text>
               </View>
-              <Switch value={isDarkMode} onValueChange={handleDarkModeToggle} />
+              <Switch value={mode === 'dark'} onValueChange={handleDarkModeToggle} />
             </View>
           </View>
         </View>
@@ -640,10 +635,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
             >
               <View style={styles.navLeft}>
-                <Ionicons name="document-text-outline" size={20} color={TOKENS.mutedText} />
+                <Ionicons name="document-text-outline" size={20} color={tokens.mutedText} />
                 <Text style={styles.navLabel}>Terms and Conditions</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={TOKENS.mutedText} />
+              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
             </Pressable>
           </View>
         </View>
@@ -657,40 +652,41 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         title="Change Email Address"
         description="Update your email address. You'll need to enter your current password to confirm."
         onClose={() => setShowEmailDialog(false)}
+        styles={styles}
       >
-        <Field label="New email address">
+        <Field label="New email address" styles={styles}>
           <TextInput
             value={newEmail}
             onChangeText={setNewEmail}
             placeholder="Enter new email address"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             autoCapitalize="none"
             keyboardType="email-address"
             style={styles.input}
           />
         </Field>
-        <Field label="Confirm new email address">
+        <Field label="Confirm new email address" styles={styles}>
           <TextInput
             value={confirmEmail}
             onChangeText={setConfirmEmail}
             placeholder="Confirm new email address"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             autoCapitalize="none"
             keyboardType="email-address"
             style={styles.input}
           />
         </Field>
-        <Field label="Current password">
+        <Field label="Current password" styles={styles}>
           <TextInput
             value={emailPassword}
             onChangeText={setEmailPassword}
             placeholder="Enter your current password"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             secureTextEntry
             style={styles.input}
           />
         </Field>
-        {!!emailError && <ErrorBox message={emailError} />}
+        {!!emailError && <ErrorBox message={emailError} styles={styles} />}
         <View style={styles.modalFooter}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -719,38 +715,39 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         title="Change Password"
         description="Enter your current password and choose a new one. Passwords must be at least 4 characters long and include at least one special character."
         onClose={() => setShowPasswordDialog(false)}
+        styles={styles}
       >
-        <Field label="Current password">
+        <Field label="Current password" styles={styles}>
           <TextInput
             value={currentPassword}
             onChangeText={setCurrentPassword}
             placeholder="Enter your current password"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             secureTextEntry
             style={styles.input}
           />
         </Field>
-        <Field label="New password">
+        <Field label="New password" styles={styles}>
           <TextInput
             value={newPassword}
             onChangeText={setNewPassword}
             placeholder="Enter new password"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             secureTextEntry
             style={styles.input}
           />
         </Field>
-        <Field label="Confirm new password">
+        <Field label="Confirm new password" styles={styles}>
           <TextInput
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             placeholder="Confirm new password"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             secureTextEntry
             style={styles.input}
           />
         </Field>
-        {!!passwordError && <ErrorBox message={passwordError} />}
+        {!!passwordError && <ErrorBox message={passwordError} styles={styles} />}
         <View style={styles.modalFooter}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -778,6 +775,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         onPasswordChange={handleDeletePasswordChange}
         onCancel={resetDeleteDialog}
         onConfirm={handleDeleteAccount}
+        styles={styles}
+        tokens={tokens}
       />
 
       {/* Notifications Modal */}
@@ -786,6 +785,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         title="Notification Settings"
         description="Manage your notification preferences. More options will be available soon."
         onClose={() => setShowNotificationsDialog(false)}
+        styles={styles}
       >
         <View style={styles.switchRow}>
           <Text style={styles.fieldLabel}>Disable all notifications</Text>
@@ -805,7 +805,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   );
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+type SettingsStyles = ReturnType<typeof createSettingsStyles>;
+type SettingsTokens = ReturnType<typeof createSettingsTokens>;
+
+function Field({
+  label,
+  children,
+  styles,
+}: {
+  label: string;
+  children: React.ReactNode;
+  styles: SettingsStyles;
+}) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -815,7 +826,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function ErrorBox({ message }: { message: string }) {
+function ErrorBox({ message, styles }: { message: string; styles: SettingsStyles }) {
   return (
     <View style={styles.errorBox}>
       <Text style={styles.errorText}>{message}</Text>
@@ -829,12 +840,14 @@ function SheetModal({
   description,
   onClose,
   children,
+  styles,
 }: {
   visible: boolean;
   title: string;
   description?: string;
   onClose: () => void;
   children: React.ReactNode;
+  styles: SettingsStyles;
 }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -860,6 +873,8 @@ function DeletePasswordModal({
   onPasswordChange,
   onCancel,
   onConfirm,
+  styles,
+  tokens,
 }: {
   visible: boolean;
   password: string;
@@ -868,6 +883,8 @@ function DeletePasswordModal({
   onPasswordChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  styles: SettingsStyles;
+  tokens: SettingsTokens;
 }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
@@ -883,7 +900,7 @@ function DeletePasswordModal({
             value={password}
             onChangeText={onPasswordChange}
             placeholder="Enter your password"
-            placeholderTextColor={TOKENS.placeholder}
+            placeholderTextColor={tokens.placeholder}
             secureTextEntry
             style={styles.input}
             autoCapitalize="none"
@@ -891,7 +908,7 @@ function DeletePasswordModal({
           />
           {!!passwordError && (
             <View style={{ marginTop: 8 }}>
-              <ErrorBox message={passwordError} />
+              <ErrorBox message={passwordError} styles={styles} />
             </View>
           )}
           <View style={{ height: 16 }} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import TagPill from './TagPill';
 import locationIcon from '../assets/icons/location-pin.png';
 import editIcon from '../assets/icons/edit.png';
 import mediaIcon from '../assets/icons/media_attached_icon.png';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppColors } from '../styles/colors';
 import videoIcon from '../assets/icons/video_attached.png';
 
 export type ObservationStatus = 'Offline' | 'Synced' | 'Error';
@@ -79,23 +81,26 @@ async function openVideoExternally(path: string) {
   }
 }
 
-const ZoomableImageIOS: React.FC<{ uri: string }> = ({ uri }) => {
+const ZoomableImageIOS: React.FC<{
+  uri: string;
+  sharedStyles: ReturnType<typeof createSharedStyles>;
+}> = ({ uri, sharedStyles }) => {
   //const { width, height } = Dimensions.get('window');
 
   // iOS-only native zoom support
   if (Platform.OS !== 'ios') {
     return (
-      <View style={styles.zoomRoot}>
-        <Image source={{ uri }} style={styles.zoomImage} resizeMode="contain" />
+      <View style={sharedStyles.zoomRoot}>
+        <Image source={{ uri }} style={sharedStyles.zoomImage} resizeMode="contain" />
       </View>
     );
   }
 
   return (
-    <View style={styles.zoomRoot}>
+    <View style={sharedStyles.zoomRoot}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.zoomScrollContent}
+        contentContainerStyle={sharedStyles.zoomScrollContent}
         minimumZoomScale={1}
         maximumZoomScale={4}
         bouncesZoom
@@ -103,37 +108,23 @@ const ZoomableImageIOS: React.FC<{ uri: string }> = ({ uri }) => {
         showsVerticalScrollIndicator={false}
         centerContent
       >
-        <Image source={{ uri }} style={styles.zoomImageIOS} resizeMode="contain" />
+        <Image source={{ uri }} style={sharedStyles.zoomImageIOS} resizeMode="contain" />
       </ScrollView>
 
-      <View style={styles.zoomHintWrap} pointerEvents="none">
-        <Text style={styles.zoomHintText}>Pinch to zoom • Drag to pan</Text>
+      <View style={sharedStyles.zoomHintWrap} pointerEvents="none">
+        <Text style={sharedStyles.zoomHintText}>Pinch to zoom • Drag to pan</Text>
       </View>
     </View>
   );
 };
 
 const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createObservationCardStyles(colors), [colors]);
+  const sharedStyles = useMemo(() => createSharedStyles(colors), [colors]);
   const { time, location, description, tags, status } = observation;
 
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
-
-  function getCategoryColor(cat: string): string {
-    switch (cat) {
-      case 'Infrastructure':
-        return '#3B82F6';
-      case 'Environmental':
-        return '#10B981';
-      case 'Wildlife':
-        return '#F59E0B';
-      case 'Hazards':
-        return '#EF4444';
-      case 'General':
-        return '#9CA3AF';
-      default:
-        return '#6B7280';
-    }
-  }
 
   const hasValidMedia = observation.hasMedia === true && !!observation.mediaFilePath;
   const mediaUri = hasValidMedia ? ensureUri(observation.mediaFilePath as string) : null;
@@ -252,15 +243,18 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
           presentationStyle="fullScreen"
           onRequestClose={() => setPhotoModalVisible(false)}
         >
-          <SafeAreaView style={styles.modalRoot}>
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setPhotoModalVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
+          <SafeAreaView style={sharedStyles.modalRoot}>
+            <View style={sharedStyles.modalHeader}>
+              <Pressable
+                onPress={() => setPhotoModalVisible(false)}
+                style={sharedStyles.closeButton}
+              >
+                <Text style={sharedStyles.closeButtonText}>Close</Text>
               </Pressable>
             </View>
 
-            <View style={styles.modalBody}>
-              <ZoomableImageIOS uri={mediaUri} />
+            <View style={sharedStyles.modalBody}>
+              <ZoomableImageIOS uri={mediaUri} sharedStyles={sharedStyles} />
             </View>
           </SafeAreaView>
         </Modal>
@@ -269,195 +263,228 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#111827',
-    backgroundColor: '#020617',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 12,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  timeLocationCol: {
-    flexShrink: 1,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 2,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationIcon: {
-    width: 14,
-    height: 14,
-    tintColor: '#9CA3AF',
-    marginRight: 4,
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    backgroundColor: '#065F46',
-  },
-  statusOffline: {
-    backgroundColor: '#92400E',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#F9FAFB',
-  },
-  mediaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  mediaIcon: {
-    width: 18,
-    height: 18,
-    tintColor: '#9CA3AF',
-  },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  editIcon: {
-    width: 14,
-    height: 14,
-    tintColor: '#9CA3AF',
-    marginRight: 4,
-  },
-  editText: {
-    fontSize: 12,
-    color: '#E5E7EB',
-  },
-  description: {
-    fontSize: 13,
-    color: '#F9FAFB',
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 8,
-  },
-  classificationRow: {
-    marginTop: 8,
-    gap: 4,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  categoryDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 6,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: '#D1D5DB',
-    fontWeight: '600',
-  },
-  keywordText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  keywordLabel: {
-    fontWeight: '600',
-    color: '#D1D5DB',
-  },
-  mediaSection: {
-    marginTop: 12,
-    alignItems: 'flex-end',
-  },
-  viewMediaButton: {
-    backgroundColor: '#1E40AF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  viewMediaText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  zoomScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  zoomImageIOS: {
-    width: '100%',
-    height: '100%',
-  },
+function getCategoryColor(cat: string): string {
+  switch (cat) {
+    case 'Infrastructure':
+      return '#3B82F6';
+    case 'Environmental':
+      return '#10B981';
+    case 'Wildlife':
+      return '#F59E0B';
+    case 'Hazards':
+      return '#EF4444';
+    case 'General':
+      return '#9CA3AF';
+    default:
+      return '#6B7280';
+  }
+}
 
-  // Modal styles
-  modalRoot: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  modalHeader: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  closeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  closeButtonText: {
-    color: '#FFF',
-    fontWeight: '700',
-  },
-  modalBody: {
-    flex: 1,
-  },
+function createObservationCardStyles(themeColors: AppColors) {
+  return StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      backgroundColor: themeColors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      marginBottom: 12,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    timeLocationCol: {
+      flexShrink: 1,
+    },
+    timeText: {
+      fontSize: 12,
+      color: themeColors.textMuted,
+      marginBottom: 2,
+    },
+    locationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    locationIcon: {
+      width: 14,
+      height: 14,
+      tintColor: themeColors.textMuted,
+      marginRight: 4,
+    },
+    locationText: {
+      fontSize: 12,
+      color: themeColors.textMuted,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    statusBadge: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      backgroundColor: themeColors.success,
+    },
+    statusOffline: {
+      backgroundColor: themeColors.danger,
+    },
+    statusText: {
+      fontSize: 11,
+      color: themeColors.textPrimary,
+    },
+    mediaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    mediaIcon: {
+      width: 18,
+      height: 18,
+      tintColor: themeColors.textMuted,
+    },
+    editRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    editIcon: {
+      width: 14,
+      height: 14,
+      tintColor: themeColors.textMuted,
+      marginRight: 4,
+    },
+    editText: {
+      fontSize: 12,
+      color: themeColors.textPrimary,
+    },
+    description: {
+      fontSize: 13,
+      color: themeColors.textPrimary,
+      marginTop: 4,
+      marginBottom: 6,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 8,
+    },
+    classificationRow: {
+      marginTop: 8,
+      gap: 4,
+    },
+    classificationText: {
+      fontSize: 12,
+      color: themeColors.textMuted,
+    },
+    classificationLabel: {
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+    },
+    categoryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    categoryDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 6,
+    },
+    categoryText: {
+      fontSize: 12,
+      color: themeColors.textPrimary,
+      fontWeight: '600',
+    },
+    keywordText: {
+      fontSize: 12,
+      color: themeColors.textMuted,
+    },
+    keywordLabel: {
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+    },
+    mediaSection: {
+      marginTop: 12,
+      alignItems: 'flex-end',
+    },
+    viewMediaButton: {
+      backgroundColor: themeColors.primary,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    },
+    viewMediaText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+    },
+  });
+}
 
-  // Zoom viewer styles
-  zoomRoot: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  zoomImage: {
-    width: '100%',
-    height: '100%',
-  },
-  zoomHintWrap: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-  },
-  zoomHintText: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-});
+function createSharedStyles(themeColors: AppColors) {
+  return StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      backgroundColor: themeColors.primaryDark,
+    },
+    modalHeader: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    closeButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    closeButtonText: {
+      color: themeColors.textPrimary,
+      fontWeight: '700',
+    },
+    modalBody: {
+      flex: 1,
+    },
+    zoomRoot: {
+      flex: 1,
+      backgroundColor: themeColors.primaryDark,
+    },
+    zoomScrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    zoomImage: {
+      width: '100%',
+      height: '100%',
+    },
+    zoomImageIOS: {
+      width: '100%',
+      height: '100%',
+    },
+    zoomHintWrap: {
+      position: 'absolute',
+      bottom: 16,
+      left: 16,
+      right: 16,
+      backgroundColor: themeColors.overlay,
+      borderRadius: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    zoomHintText: {
+      color: themeColors.textPrimary,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+  });
+}
 
 export default ObservationCard;

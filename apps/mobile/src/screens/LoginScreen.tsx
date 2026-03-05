@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, KeyboardAvoidingView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signIn } from '@waterways/shared/src/supabase/auth';
-import styles from '../styles/LoginScreen.styles';
+import { createLoginScreenStyles } from '../styles/LoginScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
 import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 import { updateAndSyncOfflineDataToCurrentUser } from '../services/OfflineService';
 import { performAutoSyncTaskOnce } from '../services/NetworkService';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -20,6 +21,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   onForgotPassword,
   onSignUp,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createLoginScreenStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

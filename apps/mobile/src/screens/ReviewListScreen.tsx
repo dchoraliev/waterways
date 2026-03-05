@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { useAuth } from '../hooks/useAuth';
-import styles from '../styles/ReviewListScreen.styles';
+import { createReviewListScreenStyles } from '../styles/ReviewListScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SubmittedJourney {
   id: string;
@@ -38,6 +39,8 @@ type ProjectNameRow = {
 
 const ReviewListScreen = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createReviewListScreenStyles(colors), [colors]);
   const { userId, loading: authLoading } = useAuth();
   const [submittedJourneys, setSubmittedJourneys] = useState<SubmittedJourney[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +163,7 @@ const ReviewListScreen = () => {
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#94a3b8" />
+          <ActivityIndicator color={colors.textMuted} />
         ) : submittedJourneys.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📄</Text>

@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { getUserProjects, createProject, joinProjectWithCode } from '../services/projectService';
 import type { Project } from '../types/project.types';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppColors } from '../styles/colors';
 
 interface Props {
   selectedProjectId: string | null;
@@ -20,6 +22,9 @@ interface Props {
 }
 
 const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, userId }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,12 +147,12 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
                   setJoinModalVisible(true);
                 }}
               >
-                <Text style={styles.actionButtonText}>Join with Code</Text>
+                <Text style={[styles.actionButtonText, styles.joinButtonText]}>Join with Code</Text>
               </TouchableOpacity>
             </View>
 
             {loading ? (
-              <ActivityIndicator size="large" color="#1D4ED8" style={styles.loader} />
+              <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
             ) : (
               <FlatList
                 data={projects}
@@ -266,102 +271,104 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
   );
 };
 
-const styles = StyleSheet.create({
-  container: { marginVertical: 12 },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: 8, color: '#9CA3AF' },
-  selector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    borderRadius: 12,
-    padding: 12,
-  },
-  selectorText: { fontSize: 15, color: '#F9FAFB' },
-  arrow: { fontSize: 12, color: '#9CA3AF' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#020617',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    width: '90%',
-    maxHeight: '80%',
-  },
-  smallModalContent: {
-    backgroundColor: '#020617',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    padding: 20,
-    width: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1D4ED8',
-  },
-  modalTitle: { fontSize: 15, fontWeight: '600', color: '#F9FAFB', marginBottom: 0 },
-  closeButton: { fontSize: 24, color: '#9CA3AF' },
-  actionButtons: { flexDirection: 'row', padding: 16, gap: 8 },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#1D4ED8',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  joinButton: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#1D4ED8' },
-  actionButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
-  loader: { marginVertical: 32 },
-  projectItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1D4ED8',
-  },
-  selectedProjectItem: { backgroundColor: '#1D4ED8' },
-  projectName: { fontSize: 15, fontWeight: '600', color: '#F9FAFB' },
-  emptyText: { textAlign: 'center', color: '#9CA3AF', padding: 32, fontSize: 13 },
-  noneButton: {
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-    backgroundColor: '#111827',
-    alignItems: 'center',
-  },
-  noneButtonText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    backgroundColor: '#020617',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    color: '#F9FAFB',
-    marginBottom: 16,
-  },
-  buttonRow: { flexDirection: 'row', gap: 8 },
-  button: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  cancelButton: {
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  cancelButtonText: { color: '#9CA3AF', fontWeight: '600', fontSize: 13 },
-  createButton: { backgroundColor: '#1D4ED8' },
-  createButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
-});
+const createStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    container: { marginVertical: 12 },
+    label: { fontSize: 13, fontWeight: '600', marginBottom: 8, color: colors.textMuted },
+    selector: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 12,
+      padding: 12,
+    },
+    selectorText: { fontSize: 15, color: colors.textPrimary },
+    arrow: { fontSize: 12, color: colors.textMuted },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      width: '90%',
+      maxHeight: '80%',
+    },
+    smallModalContent: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      padding: 20,
+      width: '85%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.primary,
+    },
+    modalTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: 0 },
+    closeButton: { fontSize: 24, color: colors.textMuted },
+    actionButtons: { flexDirection: 'row', padding: 16, gap: 8 },
+    actionButton: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    joinButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
+    actionButtonText: { color: colors.background, fontWeight: '600', fontSize: 13 },
+    joinButtonText: { color: colors.primary },
+    loader: { marginVertical: 32 },
+    projectItem: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.primary,
+    },
+    selectedProjectItem: { backgroundColor: colors.primarySoft },
+    projectName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    emptyText: { textAlign: 'center', color: colors.textMuted, padding: 32, fontSize: 13 },
+    noneButton: {
+      margin: 16,
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+    },
+    noneButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 15,
+      color: colors.textPrimary,
+      marginBottom: 16,
+    },
+    buttonRow: { flexDirection: 'row', gap: 8 },
+    button: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+    cancelButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cancelButtonText: { color: colors.textMuted, fontWeight: '600', fontSize: 13 },
+    createButton: { backgroundColor: colors.primary },
+    createButtonText: { color: colors.background, fontWeight: '600', fontSize: 13 },
+  });
 
 export default ProjectSelector;

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import ClassifierTag from './ClassifierTag';
 import { CATEGORIES } from '../../services/ObservationClassifier';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const toTitleCase = (input: string) =>
   input
@@ -10,7 +11,60 @@ const toTitleCase = (input: string) =>
     .join(' ');
 
 const ObservationClassifiers = () => {
+  const { colors } = useTheme();
   const entries = Object.entries(CATEGORIES);
+
+  const classifierStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          paddingTop: 10,
+          paddingBottom: 5,
+        },
+        subtitle: {
+          color: colors.textMuted,
+          marginBottom: 15,
+          fontSize: 16,
+        },
+        category: {
+          marginBottom: 15,
+        },
+        categoryTitle: {
+          fontSize: 18,
+          fontWeight: '600',
+          color: colors.textPrimary,
+          marginBottom: 8,
+        },
+        tagList: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+        },
+        noteBox: {
+          marginTop: 15,
+          padding: 15,
+          borderRadius: 8,
+          backgroundColor: colors.primary,
+        },
+        noteText: {
+          color: colors.background,
+          fontSize: 14,
+          lineHeight: 20,
+        },
+        fallbackBox: {
+          marginBottom: 8,
+          padding: 10,
+          borderRadius: 6,
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        fallbackText: {
+          color: colors.textMuted,
+          fontSize: 14,
+        },
+      }),
+    [colors]
+  );
 
   return (
     <View style={classifierStyles.container}>
@@ -27,7 +81,7 @@ const ObservationClassifiers = () => {
             {data.keywords.length === 0 && data.is_fallback ? (
               <View style={classifierStyles.fallbackBox}>
                 <Text style={classifierStyles.fallbackText}>
-                  This category collects miscellaneous observations that don’t match other tags.
+                  {"This category collects miscellaneous observations that don't match other tags."}
                 </Text>
               </View>
             ) : (
@@ -47,57 +101,12 @@ const ObservationClassifiers = () => {
 
       <View style={classifierStyles.noteBox}>
         <Text style={classifierStyles.noteText}>
-          Simply say the classifier name after your wake word to tag your observation.
+          Simply say the classifier name after your wake word to tag your observation. Multiple
+          classifiers can be added to a single observation.
         </Text>
       </View>
     </View>
   );
 };
-
-const classifierStyles = StyleSheet.create({
-  container: {
-    paddingTop: 10,
-    paddingBottom: 5,
-  },
-  subtitle: {
-    color: '#cbd5e1',
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  category: {
-    marginBottom: 15,
-  },
-  categoryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#F9FAFB',
-    marginBottom: 8,
-  },
-  tagList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  noteBox: {
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#3b82f6',
-  },
-  noteText: {
-    color: '#F9FAFB',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  fallbackBox: {
-    marginBottom: 8,
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: '#111827',
-  },
-  fallbackText: {
-    color: '#cbd5e1',
-    fontSize: 14,
-  },
-});
 
 export default ObservationClassifiers;

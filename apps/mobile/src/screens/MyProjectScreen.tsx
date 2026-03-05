@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -18,9 +18,13 @@ import type { Project } from '../types/project.types';
 import { useAuth } from '../hooks/useAuth';
 import { useUserProjects } from '../hooks/useUserProjects';
 import ProjectManagementModal from '../components/ProjectManagementModal';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppColors } from '../styles/colors';
 
 const MyProjectsScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createMyProjectScreenStyles(colors), [colors]);
   const { userId, loading: authLoading } = useAuth();
   const {
     projects,
@@ -39,6 +43,7 @@ const MyProjectsScreen: React.FC = () => {
   const [joining, setJoining] = useState(false);
 
   const loading = authLoading || projectsLoading;
+  const placeholderColor = colors.textMuted;
 
   useEffect(() => {
     if (userId) {
@@ -166,7 +171,7 @@ const MyProjectsScreen: React.FC = () => {
           style={[styles.actionButton, styles.joinButton]}
           onPress={() => setJoinModalVisible(true)}
         >
-          <Text style={styles.actionButtonText}>Join with Code</Text>
+          <Text style={[styles.actionButtonText, styles.joinButtonText]}>Join with Code</Text>
         </TouchableOpacity>
       </View>
 
@@ -234,7 +239,7 @@ const MyProjectsScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               placeholder="Project Name"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={placeholderColor}
               value={newProjectName}
               onChangeText={setNewProjectName}
               maxLength={50}
@@ -275,7 +280,7 @@ const MyProjectsScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               placeholder="Enter 8-character code"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={placeholderColor}
               value={joinCode}
               onChangeText={(text) => setJoinCode(text.toUpperCase())}
               maxLength={8}
@@ -318,166 +323,171 @@ const MyProjectsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#020617' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  backButton: {
-    paddingHorizontal: 24,
-    paddingTop: 45,
-    paddingBottom: 10,
-  },
-  backButtonText: {
-    color: '#60A5FA',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#F9FAFB',
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 16,
-    textAlign: 'center',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  actionButton: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  createButton: {
-    backgroundColor: '#1D4ED8',
-  },
-  joinButton: {
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-  },
-  actionButtonText: {
-    color: '#E5F2FF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  listContent: { paddingHorizontal: 24, paddingBottom: 24 },
-  projectCard: {
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    backgroundColor: '#020617',
-    padding: 16,
-    marginBottom: 16,
-  },
-  projectHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  projectName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#F9FAFB',
-  },
-  creatorBadge: {
-    fontSize: 10,
-    color: '#60A5FA',
-    fontWeight: '600',
-    backgroundColor: '#1E3A8A',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  codeContainer: {
-    backgroundColor: '#111827',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  codeLabel: { fontSize: 12, color: '#9CA3AF' },
-  code: {
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 2,
-    color: '#60A5FA',
-  },
-  buttonRow: { flexDirection: 'row', gap: 8 },
-  button: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  shareButton: {
-    backgroundColor: '#1D4ED8',
-  },
-  shareButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
-  manageButton: {
-    backgroundColor: '#7C3AED',
-  },
-  manageButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
-  leaveButton: {
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  leaveButtonText: { color: '#EF4444', fontWeight: '600', fontSize: 13 },
-  emptyContainer: { alignItems: 'center', marginTop: 64 },
-  emptyText: { fontSize: 15, color: '#F9FAFB', marginBottom: 6 },
-  emptySubtext: { fontSize: 12, color: '#9CA3AF' },
+const createMyProjectScreenStyles = (themeColors: AppColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: themeColors.background },
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    backButton: {
+      paddingHorizontal: 24,
+      paddingTop: 45,
+      paddingBottom: 10,
+    },
+    backButtonText: {
+      color: '#60A5FA',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+      paddingHorizontal: 24,
+      paddingTop: 10,
+      paddingBottom: 16,
+      textAlign: 'center',
+    },
+    actionButtonsContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 24,
+      marginBottom: 16,
+    },
+    actionButton: {
+      flex: 1,
+      padding: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    createButton: {
+      backgroundColor: '#1D4ED8',
+    },
+    joinButton: {
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: '#1D4ED8',
+    },
+    actionButtonText: {
+      color: '#E5F2FF',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    joinButtonText: {
+      color: themeColors.primary,
+    },
+    listContent: { paddingHorizontal: 24, paddingBottom: 24 },
+    projectCard: {
+      width: '100%',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#1D4ED8',
+      backgroundColor: themeColors.surface,
+      padding: 16,
+      marginBottom: 16,
+    },
+    projectHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    projectName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+    },
+    creatorBadge: {
+      fontSize: 10,
+      color: '#60A5FA',
+      fontWeight: '600',
+      backgroundColor: '#1E3A8A',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 4,
+    },
+    codeContainer: {
+      backgroundColor: themeColors.background,
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    codeLabel: { fontSize: 12, color: themeColors.textMuted },
+    code: {
+      fontSize: 18,
+      fontWeight: '600',
+      letterSpacing: 2,
+      color: '#60A5FA',
+    },
+    buttonRow: { flexDirection: 'row', gap: 8 },
+    button: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    shareButton: {
+      backgroundColor: '#1D4ED8',
+    },
+    shareButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
+    manageButton: {
+      backgroundColor: '#7C3AED',
+    },
+    manageButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 13 },
+    leaveButton: {
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    leaveButtonText: { color: '#EF4444', fontWeight: '600', fontSize: 13 },
+    emptyContainer: { alignItems: 'center', marginTop: 64 },
+    emptyText: { fontSize: 15, color: themeColors.textPrimary, marginBottom: 6 },
+    emptySubtext: { fontSize: 12, color: themeColors.textMuted },
 
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  smallModalContent: {
-    backgroundColor: '#020617',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    padding: 20,
-    width: '85%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#F9FAFB',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    backgroundColor: '#111827',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    color: '#F9FAFB',
-    marginBottom: 16,
-  },
-  modalButtonRow: { flexDirection: 'row', gap: 8 },
-  modalButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  cancelButton: {
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  cancelButtonText: { color: '#9CA3AF', fontWeight: '600', fontSize: 14 },
-  confirmButton: { backgroundColor: '#1D4ED8' },
-  confirmButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 14 },
-});
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: themeColors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    smallModalContent: {
+      backgroundColor: themeColors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#1D4ED8',
+      padding: 20,
+      width: '85%',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: '#1D4ED8',
+      backgroundColor: themeColors.background,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 15,
+      color: themeColors.textPrimary,
+      marginBottom: 16,
+    },
+    modalButtonRow: { flexDirection: 'row', gap: 8 },
+    modalButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+    cancelButton: {
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    cancelButtonText: { color: themeColors.textMuted, fontWeight: '600', fontSize: 14 },
+    confirmButton: { backgroundColor: '#1D4ED8' },
+    confirmButtonText: { color: '#E5F2FF', fontWeight: '600', fontSize: 14 },
+  });
 
 export default MyProjectsScreen;

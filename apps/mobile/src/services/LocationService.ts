@@ -8,8 +8,8 @@ export interface Coordinates {
 // -------- Internal Module State --------
 let subscription: Location.LocationSubscription | null = null;
 let lastCoordinates: Coordinates | null = null;
-let lastAccuracy: number | null = null;
-let lastTimestamp: number | null = null;
+let _lastAccuracy: number | null = null;
+let _lastTimestamp: number | null = null;
 let isTracking = false;
 
 /**
@@ -56,8 +56,8 @@ export async function startLocationTracking(options?: {
         latitude: lastKnown.coords.latitude,
         longitude: lastKnown.coords.longitude,
       };
-      lastAccuracy = lastKnown.coords.accuracy ?? null;
-      lastTimestamp = lastKnown.timestamp;
+      _lastAccuracy = lastKnown.coords.accuracy ?? null;
+      _lastTimestamp = lastKnown.timestamp;
     }
 
     // Start watching for updates
@@ -73,8 +73,8 @@ export async function startLocationTracking(options?: {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        lastAccuracy = position.coords.accuracy ?? null;
-        lastTimestamp = position.timestamp;
+        _lastAccuracy = position.coords.accuracy ?? null;
+        _lastTimestamp = position.timestamp;
       }
     );
     console.log('Started location tracking with options:', {
@@ -130,8 +130,8 @@ export async function getCurrentCoordinates(options?: {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
   };
-  lastAccuracy = position.coords.accuracy ?? null;
-  lastTimestamp = position.timestamp;
+  _lastAccuracy = position.coords.accuracy ?? null;
+  _lastTimestamp = position.timestamp;
 
   return lastCoordinates;
 }

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
-import styles from '../styles/HomeScreen.styles';
+import { createHomeScreenStyles } from '../styles/HomeScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface HomeScreenProps {
   onStartJourney: () => void;
@@ -13,6 +14,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onViewRecordings,
   onViewDrafts,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createHomeScreenStyles(colors), [colors]);
+
   return (
     <View style={styles.root}>
       <ScrollView

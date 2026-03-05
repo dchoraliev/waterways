@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import MyProjectScreen from '../screens/MyProjectScreen';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function MyProjectsRoute() {
+  const { colors } = useTheme();
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,10 +39,10 @@ export default function MyProjectsRoute() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#020617',
+          backgroundColor: colors.background,
         }}
       >
-        <ActivityIndicator size="large" color="#1D4ED8" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { useDraftJourneys, JourneyDraft } from '../hooks/useDraftJourneys';
 import { classifyObservation, CATEGORIES } from '../services/ObservationClassifier';
-import styles from '../styles/ReviewScreen.styles';
+import { createReviewScreenStyles } from '../styles/ReviewScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppColors } from '../styles/colors';
 
 export default function EditObservationScreen() {
   const { tripId, observationIndex } = useLocalSearchParams();
   const router = useRouter();
   const { getDraftByTripId, saveDraft } = useDraftJourneys();
+  const { colors } = useTheme();
+  const reviewStyles = useMemo(() => createReviewScreenStyles(colors), [colors]);
+  const editStyles = useMemo(() => createEditObservationStyles(colors), [colors]);
 
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -34,6 +39,7 @@ export default function EditObservationScreen() {
   const keywordInputRef = useRef<TextInput>(null);
 
   const index = Number(observationIndex);
+  const placeholderColor = colors.textMuted;
 
   // Dynamic categories loaded from CATEGORIES mapping (fallback handled below)
   const categoryEntries = Object.entries(CATEGORIES);
@@ -47,7 +53,7 @@ export default function EditObservationScreen() {
       if (obs) {
         setDescription(obs.description);
         setLocation(obs.location || '');
-        // if the observation has no category, use fallback from CATEGORIES
+        // If the observation has no category, use fallback from CATEGORIES.
         const fallback =
           Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
         setCategory(obs.category ?? fallback);
@@ -55,18 +61,19 @@ export default function EditObservationScreen() {
         setDraft(loadedDraft);
       }
     })();
-    // intentionally not depending on CATEGORIES (it's a mutable module-level object)
+    // Intentionally not depending on CATEGORIES (it's a mutable module-level object).
   }, [tripId, observationIndex, getDraftByTripId, index]);
 
   // FIX 2: Moved classification logic into the description change handler
   // instead of using a useEffect with setState calls
-  function handleDescriptionChange(text: string) {
+  const handleDescriptionChange = useCallback((text: string) => {
     setDescription(text);
 
     if (text) {
       const result = classifyObservation(text);
       setKeyword(result.keyword || '');
-      // if classifier returns 'OTHERS', map to the fallback category
+
+      // If classifier returns OTHERS, map to the fallback category.
       if (result.category === 'OTHERS') {
         const fallback =
           Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
@@ -75,7 +82,7 @@ export default function EditObservationScreen() {
         setCategory(result.category);
       }
     }
-  }
+  }, []);
 
   const handleSave = async () => {
     if (!draft) return;
@@ -111,7 +118,7 @@ export default function EditObservationScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={reviewStyles.root} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -124,9 +131,7 @@ export default function EditObservationScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
-              Edit Observation
-            </Text>
+            <Text style={editStyles.titleText}>Edit Observation</Text>
 
             <Text style={editStyles.label}>Description</Text>
             <TextInput
@@ -135,7 +140,7 @@ export default function EditObservationScreen() {
               multiline
               numberOfLines={4}
               style={[editStyles.textInput, { minHeight: 100, textAlignVertical: 'top' }]}
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={placeholderColor}
               returnKeyType="done"
               blurOnSubmit={true}
             />
@@ -145,15 +150,13 @@ export default function EditObservationScreen() {
               value={location}
               onChangeText={setLocation}
               style={editStyles.textInput}
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={placeholderColor}
               returnKeyType="done"
               onSubmitEditing={Keyboard.dismiss}
             />
 
             <Text style={editStyles.label}>Category</Text>
             <View style={editStyles.categoryGrid}>
-              {/* removed DEFAULT option; users must choose a category or fallback will be used */}
-
               {/* Category tiles from CATEGORIES */}
               {categoryEntries.map(
                 ([catName, data]: [
@@ -161,7 +164,7 @@ export default function EditObservationScreen() {
                   { is_fallback: boolean; color: string; keywords: string[] },
                 ]) => {
                   const isSelected = category === catName;
-                  const borderColor = data?.color ?? '#374151';
+                  const borderColor = data?.color ?? colors.border;
                   return (
                     <TouchableOpacity
                       key={catName}
@@ -194,7 +197,7 @@ export default function EditObservationScreen() {
               onChangeText={setKeyword}
               style={editStyles.textInput}
               placeholder="Auto-updates based on description"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={placeholderColor}
               returnKeyType="done"
               onSubmitEditing={Keyboard.dismiss}
               onFocus={handleKeywordFocus}
@@ -222,66 +225,75 @@ export default function EditObservationScreen() {
   );
 }
 
-const editStyles = StyleSheet.create({
-  label: {
-    color: 'white',
-    marginBottom: 8,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  textInput: {
-    backgroundColor: '#111827',
-    color: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  categoryButton: {
-    backgroundColor: '#111827',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  categoryButtonSelected: {
-    backgroundColor: '#1E40AF',
-    borderColor: '#3B82F6',
-  },
-  categoryButtonText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  categoryButtonTextSelected: {
-    color: '#FFFFFF',
-  },
-  buttonContainer: {
-    gap: 12,
-    marginTop: 8,
-  },
-  saveButton: {
-    marginBottom: 0,
-  },
-  discardButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#4B5563',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  discardText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const createEditObservationStyles = (themeColors: AppColors) =>
+  StyleSheet.create({
+    titleText: {
+      color: themeColors.textPrimary,
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 20,
+    },
+    label: {
+      color: themeColors.textPrimary,
+      marginBottom: 8,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    textInput: {
+      backgroundColor: themeColors.surface,
+      color: themeColors.textPrimary,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 16,
+      fontSize: 16,
+    },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
+    categoryButton: {
+      backgroundColor: themeColors.surface,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    categoryButtonSelected: {
+      backgroundColor: themeColors.primarySoft,
+      borderColor: themeColors.primary,
+    },
+    categoryButtonText: {
+      color: themeColors.textMuted,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    categoryButtonTextSelected: {
+      color: themeColors.textPrimary,
+    },
+    buttonContainer: {
+      gap: 12,
+      marginTop: 8,
+    },
+    saveButton: {
+      marginBottom: 0,
+    },
+    discardButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    discardText: {
+      color: themeColors.textMuted,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });

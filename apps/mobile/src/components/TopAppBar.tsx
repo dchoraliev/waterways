@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Image } from 'react-native';
-import styles from '../styles/TopAppBar.styles';
+import { createTopAppBarStyles } from '../styles/TopAppBar.styles';
 import waterwaysLogo from '../../assets/logo/waterways-logo.png';
+import { useTheme } from '../contexts/ThemeContext';
 
 const TopAppBar: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createTopAppBarStyles(colors), [colors]);
+
   return (
     <View style={styles.root}>
       <View style={styles.logoImage}>

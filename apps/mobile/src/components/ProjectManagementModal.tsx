@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
   disbandProject,
 } from '../services/projectService';
 import type { Project } from '../types/project.types';
+import { useTheme } from '../contexts/ThemeContext';
+import { AppColors } from '../styles/colors';
 
 interface Props {
   visible: boolean;
@@ -40,6 +42,8 @@ const ProjectManagementModal: React.FC<Props> = ({
   onClose,
   onProjectDisbanded,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProjectManagementModalStyles(colors), [colors]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
@@ -225,99 +229,107 @@ const ProjectManagementModal: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#020617',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1D4ED8',
-  },
-  headerCloseArea: {
-    padding: 8,
-    marginRight: -8,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '600', color: '#F9FAFB' },
-  closeButton: { fontSize: 24, color: '#9CA3AF' },
-  section: { padding: 16, maxHeight: 300 },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#F9FAFB', marginBottom: 12 },
-  loader: { marginVertical: 20 },
-  memberItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#111827',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  memberInfo: { flex: 1 },
-  memberEmail: {
-    fontSize: 13,
-    color: '#60A5FA',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  memberDate: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-  memberCreatorBadge: {
-    fontSize: 10,
-    color: '#60A5FA',
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  removeIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#DC2626',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeIcon: {
-    fontSize: 18,
-    color: '#FEE2E2',
-    fontWeight: '700',
-  },
-  emptyText: {
-    fontSize: 15,
-    color: '#9CA3AF',
-    marginBottom: 6,
-    textAlign: 'center',
-    padding: 20,
-  },
-  dangerZone: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#DC2626',
-    backgroundColor: '#1A0A0A',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  dangerTitle: { fontSize: 14, fontWeight: '600', color: '#DC2626', marginBottom: 8 },
-  disbandButton: {
-    backgroundColor: '#DC2626',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  disbandButtonText: { color: '#FEE2E2', fontWeight: '600', fontSize: 14 },
-  dangerWarning: { fontSize: 11, color: '#9CA3AF', textAlign: 'center' },
-});
+const createProjectManagementModalStyles = (themeColors: AppColors) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: themeColors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: themeColors.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: themeColors.primary,
+      width: '90%',
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: themeColors.primary,
+    },
+    headerCloseArea: {
+      padding: 8,
+      marginRight: -8,
+    },
+    modalTitle: { fontSize: 16, fontWeight: '600', color: themeColors.textPrimary },
+    closeButton: { fontSize: 24, color: themeColors.textMuted },
+    section: { padding: 16, maxHeight: 300 },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: themeColors.textPrimary,
+      marginBottom: 12,
+    },
+    loader: { marginVertical: 20 },
+    memberItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: themeColors.surface,
+      borderRadius: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    memberInfo: { flex: 1 },
+    memberEmail: {
+      fontSize: 13,
+      color: themeColors.primary,
+      fontWeight: '500',
+      marginBottom: 4,
+    },
+    memberDate: { fontSize: 11, color: themeColors.textMuted, marginTop: 2 },
+    memberCreatorBadge: {
+      fontSize: 10,
+      color: themeColors.primary,
+      fontWeight: '600',
+      marginTop: 6,
+    },
+    removeIconButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: '#DC2626',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeIcon: {
+      fontSize: 18,
+      color: '#FEE2E2',
+      fontWeight: '700',
+    },
+    emptyText: {
+      fontSize: 15,
+      color: themeColors.textMuted,
+      marginBottom: 6,
+      textAlign: 'center',
+      padding: 20,
+    },
+    dangerZone: {
+      padding: 16,
+      borderTopWidth: 1,
+      borderTopColor: '#DC2626',
+      backgroundColor: themeColors.surface,
+      borderBottomLeftRadius: 16,
+      borderBottomRightRadius: 16,
+    },
+    dangerTitle: { fontSize: 14, fontWeight: '600', color: '#DC2626', marginBottom: 8 },
+    disbandButton: {
+      backgroundColor: '#DC2626',
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    disbandButtonText: { color: '#FEE2E2', fontWeight: '600', fontSize: 14 },
+    dangerWarning: { fontSize: 11, color: themeColors.textMuted, textAlign: 'center' },
+  });
 
 export default ProjectManagementModal;

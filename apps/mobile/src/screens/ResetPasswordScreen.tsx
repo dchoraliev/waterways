@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, KeyboardAvoidingView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -6,10 +6,11 @@ import {
   verifyResetPasswordOtp,
   resetPassword,
 } from '@waterways/shared/src/supabase/auth';
-import styles from '../styles/ResetPasswordScreen.styles';
+import { createResetPasswordScreenStyles } from '../styles/ResetPasswordScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
 import waterwaysLogo from '../../assets/logo/waterways-logo.png';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface ResetPasswordScreenProps {
   onPasswordChange: () => void;
@@ -20,6 +21,8 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
   onPasswordChange,
   onBackToLogin,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createResetPasswordScreenStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');

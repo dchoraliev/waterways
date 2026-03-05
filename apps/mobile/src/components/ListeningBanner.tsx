@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Text, Animated } from 'react-native';
-import { styles } from '../styles/JourneyScreen.styles';
+import { createJourneyScreenStyles } from '../styles/JourneyScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type ListeningBannerState = 'idle' | 'listening' | 'detected' | 'recording';
 
@@ -17,6 +18,8 @@ export default function ListeningBanner({
   partialTranscript,
   showAnimation = false,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createJourneyScreenStyles(colors), [colors]);
   const [pulseAnim] = useState(() => new Animated.Value(1));
   const [glowAnim] = useState(() => new Animated.Value(0));
 
@@ -69,12 +72,12 @@ export default function ListeningBanner({
 
   const backgroundColor = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#15803d', '#22c55e'], // green-700 to green-500
+    outputRange: [colors.success, colors.primary],
   });
 
   const borderColor = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['transparent', '#4ade80'], // green-400
+    outputRange: ['transparent', colors.primary],
   });
 
   return (

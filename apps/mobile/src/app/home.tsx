@@ -1,4 +1,4 @@
-// apps/mobile/src/app/home.tsx
+﻿// apps/mobile/src/app/home.tsx
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,12 +8,14 @@ import BottomNav, { BottomTabKey } from '../components/BottomNav';
 import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import InstructionsScreen from '../screens/InstructionsScreen';
-import { ROUTES } from '../constants/routes';
 import MapScreen from '../screens/MapScreen';
+import { ROUTES } from '../constants/routes';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function HomeRoute() {
   const [currentTab, setCurrentTab] = useState<BottomTabKey>('home');
   const router = useRouter();
+  const { colors } = useTheme();
 
   const handleTabPress = (tab: BottomTabKey, route: string) => {
     setCurrentTab(tab);
@@ -34,7 +36,7 @@ export default function HomeRoute() {
             onStartJourney={() => router.push(ROUTES.journey)}
             onViewRecordings={() => {
               // Navigate to the list of previous journeys
-              router.push('/review' as any);
+              router.push(ROUTES.review);
             }}
             onViewDrafts={() => router.push(ROUTES.drafts)}
           />
@@ -56,7 +58,7 @@ export default function HomeRoute() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flex: 1 }}>
         <TopAppBar />
         {renderContent()}

@@ -3,10 +3,13 @@ import { View, Text, FlatList, TouchableOpacity, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
-import styles from '../styles/DraftsScreen.styles';
+import { createDraftsScreenStyles } from '../styles/DraftsScreen.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 const DraftsScreen: React.FC = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createDraftsScreenStyles(colors), [colors]);
   const { drafts } = useDraftJourneys();
 
   const draftJourneys = drafts.filter((j) => j.status === 'draft');
