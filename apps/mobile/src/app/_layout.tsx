@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Slot, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DraftJourneysProvider } from '../hooks/useDraftJourneys';
+import * as Notifications from 'expo-notifications';
 import TripRecoveryModal from '../components/TripRecoveryModal';
 import {
   checkForIncompleteTrip,
@@ -81,6 +82,36 @@ export default function RootLayout() {
       console.error('[App] Error discarding trip:', error);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as {
+        route?: string;
+        tripId?: string;
+      };
+
+      if (!mounted || !data?.route) return;
+
+      router.push(data.route as Parameters<typeof router.push>[0]);
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) handleResponse(response);
+      })
+      .catch((error) => {
+        console.warn('[Notifications] Failed to read last response:', error);
+      });
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [router]);
 
   return (
     <SafeAreaProvider>

@@ -43,6 +43,8 @@ export default {
         usesNonExemptEncryption: false,
       },
       infoPlist: {
+        NSUserNotificationUsageDescription:
+          'We use notifications to remind you to review and submit draft journeys.',
         NSMicrophoneUsageDescription:
           'Waterways needs microphone access to record and transcribe field observations.',
         NSSpeechRecognitionUsageDescription:
@@ -62,7 +64,7 @@ export default {
       },
     },
 
-    plugins: ['expo-router', './plugins/withAndroidCompatibility.js'],
+    plugins: ['expo-router', 'expo-notifications', './plugins/withAndroidCompatibility.js'],
 
     experiments: {
       typedRoutes: true,
