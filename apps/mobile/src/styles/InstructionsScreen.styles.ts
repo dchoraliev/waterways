@@ -1,32 +1,36 @@
 import { StyleSheet } from 'react-native';
+import { AppColors, colors } from './colors';
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#020617',
-    paddingHorizontal: 15,
-  },
-  content: {
-    paddingVertical: 20,
-    paddingBottom: 50,
-  },
-  mainTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#F9FAFB',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  description: {
-    color: '#cbd5e1',
-    fontSize: 16,
-    marginBottom: 30,
-    textAlign: 'center',
-    lineHeight: 22,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    paddingBottom: 20,
-  },
-});
+export const createInstructionsScreenStyles = (themeColors: AppColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+      paddingHorizontal: 15,
+    },
+    content: {
+      paddingVertical: 20,
+      paddingBottom: 50,
+    },
+    mainTitle: {
+      fontSize: 26,
+      fontWeight: 'bold',
+      color: themeColors.textPrimary,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    description: {
+      color: themeColors.textMuted,
+      fontSize: 16,
+      marginBottom: 30,
+      textAlign: 'center',
+      lineHeight: 22,
+      borderBottomWidth: 1,
+      borderBottomColor: themeColors.border,
+      paddingBottom: 20,
+    },
+  });
+
+const styles = createInstructionsScreenStyles(colors);
 
 export default styles;

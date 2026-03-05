@@ -16,6 +16,8 @@ import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
+import { AppColors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -119,16 +121,19 @@ function clusterObservations(observations: Observation[], zoom: number): Cluster
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
-const TOKENS = {
-  bg: '#0a0a0a',
-  card: '#141414',
-  border: '#222222',
-  primary: '#3b82f6',
-  destructive: '#ef4444',
-  text: '#f5f5f5',
-  mutedText: '#737373',
-  inputBg: '#1a1a1a',
-};
+function createMapTokens(themeColors: AppColors) {
+  return {
+    bg: themeColors.background,
+    card: themeColors.surface,
+    border: themeColors.border,
+    primary: themeColors.primary,
+    destructive: themeColors.danger,
+    text: themeColors.textPrimary,
+    mutedText: themeColors.textMuted,
+    inputBg: themeColors.surface,
+    overlay: themeColors.overlay,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -151,6 +156,9 @@ const MapScreen: React.FC = () => {
   const [isSatellite, setIsSatellite] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
+  const { colors } = useTheme();
+  const tokens = useMemo(() => createMapTokens(colors), [colors]);
+  const styles = useMemo(() => createMapScreenStyles(tokens), [tokens]);
 
   // ── Fetch from Supabase using get_filtered_observations RPC ──
   useEffect(() => {
@@ -248,7 +256,7 @@ const MapScreen: React.FC = () => {
 
   function getCategoryColor(type: string): string {
     const upper = type.toUpperCase();
-    return categoryColors[upper] ?? '#38BDF8';
+    return categoryColors[upper] ?? tokens.primary;
   }
 
   return (
@@ -268,7 +276,7 @@ const MapScreen: React.FC = () => {
           <Ionicons
             name={isSatellite ? 'map-outline' : 'earth-outline'}
             size={13}
-            color={TOKENS.text}
+            color={tokens.text}
           />
           <Text style={[styles.buttonText, styles.buttonTextOutline]}>
             {isSatellite ? 'Map' : 'Satellite'}
@@ -280,7 +288,7 @@ const MapScreen: React.FC = () => {
       <View style={styles.mapFull}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={TOKENS.primary} />
+            <ActivityIndicator size="large" color={tokens.primary} />
             <Text style={styles.loadingText}>Loading observations...</Text>
           </View>
         ) : (
@@ -353,14 +361,14 @@ const MapScreen: React.FC = () => {
                 style={styles.closeButton}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close" size={18} color={TOKENS.text} />
+                <Ionicons name="close" size={18} color={tokens.text} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
               {selectedCluster?.observations.map((obs) => (
                 <View key={obs.id} style={styles.obsRow}>
                   <View style={styles.obsRowLeft}>
-                    <Ionicons name="location-outline" size={20} color={TOKENS.primary} />
+                    <Ionicons name="location-outline" size={20} color={tokens.primary} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.obsRowLabel}>
                         {obs.observation ?? `Observation #${obs.id}`}
@@ -386,107 +394,109 @@ const MapScreen: React.FC = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: TOKENS.bg },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: TOKENS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: TOKENS.border,
-  },
-  mapFull: {
-    flex: 1,
-  },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: TOKENS.text },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: TOKENS.mutedText, fontSize: 14 },
-  clusterMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: TOKENS.destructive,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  clusterMarkerLarge: { width: 52, height: 52, borderRadius: 26 },
-  clusterText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-  buttonSm: { paddingHorizontal: 10, paddingVertical: 6 },
-  buttonOutline: { borderWidth: 1, borderColor: TOKENS.border, backgroundColor: 'transparent' },
-  buttonText: { fontSize: 13, fontWeight: '500' },
-  buttonTextOutline: { color: TOKENS.text },
-  pressed: { opacity: 0.6 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheetWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  sheet: {
-    backgroundColor: TOKENS.card,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderWidth: 1,
-    borderColor: TOKENS.border,
-    maxHeight: 480,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: TOKENS.border,
-  },
-  sheetTitle: { fontSize: 16, fontWeight: '600', color: TOKENS.text },
-  sheetBody: { paddingHorizontal: 16, paddingBottom: 24, maxHeight: 380 },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TOKENS.inputBg,
-  },
-  obsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: TOKENS.border,
-  },
-  obsRowLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
-  obsRowLabel: { fontSize: 14, fontWeight: '500', color: TOKENS.text, marginBottom: 2 },
-  obsSubLabel: { fontSize: 12, color: TOKENS.mutedText, marginTop: 2 },
+function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: TOKENS.bg },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: TOKENS.card,
+      borderBottomWidth: 1,
+      borderBottomColor: TOKENS.border,
+    },
+    mapFull: {
+      flex: 1,
+    },
+    cardTitle: { fontSize: 15, fontWeight: '600', color: TOKENS.text },
+    loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    loadingText: { color: TOKENS.mutedText, fontSize: 14 },
+    clusterMarker: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: TOKENS.destructive,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    clusterMarkerLarge: { width: 52, height: 52, borderRadius: 26 },
+    clusterText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 8,
+    },
+    buttonSm: { paddingHorizontal: 10, paddingVertical: 6 },
+    buttonOutline: { borderWidth: 1, borderColor: TOKENS.border, backgroundColor: 'transparent' },
+    buttonText: { fontSize: 13, fontWeight: '500' },
+    buttonTextOutline: { color: TOKENS.text },
+    pressed: { opacity: 0.6 },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: TOKENS.overlay },
+    sheetWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+    sheet: {
+      backgroundColor: TOKENS.card,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      borderWidth: 1,
+      borderColor: TOKENS.border,
+      maxHeight: 480,
+    },
+    sheetHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: TOKENS.border,
+    },
+    sheetTitle: { fontSize: 16, fontWeight: '600', color: TOKENS.text },
+    sheetBody: { paddingHorizontal: 16, paddingBottom: 24, maxHeight: 380 },
+    closeButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: TOKENS.inputBg,
+    },
+    obsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: TOKENS.border,
+    },
+    obsRowLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
+    obsRowLabel: { fontSize: 14, fontWeight: '500', color: TOKENS.text, marginBottom: 2 },
+    obsSubLabel: { fontSize: 12, color: TOKENS.mutedText, marginTop: 2 },
 
-  singleMarker: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-});
+    singleMarker: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: '#fff',
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 4,
+    },
+  });
+}
 
 export default MapScreen;

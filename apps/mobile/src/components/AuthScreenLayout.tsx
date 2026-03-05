@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { KeyboardAvoidingView, View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import styles from '../styles/AuthScreenLayout.styles';
+import { createAuthScreenLayoutStyles } from '../styles/AuthScreenLayout.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface AuthScreenLayoutProps {
   title: string;
@@ -10,6 +11,9 @@ interface AuthScreenLayoutProps {
 }
 
 const AuthScreenLayout: React.FC<AuthScreenLayoutProps> = ({ title, subtitle, children }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createAuthScreenLayoutStyles(colors), [colors]);
+
   return (
     <SafeAreaView style={styles.root}>
       <KeyboardAvoidingView style={styles.root}>

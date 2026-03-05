@@ -1,16 +1,26 @@
-export const colors = {
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  primary: '#0F766E',
-  primaryDark: '#0F172A',
-  primarySoft: 'rgba(15,118,110,0.08)',
-  textPrimary: '#0F172A',
-  textMuted: '#64748B',
-  border: '#E2E8F0',
-  overlay: 'rgba(15,23,42,0.4)',
-  success: '#16A34A',
-  danger: '#DC2626',
+import themeColors from './theme.colors.json';
+
+export type ThemeMode = 'light' | 'dark';
+
+export type AppColors = {
+  background: string;
+  surface: string;
+  primary: string;
+  primaryDark: string;
+  primarySoft: string;
+  textPrimary: string;
+  textMuted: string;
+  border: string;
+  overlay: string;
+  success: string;
+  danger: string;
 };
+
+const typedThemeColors = themeColors as Record<ThemeMode, AppColors>;
+
+export const getThemeColors = (mode: ThemeMode): AppColors => typedThemeColors[mode];
+
+export const colors = getThemeColors('light');
 
 export const classifierTagPalette = {
   infrastructure: { bg: '#bbf7d0', text: '#1f2937' },

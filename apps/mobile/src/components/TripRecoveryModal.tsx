@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
-import styles from '../styles/TripRecoveryModal.styles';
+import { createTripRecoveryModalStyles } from '../styles/TripRecoveryModal.styles';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface IncompleteTrip {
   id: string;
@@ -24,6 +25,9 @@ export default function TripRecoveryModal({
   onResume,
   onDiscard,
 }: TripRecoveryModalProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createTripRecoveryModalStyles(colors), [colors]);
+
   // Move Date.now() call outside of render to fix purity issue
   const [currentTime] = React.useState(() => Date.now());
 

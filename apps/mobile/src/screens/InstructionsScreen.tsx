@@ -1,14 +1,20 @@
+// apps/mobile/src/screens/InstructionsScreen.tsx (The main file)
+
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
-import styles from '../styles/InstructionsScreen.styles';
+import { createInstructionsScreenStyles } from '../styles/InstructionsScreen.styles';
 import Accordion from '../components/instruction/Accodian';
 import InstructionRow from '../components/instruction/InstuctionRow';
 import VoiceCommandStructure from '../components/instruction/VoiceCommandStructure';
 import ObservationClassifiers from '../components/instruction/ObservationClassifiers';
 import ExampleCommands from '../components/instruction/ExampleCommands';
 import TipsForBestResults from '../components/instruction/TipsForBestResults';
+import { useTheme } from '../contexts/ThemeContext';
 
 const InstructionsScreen = () => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createInstructionsScreenStyles(colors), [colors]);
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>

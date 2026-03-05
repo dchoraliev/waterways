@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Slot, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { DraftJourneysProvider } from '../hooks/useDraftJourneys';
 import * as Notifications from 'expo-notifications';
 import TripRecoveryModal from '../components/TripRecoveryModal';
@@ -11,79 +14,64 @@ import {
   type IncompleteTrip,
 } from '../services/TripRecoveryService';
 
-export default function RootLayout() {
+function ThemedAppShell() {
   const router = useRouter();
+  const { mode, colors, isReady } = useTheme();
   const [incompleteTrip, setIncompleteTrip] = useState<IncompleteTrip | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
-  // Check for incomplete trips on app launch
   useEffect(() => {
-    async function checkIncompleteTrips() {
+    let mounted = true;
+
+    const checkIncompleteTrips = async () => {
       try {
-        console.log('[App] Checking for incomplete trips on launch...');
-
-        // Wait a bit for database to initialize
         await new Promise((resolve) => globalThis.setTimeout(resolve, 1000));
-
         const trip = await checkForIncompleteTrip();
 
-        if (trip) {
-          console.log('[App] Found incomplete trip, showing recovery modal');
+        if (trip && mounted) {
           setIncompleteTrip(trip);
           setShowRecoveryModal(true);
-        } else {
-          console.log('[App] No incomplete trips found');
         }
       } catch (error) {
         console.error('[App] Error checking for incomplete trips:', error);
       }
-    }
+    };
 
     void checkIncompleteTrips();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Handle Resume - go directly to journey screen
-  const handleResumeTrip = async () => {
+  const handleResumeTrip = useCallback(async () => {
     if (!incompleteTrip) return;
 
     try {
-      console.log('[App] Resuming trip:', incompleteTrip.id);
-
-      // Mark as resumed (keeps AsyncStorage keys)
       await resumeTrip(incompleteTrip.id, incompleteTrip.isReviewing);
-
-      // Hide modal
       setShowRecoveryModal(false);
       setIncompleteTrip(null);
-
-      // Navigate to journey screen (always, even if was reviewing)
       router.push('/journey');
     } catch (error) {
       console.error('[App] Error resuming trip:', error);
     }
-  };
+  }, [incompleteTrip, router]);
 
-  // Handle Discard - delete everything
-  const handleDiscardTrip = async () => {
+  const handleDiscardTrip = useCallback(async () => {
     if (!incompleteTrip) return;
 
     try {
-      console.log('[App] Discarding trip:', incompleteTrip.id);
-
-      // Delete the trip and clear all storage
       await discardIncompleteTrip(incompleteTrip.id);
-
-      // Hide modal
       setShowRecoveryModal(false);
       setIncompleteTrip(null);
-
-      console.log('[App] Trip discarded successfully');
     } catch (error) {
       console.error('[App] Error discarding trip:', error);
     }
-  };
+  }, [incompleteTrip]);
 
   useEffect(() => {
+    if (!isReady) return;
+
     let mounted = true;
 
     const handleResponse = (response: Notifications.NotificationResponse) => {
@@ -111,22 +99,34 @@ export default function RootLayout() {
       mounted = false;
       subscription.remove();
     };
-  }, [router]);
+  }, [isReady, router]);
+
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  }
 
   return (
-    <SafeAreaProvider>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <DraftJourneysProvider>
-        {/* Trip Recovery Modal - Only Resume or Discard */}
         <TripRecoveryModal
           visible={showRecoveryModal}
           trip={incompleteTrip}
           onResume={handleResumeTrip}
           onDiscard={handleDiscardTrip}
         />
-
-        {/* App Content */}
         <Slot />
       </DraftJourneysProvider>
+    </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <ThemedAppShell />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

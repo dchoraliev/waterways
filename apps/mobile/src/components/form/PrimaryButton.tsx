@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -8,6 +8,7 @@ import {
   ViewStyle,
   StyleSheet,
 } from 'react-native';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export interface PrimaryButtonProps {
   label: string;
@@ -25,6 +26,29 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   style,
 }) => {
   const isDisabled = disabled || loading;
+  const { colors } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        button: {
+          borderRadius: 8,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+        },
+        buttonDisabled: {
+          opacity: 0.6,
+        },
+        label: {
+          color: colors.background,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+      }),
+    [colors]
+  );
 
   return (
     <TouchableOpacity
@@ -33,28 +57,13 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       onPress={onPress}
       disabled={isDisabled}
     >
-      {loading ? <ActivityIndicator color="#F9FAFB" /> : <Text style={styles.label}>{label}</Text>}
+      {loading ? (
+        <ActivityIndicator color={colors.background} />
+      ) : (
+        <Text style={styles.label}>{label}</Text>
+      )}
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: 8,
-    backgroundColor: '#1D4ED8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  label: {
-    color: '#F9FAFB',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
 
 export default PrimaryButton;

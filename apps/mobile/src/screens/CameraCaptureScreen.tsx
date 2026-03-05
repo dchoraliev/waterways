@@ -5,10 +5,11 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { styles } from '../styles/CameraCaptureScreen.styles';
+import { createCameraCaptureScreenStyles } from '../styles/CameraCaptureScreen.styles';
 import { showToast } from '../utils/toast';
 import { attachLocalMediaToObservation } from '../services/CameraMediaService';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
+import { useTheme } from '../contexts/ThemeContext';
 
 type Mode = 'picture' | 'video';
 
@@ -31,6 +32,8 @@ async function persistToDocuments(srcUri: string, fileName: string) {
 
 export default function CameraCaptureScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createCameraCaptureScreenStyles(colors), [colors]);
   const params = useLocalSearchParams<{
     observationId?: string | string[];
     secondsElapsed?: string | string[];

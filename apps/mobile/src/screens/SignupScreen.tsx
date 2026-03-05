@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, KeyboardAvoidingView, TouchableOpacity, Image } from 'react-native';
 import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import styles from '../styles/SignupScreen.styles';
+import { createSignupScreenStyles } from '../styles/SignupScreen.styles';
 import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
 import waterwaysLogo from '../../assets/logo/waterways-logo.png';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface SignupScreenProps {
   onSignupSuccess: () => void;
@@ -30,6 +31,8 @@ const parseFullName = (fullName: string): { firstName: string; lastName: string 
 };
 
 const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLogin }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createSignupScreenStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

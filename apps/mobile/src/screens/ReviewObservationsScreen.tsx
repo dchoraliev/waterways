@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { useAuth } from '../hooks/useAuth';
-import styles from '../styles/ReviewObservationsScreen.styles';
+import { createReviewObservationsScreenStyles } from '../styles/ReviewObservationsScreen.styles';
 import { classifierTagCategoryMap, classifierTagPalette } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 
 type ObservationRow = {
   id: string;
@@ -34,6 +35,8 @@ type ObservationUI = {
 
 const ReviewObservationsScreen = () => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createReviewObservationsScreenStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { userId, loading: authLoading } = useAuth();
 
@@ -171,7 +174,7 @@ const ReviewObservationsScreen = () => {
         <Text style={styles.sectionTitle}>Observations</Text>
 
         {loading ? (
-          <ActivityIndicator color="#94a3b8" />
+          <ActivityIndicator color={colors.textMuted} />
         ) : observations.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No observations recorded</Text>

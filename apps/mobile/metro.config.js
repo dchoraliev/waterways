@@ -15,4 +15,39 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// 3. Mirror tsconfig/workspace aliases so Metro can resolve shared imports at runtime.
+config.resolver.extraNodeModules = {
+  ...(config.resolver.extraNodeModules || {}),
+  '@waterways/shared': path.resolve(monorepoRoot, 'packages/shared'),
+  '@shared': path.resolve(monorepoRoot, 'packages/shared/src'),
+};
+
+// 4. Resolve shared aliases to concrete files inside packages/shared/src.
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === '@waterways/shared') {
+    const mappedPath = path.resolve(monorepoRoot, 'packages/shared/src/index.ts');
+    return context.resolveRequest(context, mappedPath, platform);
+  }
+
+  if (moduleName.startsWith('@waterways/shared/src/')) {
+    const mappedPath = path.resolve(
+      monorepoRoot,
+      'packages/shared/src',
+      moduleName.replace('@waterways/shared/src/', '')
+    );
+    return context.resolveRequest(context, mappedPath, platform);
+  }
+
+  if (moduleName.startsWith('@shared/')) {
+    const mappedPath = path.resolve(
+      monorepoRoot,
+      'packages/shared/src',
+      moduleName.replace('@shared/', '')
+    );
+    return context.resolveRequest(context, mappedPath, platform);
+  }
+
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

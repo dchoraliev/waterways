@@ -1,184 +1,139 @@
 import { StyleSheet } from 'react-native';
+import { AppColors, colors } from './colors';
 
-export const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
+export const createCameraCaptureScreenStyles = (themeColors: AppColors) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: themeColors.background },
 
-  // Header
-  header: {
-    paddingTop: 8,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '300',
-  },
-  placeholder: {
-    width: 32,
-  },
+    header: {
+      paddingTop: 14,
+      paddingHorizontal: 16,
+      paddingBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: { color: themeColors.textPrimary, fontSize: 18, fontWeight: '800' },
+    closeBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: 10,
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    closeText: { color: themeColors.textPrimary, fontWeight: '700' },
+    placeholder: { width: 32, height: 32 },
 
-  // Permission
-  permissionWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#000000',
-  },
-  permissionText: {
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 20,
-    textAlign: 'center',
-    fontSize: 16,
-  },
+    permissionWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+    permissionText: { color: themeColors.textMuted, marginBottom: 12, textAlign: 'center' },
 
-  primaryBtn: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  primaryBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
+    primaryBtn: {
+      backgroundColor: themeColors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+    },
+    primaryBtnText: { color: '#fff', fontWeight: '800' },
 
-  // Camera
-  cameraWrap: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  camera: {
-    flex: 1,
-    borderRadius: 0,
-  },
+    cameraWrap: { flex: 1 },
+    camera: { flex: 1, marginHorizontal: 12 },
+    controls: { padding: 14 },
 
-  // Controls
-  controls: {
-    paddingBottom: 40,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#000000',
-  },
+    modeRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+    modeLabelRow: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginBottom: 16 },
+    modeLabelBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+    modeLabelText: { color: themeColors.textMuted, fontWeight: '700', fontSize: 12 },
+    modeLabelActive: { color: themeColors.textPrimary },
+    modeBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 14,
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      alignItems: 'center',
+    },
+    modeBtnActive: { backgroundColor: themeColors.primarySoft, borderColor: themeColors.primary },
+    modeBtnText: { color: themeColors.textPrimary, fontWeight: '800' },
 
-  // Mode Labels (PHOTO/VIDEO text above buttons)
-  modeLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-    gap: 40,
-  },
-  modeLabelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  modeLabelText: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  modeLabelActive: {
-    color: '#FFD60A',
-  },
+    captureBtn: {
+      backgroundColor: themeColors.primary,
+      paddingVertical: 12,
+      borderRadius: 16,
+      alignItems: 'center',
+    },
+    captureBtnText: { color: '#fff', fontWeight: '900' },
 
-  // Capture Row (main button area)
-  captureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
+    captureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sideSpace: { width: 70, minHeight: 24, alignItems: 'center', justifyContent: 'center' },
+    captureButtonContainer: { alignItems: 'center', justifyContent: 'center' },
+    captureButtonOuter: {
+      width: 78,
+      height: 78,
+      borderRadius: 39,
+      borderWidth: 4,
+      borderColor: '#ffffff',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.12)',
+    },
+    captureButtonInner: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      backgroundColor: '#ffffff',
+    },
+    recordingOuter: {
+      borderColor: '#ef4444',
+    },
+    recordingInner: {
+      width: 32,
+      height: 32,
+      borderRadius: 6,
+      backgroundColor: '#ef4444',
+    },
 
-  sideSpace: {
-    width: 60,
-    alignItems: 'center',
-  },
+    recordingIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      gap: 6,
+    },
+    recordingDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#ef4444',
+    },
+    recordingText: {
+      color: '#ffffff',
+      fontWeight: '700',
+      fontSize: 11,
+    },
+    processingText: {
+      color: themeColors.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
 
-  // Main Capture Button (iPhone-style)
-  captureButtonContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captureButtonOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-  },
-  captureButtonInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FFFFFF',
-  },
+    videoRow: { flexDirection: 'row', gap: 10 },
+    secondaryBtn: {
+      paddingVertical: 12,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: 1,
+      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    secondaryBtnText: { color: themeColors.textPrimary, fontWeight: '800' },
+  });
 
-  // Recording state styles
-  recordingOuter: {
-    backgroundColor: 'rgba(239, 68, 68, 0.3)',
-    borderColor: '#EF4444',
-  },
-  recordingInner: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#EF4444',
-  },
+const styles = createCameraCaptureScreenStyles(colors);
 
-  // Recording indicator (REC text + dot)
-  recordingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-  },
-  recordingText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  // Processing indicator
-  processingText: {
-    color: '#FFD60A',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});
+export { styles };

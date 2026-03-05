@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ViewStyle,
   StyleSheet,
 } from 'react-native';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export interface TextInputFieldProps extends TextInputProps {
   label?: string;
@@ -22,43 +23,52 @@ const TextInputField: React.FC<TextInputFieldProps> = ({
   style,
   ...inputProps
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          marginTop: 16,
+        },
+        label: {
+          fontSize: 13,
+          color: colors.textPrimary,
+          marginBottom: 4,
+        },
+        input: {
+          borderRadius: 8,
+          backgroundColor: colors.background,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          fontSize: 14,
+          color: colors.textPrimary,
+        },
+        errorText: {
+          marginTop: 4,
+          fontSize: 11,
+          color: colors.danger,
+        },
+      }),
+    [colors]
+  );
+
   const showError = Boolean(errorText);
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TextInput style={[styles.input, style]} placeholderTextColor="#6C727F" {...inputProps} />
+      <TextInput
+        style={[styles.input, style]}
+        placeholderTextColor={colors.textMuted}
+        {...inputProps}
+      />
 
       {showError ? <Text style={styles.errorText}>{errorText}</Text> : null}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginTop: 16,
-  },
-  label: {
-    fontSize: 13,
-    color: '#E5E7EB',
-    marginBottom: 4,
-  },
-  input: {
-    borderRadius: 8,
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#111827',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#F9FAFB',
-  },
-  errorText: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#F97373',
-  },
-});
 
 export default TextInputField;
