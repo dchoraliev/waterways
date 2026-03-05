@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, PropsWithChildren } from 'react';
 import type { Observation } from '../components/ObservationCard';
 import { getObservationsByTripId } from '../database/ObservationManager';
+
+import {
+  cancelDraftReminder,
+  cancelDraftRemindersForTrips,
+  scheduleDraftReminder,
+} from '../services/DraftReminderService';
+
 import { getMediaById } from '../database/MediaManager';
 
 export type JourneyStatus = 'draft' | 'submitted';
@@ -51,13 +58,33 @@ export const DraftJourneysProvider: React.FC<PropsWithChildren> = ({ children })
       next[index] = draft;
       return next;
     });
+
+    if (draft.status === 'draft') {
+      const createdAt = draft.createdAt > 0 ? draft.createdAt : Date.now();
+      void scheduleDraftReminder(draft.id, createdAt).catch((error) => {
+        console.warn('[DraftReminder] Failed to schedule reminder:', error);
+      });
+    } else {
+      void cancelDraftReminder(draft.id).catch((error) => {
+        console.warn('[DraftReminder] Failed to cancel reminder:', error);
+      });
+    }
   };
 
   const removeDraft = (id: string) => {
     setDrafts((prev) => prev.filter((j) => j.id !== id));
+    void cancelDraftReminder(id).catch((error) => {
+      console.warn('[DraftReminder] Failed to cancel reminder:', error);
+    });
   };
 
-  const clearDrafts = () => setDrafts([]);
+  const clearDrafts = () => {
+    const ids = drafts.map((journey) => journey.id);
+    setDrafts([]);
+    void cancelDraftRemindersForTrips(ids).catch((error) => {
+      console.warn('[DraftReminder] Failed to cancel reminders:', error);
+    });
+  };
 
   const getDraftById = (id: string) => drafts.find((journey) => journey.id === id);
 

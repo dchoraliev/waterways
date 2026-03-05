@@ -8,6 +8,7 @@ import { Mic, MapPin, Camera as CameraIcon, CheckCircle2, Circle, Info } from 'l
 import * as Location from 'expo-location';
 import { Camera as ExpoCamera } from 'expo-camera';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
+import * as Notifications from 'expo-notifications';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import styles from '../styles/PermissionsScreen.styles';
@@ -23,6 +24,7 @@ const PermissionsScreen: React.FC = () => {
   const [micPermission, setMicPermission] = useState<PermissionState>('prompt');
   const [locationPermission, setLocationPermission] = useState<PermissionState>('prompt');
   const [cameraPermission, setCameraPermission] = useState<PermissionState>('prompt');
+  const [notificationPermission, setNotificationPermission] = useState<PermissionState>('prompt');
 
   const [checking, setChecking] = useState(true);
   const [skipping, setSkipping] = useState(false);
@@ -49,6 +51,9 @@ const PermissionsScreen: React.FC = () => {
 
         const cam = await ExpoCamera.getCameraPermissionsAsync();
         setCameraPermission(mapExpoStatus(cam.status));
+
+        const notificationSettings = await Notifications.getPermissionsAsync();
+        setNotificationPermission(mapExpoStatus(notificationSettings.status));
       } catch (e) {
         console.log('Error checking permissions', e);
       } finally {
@@ -91,6 +96,15 @@ const PermissionsScreen: React.FC = () => {
       setCameraPermission(mapExpoStatus(status));
     } catch (e) {
       console.log('Error requesting camera permission', e);
+    }
+  };
+
+  const requestNotifications = async () => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      setNotificationPermission(mapExpoStatus(status));
+    } catch (e) {
+      console.log('Error requesting notification permission', e);
     }
   };
 
@@ -170,9 +184,20 @@ const PermissionsScreen: React.FC = () => {
           label="Photo & video"
         />
 
+        {/* Notifications (optional) */}
+        <PermissionCard
+          icon={<Info size={20} />}
+          title="Notifications"
+          description="Get reminders to review and submit draft journeys."
+          state={notificationPermission}
+          required={false}
+          onRequest={requestNotifications}
+          label="Draft reminders"
+        />
+
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Microphone and location are required. Camera is optional.
+            Microphone and location are required. Camera and notifications are optional.
           </Text>
 
           <TouchableOpacity
