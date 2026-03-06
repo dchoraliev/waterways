@@ -116,6 +116,7 @@ eas_build_ios_development:
         --non-interactive
         --platform ios
         --profile development
+        --clear-credentials
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: always
