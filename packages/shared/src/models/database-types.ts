@@ -12,7 +12,7 @@ export type Database = {
         Row: {
           color: string | null;
           id: number;
-          is_active: boolean | null;
+          is_active: boolean;
           is_fallback: boolean;
           keywords: string[] | null;
           type: string;
@@ -20,7 +20,7 @@ export type Database = {
         Insert: {
           color?: string | null;
           id?: number;
-          is_active?: boolean | null;
+          is_active?: boolean;
           is_fallback?: boolean;
           keywords?: string[] | null;
           type: string;
@@ -28,7 +28,7 @@ export type Database = {
         Update: {
           color?: string | null;
           id?: number;
-          is_active?: boolean | null;
+          is_active?: boolean;
           is_fallback?: boolean;
           keywords?: string[] | null;
           type?: string;

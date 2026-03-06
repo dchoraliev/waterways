@@ -235,12 +235,12 @@ export async function fetchObservationCategories(): Promise<
     color: string | null;
     keywords: string[] | null;
     is_fallback: boolean;
+    is_active: boolean;
   }>
 > {
   const { data, error } = await supabase
     .from('observation_categories')
-    .select('id, type, color, keywords, is_fallback')
-    .eq('is_active', true)
+    .select('id, type, color, keywords, is_fallback, is_active')
     .order('type');
 
   if (error) {
@@ -270,7 +270,6 @@ export async function fetchObservationCategories(): Promise<
             .filter((k: string) => k.length > 0);
         }
       }
-
       return null;
     })(),
   }));

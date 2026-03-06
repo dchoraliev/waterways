@@ -14,7 +14,16 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
-import { Download, User, LogOut, LogIn, ChevronDown, CalendarDays, Info } from 'lucide-react';
+import {
+  Download,
+  User,
+  LogOut,
+  LogIn,
+  ChevronDown,
+  CalendarDays,
+  Info,
+  Shield,
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { SignIn } from '../pages/SignIn';
 import { SignUp } from '../pages/SignUp';
@@ -34,6 +43,7 @@ interface HeaderProps {
   onClearUserFilter?: () => void;
   onDailyReportClick?: () => void;
   projects?: Array<{ id: string; name: string }>;
+  onAdminClick?: () => void;
 }
 
 type AuthDialog = 'signin' | 'signup' | null;
@@ -45,6 +55,7 @@ export function Header({
   mapAlertMessage,
   onExportCSV,
   onAccountClick,
+  onAdminClick,
   filteredUserId,
   filteredUserName,
   onClearUserFilter,
@@ -66,8 +77,9 @@ export function Header({
     try {
       await signOut();
       toast.success('Successfully signed out');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign out');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Failed to sign out');
     }
   };
 
@@ -275,6 +287,19 @@ export function Header({
                       <p className="text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
+                  {user?.role === 'admin' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          onAdminClick?.();
+                        }}
+                      >
+                        <Shield className="size-4 mr-2" />
+                        Admin
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="size-4 mr-2" />

@@ -31,6 +31,7 @@ import { getMediaCountsForTrip } from '../services/MediaQueries';
 import { useWakeWord } from '../hooks/useWakeWord';
 import type { WakeWordMatch } from '../utils/stringMatching';
 import { useTheme } from '../contexts/ThemeContext';
+import { ROUTES } from '../constants/routes';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -416,7 +417,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     await wakeWordStopRef.current();
 
     router.push({
-      pathname: '/camera-capture',
+      pathname: ROUTES.cameraCapture,
       params: { observationId: lastObservationId },
     });
   }, [lastObservationId, router]);

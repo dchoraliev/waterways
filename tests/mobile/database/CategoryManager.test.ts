@@ -13,7 +13,6 @@ jest.mock('@shared/supabase/client', () => ({
   },
 }));
 
-// IMPORTANT: must match the module path that CategoryManager resolves './db' to
 jest.mock('@waterways/mobile/src/database/db', () => ({
   getDatabase: jest.fn(),
 }));
@@ -30,6 +29,22 @@ describe('CategoryManager', () => {
     getAllAsync: jest.Mock;
   };
 
+  const buildSupabaseChain = (finalResult: { data: unknown; error: unknown }) => {
+    const orderMock = jest.fn().mockResolvedValue(finalResult);
+    const eqMock = jest.fn().mockReturnValue({
+      order: orderMock,
+    });
+    const selectMock = jest.fn().mockReturnValue({
+      eq: eqMock,
+    });
+
+    (supabase.from as jest.Mock).mockReturnValue({
+      select: selectMock,
+    });
+
+    return { selectMock, eqMock, orderMock };
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -38,33 +53,26 @@ describe('CategoryManager', () => {
       getAllAsync: mockGetAllAsync,
     };
 
-    // getDatabase() likely has a specific return type (expo-sqlite database)
-    // so we cast our DbLike to that return type without using `any`.
     mockGetDatabase.mockResolvedValue(
       db as unknown as Awaited<ReturnType<typeof dbModule.getDatabase>>
     );
-
-    // default supabase mock
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn(),
-    });
   });
 
   describe('syncCategoriesFromSupabase', () => {
     test('logs error and returns early when Supabase returns an error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      const selectMock = jest.fn().mockResolvedValue({
+      const { selectMock, eqMock, orderMock } = buildSupabaseChain({
         data: null,
         error: { message: 'boom' },
       });
 
-      (supabase.from as jest.Mock).mockReturnValue({ select: selectMock });
-
       await syncCategoriesFromSupabase();
 
       expect(supabase.from).toHaveBeenCalledWith('observation_categories');
-      expect(selectMock).toHaveBeenCalledWith('*');
+      expect(selectMock).toHaveBeenCalledWith('id, type, color, keywords, is_fallback');
+      expect(eqMock).toHaveBeenCalledWith('is_active', true);
+      expect(orderMock).toHaveBeenCalledWith('is_fallback', { ascending: true });
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(mockGetDatabase).not.toHaveBeenCalled();
@@ -74,12 +82,10 @@ describe('CategoryManager', () => {
     });
 
     test('does nothing to DB if Supabase returns null/undefined data and no error', async () => {
-      const selectMock = jest.fn().mockResolvedValue({
+      buildSupabaseChain({
         data: null,
         error: null,
       });
-
-      (supabase.from as jest.Mock).mockReturnValue({ select: selectMock });
 
       await syncCategoriesFromSupabase();
 
@@ -107,32 +113,27 @@ describe('CategoryManager', () => {
         },
       ];
 
-      const selectMock = jest.fn().mockResolvedValue({
+      buildSupabaseChain({
         data: supabaseData,
         error: null,
       });
 
-      (supabase.from as jest.Mock).mockReturnValue({ select: selectMock });
-
       await syncCategoriesFromSupabase();
 
-      // DB should be opened
       expect(mockGetDatabase).toHaveBeenCalledTimes(1);
 
-      // First call: delete all existing categories
       expect(mockRunAsync).toHaveBeenNthCalledWith(1, 'DELETE FROM categories');
 
-      // Next calls: insert/replace for each row (2 rows => 2 inserts)
       expect(mockRunAsync).toHaveBeenNthCalledWith(
         2,
-        `INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)`,
-        ['1', 'ENVIRONMENTAL', false, '#00FF00', 'algae,foam'] // keywords array -> "algae,foam"
+        'INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)',
+        ['1', 'ENVIRONMENTAL', false, '#00FF00', 'algae,foam']
       );
 
       expect(mockRunAsync).toHaveBeenNthCalledWith(
         3,
-        `INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)`,
-        ['2', 'OTHERS', true, '#999999', null] // keywords null -> null
+        'INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)',
+        ['2', 'OTHERS', true, '#999999', null]
       );
 
       consoleLogSpy.mockRestore();
@@ -145,23 +146,20 @@ describe('CategoryManager', () => {
           type: 'INFRASTRUCTURE',
           is_fallback: false,
           color: '#123456',
-          // keywords intentionally missing
         },
       ];
 
-      const selectMock = jest.fn().mockResolvedValue({
+      buildSupabaseChain({
         data: supabaseData,
         error: null,
       });
-
-      (supabase.from as jest.Mock).mockReturnValue({ select: selectMock });
 
       await syncCategoriesFromSupabase();
 
       expect(mockRunAsync).toHaveBeenNthCalledWith(1, 'DELETE FROM categories');
       expect(mockRunAsync).toHaveBeenNthCalledWith(
         2,
-        `INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)`,
+        'INSERT OR REPLACE INTO categories (id, name, is_fallback, color, keywords) VALUES (?, ?, ?, ?, ?)',
         ['3', 'INFRASTRUCTURE', false, '#123456', null]
       );
     });
