@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginPage } from './LoginPage';
 import { DEFAULT_FILTER_OPTIONS, type FilterOptions } from '@waterways/shared';
+import { AdminPage } from './Admin';
 
 const ObservationDetails = lazy(() =>
   import('../components/ObservationDetails').then((module) => ({
@@ -75,6 +76,7 @@ export function Dashboard() {
   const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const observationsCacheRef = useRef<
     Map<
@@ -277,6 +279,10 @@ export function Dashboard() {
     }
   };
 
+  const handleAdminClick = () => {
+    setAdminOpen(true);
+  };
+
   // Admin action handlers
   const handleDeleteObservation = async (observationId: string) => {
     try {
@@ -396,6 +402,14 @@ export function Dashboard() {
     );
   }
 
+  if (adminOpen) {
+    return (
+      <Suspense fallback={null}>
+        <AdminPage onClose={() => setAdminOpen(false)} />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
@@ -405,6 +419,7 @@ export function Dashboard() {
         mapAlertMessage={topMapAlertMessage}
         onExportCSV={handleExportCSV}
         onAccountClick={handleAccountClick}
+        onAdminClick={handleAdminClick}
         filteredUserId={filteredUserId}
         filteredUserName={filteredUserName}
         onClearUserFilter={() => setFilteredUserId(null)}

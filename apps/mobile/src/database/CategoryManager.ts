@@ -4,7 +4,11 @@ import { getDatabase } from './db';
 
 export async function syncCategoriesFromSupabase(): Promise<void> {
   // Fetch categories from Supabase
-  const { data, error } = await supabase.from('observation_categories').select('*');
+  const { data, error } = await supabase
+    .from('observation_categories')
+    .select('id, type, color, keywords, is_fallback')
+    .eq('is_active', true)
+    .order('is_fallback', { ascending: true });
 
   if (error) {
     console.error('[CategoryManager] Error fetching categories from Supabase:', error);

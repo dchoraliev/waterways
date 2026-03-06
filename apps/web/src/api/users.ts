@@ -13,9 +13,10 @@ export async function banUser(userId: string): Promise<UpdateResult> {
       return { success: false, error: error.message, data };
     }
     return { success: true, data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Exception banning user (RPC):', err);
-    return { success: false, error: err?.message ?? String(err) };
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
   }
 }
 

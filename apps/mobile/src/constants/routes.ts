@@ -11,6 +11,7 @@ export const ROUTES = {
   review: '/review' as const,
   drafts: '/drafts' as const,
   projects: '/projects' as const,
+  cameraCapture: '/camera-capture' as const,
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

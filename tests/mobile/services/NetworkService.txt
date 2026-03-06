@@ -1,0 +1,231 @@
+// tests/mobile/services/NetworkService.test.ts
+
+/////// This is test file which needs certain fix, will convert it to test when it is ready. //////
+
+type NetworkState = { isConnected?: boolean | null };
+
+const mockGetNetworkStateAsync = jest.fn();
+const mockAddNetworkStateListener = jest.fn();
+
+const mockSyncCategoriesFromSupabase = jest.fn();
+const mockPrepareCategoryKeywordMapping = jest.fn();
+
+let listenerCallback: ((state: NetworkState) => void) | undefined;
+let removeMock: jest.Mock;
+
+// ---- Mocks ----
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: (...args: unknown[]) => mockGetNetworkStateAsync(...args),
+  addNetworkStateListener: (cb: (state: NetworkState) => void) => {
+    listenerCallback = cb;
+    return mockAddNetworkStateListener(cb);
+  },
+}));
+
+jest.mock('@waterways/mobile/src/database/CategoryManager', () => ({
+  syncCategoriesFromSupabase: (...args: unknown[]) => mockSyncCategoriesFromSupabase(...args),
+}));
+
+jest.mock('@waterways/mobile/src/services/ObservationClassifier', () => ({
+  prepareCategoryKeywordMapping: (...args: unknown[]) => mockPrepareCategoryKeywordMapping(...args),
+}));
+
+async function importFreshService() {
+  jest.resetModules();
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('@waterways/mobile/src/services/NetworkService') as typeof import('@waterways/mobile/src/services/NetworkService');
+}
+
+// allow async callbacks/promises to settle
+async function flush(times = 2) {
+  for (let i = 0; i < times; i += 1) {
+    await Promise.resolve();
+  }
+}
+
+describe('NetworkService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    listenerCallback = undefined;
+
+    removeMock = jest.fn();
+    mockAddNetworkStateListener.mockReturnValue({ remove: removeMock });
+
+    mockGetNetworkStateAsync.mockResolvedValue({ isConnected: null });
+
+    mockSyncCategoriesFromSupabase.mockResolvedValue(undefined);
+    mockPrepareCategoryKeywordMapping.mockResolvedValue(undefined);
+  });
+
+  test('getIsOnline returns true when isConnected === true', async () => {
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: true });
+
+    const service = await importFreshService();
+    await expect(service.getIsOnline()).resolves.toBe(true);
+
+    expect(mockGetNetworkStateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test('getIsOnline returns false when isConnected is false/null/undefined', async () => {
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
+
+    const service = await importFreshService();
+    await expect(service.getIsOnline()).resolves.toBe(false);
+
+    mockGetNetworkStateAsync.mockResolvedValueOnce(null);
+    await expect(service.getIsOnline()).resolves.toBe(false);
+
+    mockGetNetworkStateAsync.mockResolvedValueOnce(undefined);
+    await expect(service.getIsOnline()).resolves.toBe(false);
+  });
+
+  test('startNetworkListener is idempotent (does not double subscribe)', async () => {
+    const service = await importFreshService();
+
+    await service.startNetworkListener();
+    await service.startNetworkListener();
+
+    expect(mockAddNetworkStateListener).toHaveBeenCalledTimes(1);
+    expect(service.isListening()).toBe(true);
+  });
+
+  test('startNetworkListener performs initial online check and runs category sync + mapping when online', async () => {
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: true });
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    await flush();
+
+    expect(mockGetNetworkStateAsync).toHaveBeenCalledTimes(1);
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+    expect(mockPrepareCategoryKeywordMapping).toHaveBeenCalledTimes(1);
+    expect(mockAddNetworkStateListener).toHaveBeenCalledTimes(1);
+    expect(service.isListening()).toBe(true);
+  });
+
+  test('startNetworkListener performs initial offline check and does not run sync when offline', async () => {
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    await flush();
+
+    expect(mockGetNetworkStateAsync).toHaveBeenCalledTimes(1);
+    expect(mockSyncCategoriesFromSupabase).not.toHaveBeenCalled();
+    expect(mockPrepareCategoryKeywordMapping).not.toHaveBeenCalled();
+    expect(mockAddNetworkStateListener).toHaveBeenCalledTimes(1);
+  });
+
+  test('listener callback triggers syncCategories only on change (offline -> online)', async () => {
+    // initial state offline
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    expect(listenerCallback).toBeTruthy();
+
+    // no change (still offline) -> nothing
+    if (listenerCallback) listenerCallback({ isConnected: false });
+    await flush();
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(0);
+
+    // change to online -> sync categories
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+
+    // NOTE: based on your current implementation, the listener path does not call mapping
+    expect(mockPrepareCategoryKeywordMapping).toHaveBeenCalledTimes(0);
+
+    // no change (still online) -> no additional sync
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+  });
+
+  test('stopNetworkListener removes subscription and clears listening state', async () => {
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    expect(service.isListening()).toBe(true);
+
+    service.stopNetworkListener();
+
+    expect(removeMock).toHaveBeenCalledTimes(1);
+    expect(service.isListening()).toBe(false);
+
+    // safe to call twice
+    service.stopNetworkListener();
+    expect(removeMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('performAutoSyncTaskOnce runs category sync + mapping', async () => {
+    const service = await importFreshService();
+
+    await service.performAutoSyncTaskOnce();
+    await flush();
+
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+    expect(mockPrepareCategoryKeywordMapping).toHaveBeenCalledTimes(1);
+  });
+
+  test('inSyncingFlight prevents overlapping category sync calls', async () => {
+    let resolveCategories: (() => void) | undefined;
+
+    mockSyncCategoriesFromSupabase.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCategories = resolve;
+        })
+    );
+
+    // initial offline -> subscribe
+    mockGetNetworkStateAsync.mockResolvedValueOnce({ isConnected: false });
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    // trigger online (starts sync and gets stuck)
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+
+    // flap quickly; should not start another call while first in flight
+    if (listenerCallback) listenerCallback({ isConnected: false });
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+
+    // finish first sync
+    if (resolveCategories) resolveCategories();
+    await flush(4);
+
+    // after completion, a new offline->online change can trigger again
+    if (listenerCallback) listenerCallback({ isConnected: false });
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(2);
+  });
+
+  test('startNetworkListener handles getNetworkStateAsync throwing and still subscribes', async () => {
+    mockGetNetworkStateAsync.mockRejectedValueOnce(new Error('no network yet'));
+
+    const service = await importFreshService();
+    await service.startNetworkListener();
+
+    expect(mockAddNetworkStateListener).toHaveBeenCalledTimes(1);
+    expect(service.isListening()).toBe(true);
+
+    // First online event should still trigger category sync
+    if (listenerCallback) listenerCallback({ isConnected: true });
+    await flush();
+
+    expect(mockSyncCategoriesFromSupabase).toHaveBeenCalledTimes(1);
+  });
+});
