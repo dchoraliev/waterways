@@ -1,18 +1,9 @@
 // apps/mobile/src/screens/MapScreen.tsx
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Pressable,
-  Modal,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
@@ -24,98 +15,12 @@ import { useTheme } from '../contexts/ThemeContext';
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Observation {
   id: string;
-  type: string; // derived from categories[0]
-  date: string; // derived from created_at
+  type: string;
+  date: string;
   latitude: number;
   longitude: number;
   observation: string | null;
   projectName: string | null;
-}
-
-interface Cluster {
-  id: string;
-  lat: number;
-  lng: number;
-  isCluster: boolean;
-  observations: Observation[];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Clustering
-// ─────────────────────────────────────────────────────────────────────────────
-function getPixelDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-  zoom: number
-): number {
-  const scale = 256 * Math.pow(2, zoom);
-  const x1 = (lng1 + 180) * (scale / 360);
-  const y1 =
-    ((1 -
-      Math.log(Math.tan((lat1 * Math.PI) / 180) + 1 / Math.cos((lat1 * Math.PI) / 180)) / Math.PI) /
-      2) *
-    scale;
-  const x2 = (lng2 + 180) * (scale / 360);
-  const y2 =
-    ((1 -
-      Math.log(Math.tan((lat2 * Math.PI) / 180) + 1 / Math.cos((lat2 * Math.PI) / 180)) / Math.PI) /
-      2) *
-    scale;
-  return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-}
-
-function clusterObservations(observations: Observation[], zoom: number): Cluster[] {
-  const clusterRadius = zoom >= 12 ? 40 : zoom >= 9 ? 60 : zoom >= 6 ? 80 : 100;
-  const clusters: Cluster[] = [];
-  const processed = new Set<string>();
-
-  observations.forEach((obs) => {
-    if (processed.has(obs.id)) return;
-
-    const cluster: Cluster = {
-      id: obs.id,
-      lat: obs.latitude,
-      lng: obs.longitude,
-      observations: [obs],
-      isCluster: false,
-    };
-
-    observations.forEach((other) => {
-      if (processed.has(other.id) || obs.id === other.id) return;
-
-      const distance = getPixelDistance(
-        obs.latitude,
-        obs.longitude,
-        other.latitude,
-        other.longitude,
-        zoom
-      );
-
-      if (distance < clusterRadius) {
-        cluster.observations.push(other);
-        processed.add(other.id);
-      }
-    });
-
-    if (cluster.observations.length > 1) {
-      cluster.lat =
-        cluster.observations.reduce((s, o) => s + o.latitude, 0) / cluster.observations.length;
-      cluster.lng =
-        cluster.observations.reduce((s, o) => s + o.longitude, 0) / cluster.observations.length;
-      cluster.isCluster = true;
-      cluster.id = cluster.observations
-        .map((o) => o.id)
-        .sort()
-        .join('-');
-    }
-
-    processed.add(obs.id);
-    clusters.push(cluster);
-  });
-
-  return clusters;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,31 +41,296 @@ function createMapTokens(themeColors: AppColors) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants
+// Leaflet HTML builder
 // ─────────────────────────────────────────────────────────────────────────────
-const INITIAL_REGION: Region = {
-  latitude: 39.5,
-  longitude: -98.35,
-  latitudeDelta: 40,
-  longitudeDelta: 60,
-};
+function buildLeafletHTML(
+  observations: Observation[],
+  categoryColors: Record<string, string>,
+  isDark: boolean
+): string {
+  const obsJson = JSON.stringify(
+    observations.map((o) => ({
+      id: o.id,
+      lat: o.latitude,
+      lng: o.longitude,
+      type: o.type,
+      date: o.date,
+      observation: o.observation,
+      projectName: o.projectName,
+      color: categoryColors[o.type?.toUpperCase()] ?? '#38BDF8',
+    }))
+  );
+
+  const bgColor = isDark ? '#0a0a0a' : '#f5f5f5';
+  const cardBg = isDark ? '#141414' : '#ffffff';
+  const textColor = isDark ? '#f5f5f5' : '#111111';
+  const mutedColor = isDark ? '#737373' : '#666666';
+  const borderColor = isDark ? '#222222' : '#e0e0e0';
+  const closeBg = isDark ? '#1a1a1a' : '#f0f0f0';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: ${bgColor}; }
+    #map { width: 100%; height: 100%; }
+
+    .custom-cluster {
+      background: #ef4444;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .custom-cluster-large { background: #dc2626; }
+
+    #sheet {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: ${cardBg};
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      border: 1px solid ${borderColor};
+      max-height: 480px;
+      z-index: 9999;
+      flex-direction: column;
+    }
+    #sheet.visible { display: flex; }
+    #sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid ${borderColor};
+      flex-shrink: 0;
+    }
+    #sheet-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: ${textColor};
+      font-family: -apple-system, sans-serif;
+    }
+    #sheet-close {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: ${closeBg};
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: ${textColor};
+    }
+    #sheet-body {
+      overflow-y: auto;
+      padding: 0 16px 24px;
+      flex: 1;
+    }
+    .obs-row {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid ${borderColor};
+      gap: 12px;
+    }
+    .obs-pin { color: #3b82f6; font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+    .obs-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: ${textColor};
+      font-family: -apple-system, sans-serif;
+      margin-bottom: 2px;
+    }
+    .obs-sub {
+      font-size: 12px;
+      color: ${mutedColor};
+      font-family: -apple-system, sans-serif;
+      margin-top: 2px;
+    }
+    #backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 9998;
+    }
+    #backdrop.visible { display: block; }
+
+    /* Override leaflet cluster styles */
+    .marker-cluster { background: transparent !important; box-shadow: none !important; }
+    .marker-cluster div { background: transparent !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="backdrop" onclick="closeSheet()"></div>
+  <div id="sheet">
+    <div id="sheet-header">
+      <span id="sheet-title"></span>
+      <button id="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+
+  <script>
+    var observations = ${obsJson};
+    var currentTileLayer;
+
+    var map = L.map('map', {
+      center: [39.5, -98.35],
+      zoom: 4,
+      zoomControl: true,
+    });
+
+    function addTileLayer(satellite) {
+      if (currentTileLayer) map.removeLayer(currentTileLayer);
+      if (satellite) {
+        currentTileLayer = L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          { attribution: '© Esri', maxZoom: 19 }
+        ).addTo(map);
+      } else {
+        currentTileLayer = L.tileLayer(
+          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          { attribution: '© OpenStreetMap contributors', maxZoom: 19, subdomains: ['a','b','c'] }
+        ).addTo(map);
+      }
+    }
+
+    addTileLayer(false);
+
+    function createClusterIcon(cluster) {
+      var count = cluster.getChildCount();
+      var size = count >= 10 ? 52 : 44;
+      var cls = count >= 10 ? 'custom-cluster custom-cluster-large' : 'custom-cluster';
+      return L.divIcon({
+        html: '<div class="' + cls + '" style="width:' + size + 'px;height:' + size + 'px;">' + count + '</div>',
+        className: '',
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+    }
+
+    var markerGroup = L.markerClusterGroup({
+      iconCreateFunction: createClusterIcon,
+      maxClusterRadius: 80,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      disableClusteringAtZoom: 15,
+    });
+
+    // Store obs by marker so we can show in sheet
+    var markerObsMap = [];
+
+    observations.forEach(function(obs) {
+      var icon = L.divIcon({
+        html: '<div style="width:22px;height:22px;border-radius:50%;background:' + obs.color + ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.35);font-size:10px;color:#fff;">●</div>',
+        className: '',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+
+      var marker = L.marker([obs.lat, obs.lng], { icon: icon });
+      marker._obsData = obs;
+      marker.on('click', function() {
+        showSheet([this._obsData]);
+      });
+      markerGroup.addLayer(marker);
+    });
+
+    // Show sheet when a cluster is clicked (if zoomed in enough)
+    markerGroup.on('clusterclick', function(e) {
+      var zoom = map.getZoom();
+      if (zoom >= 14) {
+        var markers = e.layer.getAllChildMarkers();
+        var obsData = markers.map(function(m) { return m._obsData; });
+        showSheet(obsData);
+      }
+      // otherwise default zoom-in behavior handles it
+    });
+
+    map.addLayer(markerGroup);
+
+    // Listen for satellite toggle from React Native
+    window.addEventListener('message', function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if (msg.type === 'SET_SATELLITE') {
+          addTileLayer(msg.value);
+        }
+      } catch(err) {}
+    });
+
+    // Also handle Android
+    document.addEventListener('message', function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if (msg.type === 'SET_SATELLITE') {
+          addTileLayer(msg.value);
+        }
+      } catch(err) {}
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showSheet(obs) {
+      var title = obs.length > 1 ? obs.length + ' Observations' : 'Observation #' + obs[0].id;
+      document.getElementById('sheet-title').textContent = title;
+      var body = document.getElementById('sheet-body');
+      body.innerHTML = obs.map(function(o) {
+        return '<div class="obs-row">' +
+          '<span class="obs-pin">📍</span>' +
+          '<div>' +
+            '<div class="obs-label">' + escapeHtml(o.observation || 'Observation #' + o.id) + '</div>' +
+            '<div class="obs-sub">' + escapeHtml(o.type) + ' · ' + escapeHtml(o.date) + '</div>' +
+            (o.projectName ? '<div class="obs-sub">Project: ' + escapeHtml(o.projectName) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('sheet').classList.add('visible');
+      document.getElementById('backdrop').classList.add('visible');
+    }
+
+    function closeSheet() {
+      document.getElementById('sheet').classList.remove('visible');
+      document.getElementById('backdrop').classList.remove('visible');
+    }
+  </script>
+</body>
+</html>`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 const MapScreen: React.FC = () => {
-  const mapRef = useRef<MapView>(null);
+  const webViewRef = useRef<WebView>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [zoom, setZoom] = useState(4);
   const [isSatellite, setIsSatellite] = useState(false);
-  const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
   const { colors } = useTheme();
   const tokens = useMemo(() => createMapTokens(colors), [colors]);
   const styles = useMemo(() => createMapScreenStyles(tokens), [tokens]);
+  const isDark = colors.background === '#0a0a0a';
 
-  // ── Fetch from Supabase using get_filtered_observations RPC ──
+  // ── Fetch observations ──
   useEffect(() => {
     async function fetchObservations() {
       try {
@@ -210,6 +380,7 @@ const MapScreen: React.FC = () => {
     fetchObservations();
   }, []);
 
+  // ── Fetch category colors ──
   useEffect(() => {
     async function fetchCategories() {
       const { data } = await supabase
@@ -228,36 +399,17 @@ const MapScreen: React.FC = () => {
     fetchCategories();
   }, []);
 
-  const clusters = useMemo(() => clusterObservations(observations, zoom), [observations, zoom]);
-
-  const handleRegionChangeComplete = (region: Region) => {
-    const approxZoom = Math.round(Math.log2(360 / region.longitudeDelta));
-    setZoom(approxZoom);
+  // ── Toggle satellite via WebView postMessage ──
+  const handleSatelliteToggle = () => {
+    const next = !isSatellite;
+    setIsSatellite(next);
+    webViewRef.current?.postMessage(JSON.stringify({ type: 'SET_SATELLITE', value: next }));
   };
 
-  const handleMarkerPress = (cluster: Cluster) => {
-    if (cluster.isCluster && cluster.observations.length > 10) {
-      const nextZoom = Math.min(zoom + 2, 18);
-      const latDelta = 360 / Math.pow(2, nextZoom);
-      const lngDelta = 360 / Math.pow(2, nextZoom);
-      mapRef.current?.animateToRegion(
-        {
-          latitude: cluster.lat,
-          longitude: cluster.lng,
-          latitudeDelta: latDelta,
-          longitudeDelta: lngDelta,
-        },
-        400
-      );
-    } else {
-      setSelectedCluster(cluster);
-    }
-  };
-
-  function getCategoryColor(type: string): string {
-    const upper = type.toUpperCase();
-    return categoryColors[upper] ?? tokens.primary;
-  }
+  const html = useMemo(
+    () => buildLeafletHTML(observations, categoryColors, isDark),
+    [observations, categoryColors, isDark]
+  );
 
   return (
     <SafeAreaView style={styles.root} edges={['left', 'right', 'top']}>
@@ -271,7 +423,7 @@ const MapScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.85}
           style={[styles.button, styles.buttonOutline, styles.buttonSm]}
-          onPress={() => setIsSatellite((prev) => !prev)}
+          onPress={handleSatelliteToggle}
         >
           <Ionicons
             name={isSatellite ? 'map-outline' : 'earth-outline'}
@@ -284,7 +436,7 @@ const MapScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Full screen map */}
+      {/* Map */}
       <View style={styles.mapFull}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -292,101 +444,19 @@ const MapScreen: React.FC = () => {
             <Text style={styles.loadingText}>Loading observations...</Text>
           </View>
         ) : (
-          <MapView
-            ref={mapRef}
-            style={StyleSheet.absoluteFillObject}
-            initialRegion={INITIAL_REGION}
-            mapType={isSatellite ? 'satellite' : 'standard'}
-            onRegionChangeComplete={handleRegionChangeComplete}
-            showsUserLocation
-            showsCompass
-          >
-            {clusters.map((cluster) =>
-              cluster.isCluster ? (
-                <Marker
-                  key={cluster.id}
-                  coordinate={{ latitude: cluster.lat, longitude: cluster.lng }}
-                  onPress={() => handleMarkerPress(cluster)}
-                  tracksViewChanges={false}
-                >
-                  <View
-                    style={[
-                      styles.clusterMarker,
-                      cluster.observations.length >= 10 && styles.clusterMarkerLarge,
-                    ]}
-                  >
-                    <Text style={styles.clusterText}>{cluster.observations.length}</Text>
-                  </View>
-                </Marker>
-              ) : (
-                <Marker
-                  key={cluster.id}
-                  coordinate={{ latitude: cluster.lat, longitude: cluster.lng }}
-                  onPress={() => handleMarkerPress(cluster)}
-                  tracksViewChanges={false}
-                >
-                  <View
-                    style={[
-                      styles.singleMarker,
-                      { backgroundColor: getCategoryColor(cluster.observations[0].type) },
-                    ]}
-                  >
-                    <Ionicons name="location" size={12} color="#fff" />
-                  </View>
-                </Marker>
-              )
-            )}
-          </MapView>
+          <WebView
+            ref={webViewRef}
+            source={{ html }}
+            style={styles.webView}
+            originWhitelist={['*']}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState={false}
+            scrollEnabled={false}
+            allowsInlineMediaPlayback
+          />
         )}
       </View>
-
-      {/* Modal — unchanged */}
-      <Modal
-        visible={!!selectedCluster}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedCluster(null)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedCluster(null)} />
-        <View style={styles.sheetWrap}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>
-                {selectedCluster && selectedCluster.observations.length > 1
-                  ? `${selectedCluster.observations.length} Observations`
-                  : `Observation #${selectedCluster?.observations[0]?.id}`}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setSelectedCluster(null)}
-                style={styles.closeButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="close" size={18} color={tokens.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
-              {selectedCluster?.observations.map((obs) => (
-                <View key={obs.id} style={styles.obsRow}>
-                  <View style={styles.obsRowLeft}>
-                    <Ionicons name="location-outline" size={20} color={tokens.primary} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.obsRowLabel}>
-                        {obs.observation ?? `Observation #${obs.id}`}
-                      </Text>
-                      <Text style={styles.obsSubLabel}>
-                        {obs.type} · {obs.date}
-                      </Text>
-                      {obs.projectName && (
-                        <Text style={styles.obsSubLabel}>Project: {obs.projectName}</Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -407,27 +477,11 @@ function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
       borderBottomWidth: 1,
       borderBottomColor: TOKENS.border,
     },
-    mapFull: {
-      flex: 1,
-    },
+    mapFull: { flex: 1 },
+    webView: { flex: 1 },
     cardTitle: { fontSize: 15, fontWeight: '600', color: TOKENS.text },
     loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     loadingText: { color: TOKENS.mutedText, fontSize: 14 },
-    clusterMarker: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: TOKENS.destructive,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.4,
-      shadowRadius: 4,
-      elevation: 5,
-    },
-    clusterMarkerLarge: { width: 52, height: 52, borderRadius: 26 },
-    clusterText: { color: '#fff', fontWeight: '600', fontSize: 15 },
     button: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -440,62 +494,6 @@ function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
     buttonOutline: { borderWidth: 1, borderColor: TOKENS.border, backgroundColor: 'transparent' },
     buttonText: { fontSize: 13, fontWeight: '500' },
     buttonTextOutline: { color: TOKENS.text },
-    pressed: { opacity: 0.6 },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: TOKENS.overlay },
-    sheetWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-    sheet: {
-      backgroundColor: TOKENS.card,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      borderWidth: 1,
-      borderColor: TOKENS.border,
-      maxHeight: 480,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: TOKENS.border,
-    },
-    sheetTitle: { fontSize: 16, fontWeight: '600', color: TOKENS.text },
-    sheetBody: { paddingHorizontal: 16, paddingBottom: 24, maxHeight: 380 },
-    closeButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: TOKENS.inputBg,
-    },
-    obsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: TOKENS.border,
-    },
-    obsRowLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
-    obsRowLabel: { fontSize: 14, fontWeight: '500', color: TOKENS.text, marginBottom: 2 },
-    obsSubLabel: { fontSize: 12, color: TOKENS.mutedText, marginTop: 2 },
-
-    singleMarker: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      borderWidth: 2,
-      borderColor: '#fff',
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-      elevation: 4,
-    },
   });
 }
 
