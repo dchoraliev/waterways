@@ -44,7 +44,7 @@ install_dependencies:
       - node_modules/
       - apps/*/node_modules/
       - packages/*/node_modules/
-    expire_in: 1 hour
+    expire_in: 2 hour
     untracked: false
 
 # Job 2: Lint (runs in parallel with type-check and test)
