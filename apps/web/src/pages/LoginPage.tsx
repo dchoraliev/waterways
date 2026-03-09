@@ -100,17 +100,17 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
         )}
 
         {/* Forgot Password Form Container */}
-        <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-0 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-70px)] overflow-y-auto">
+        <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-8 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-50px)] overflow-hidden">
           {/* Header */}
           <div className="content-stretch flex flex-col gap-[8px] items-start relative shrink-0 w-full">
-            <div className="h-[48px] relative shadow-[0px_4px_8px_0px_rgba(0,0,0,0.15)] shrink-0 w-full">
+            <div className="h-[48px] relative shrink-0 w-full">
               <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[48px] left-1/2 text-[48px] text-center text-nowrap text-white top-[-5px] -translate-x-1/2 whitespace-pre">
                 Waterways
               </p>
             </div>
-            <div className="h-[28px] opacity-90 relative shadow-[0px_3px_6px_0px_rgba(0,0,0,0.12)] shrink-0 w-full">
-              <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[28px] left-1/2 text-[20px] text-center text-nowrap text-white top-[-2.2px] -translate-x-1/2 whitespace-pre">
-                Navigate your water journey
+            <div className="h-[20px] opacity-90 relative shrink-0 w-full">
+              <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[20px] left-1/2 text-[16px] text-center text-nowrap text-white top-[-1px] -translate-x-1/2 whitespace-pre">
+                Navigate Your Water Journey
               </p>
             </div>
           </div>
@@ -212,17 +212,17 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
         )}
 
         {/* Sign Up Form Container */}
-        <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-0 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-70px)] overflow-y-auto">
+        <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-8 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-50px)] overflow-hidden">
           {/* Header */}
           <div className="content-stretch flex flex-col gap-[8px] items-start relative shrink-0 w-full">
-            <div className="h-[48px] relative shadow-[0px_4px_8px_0px_rgba(0,0,0,0.15)] shrink-0 w-full">
+            <div className="h-[48px] relative shrink-0 w-full">
               <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[48px] left-1/2 text-[48px] text-center text-nowrap text-white top-[-5px] -translate-x-1/2 whitespace-pre">
                 Waterways
               </p>
             </div>
-            <div className="h-[28px] opacity-90 relative shadow-[0px_3px_6px_0px_rgba(0,0,0,0.12)] shrink-0 w-full">
-              <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[28px] left-1/2 text-[20px] text-center text-nowrap text-white top-[-2.2px] -translate-x-1/2 whitespace-pre">
-                Navigate your water journey
+            <div className="h-[20px] opacity-90 relative shrink-0 w-full">
+              <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[20px] left-1/2 text-[16px] text-center text-nowrap text-white top-[-1px] -translate-x-1/2 whitespace-pre">
+                Navigate Your Water Journey
               </p>
             </div>
           </div>
@@ -353,17 +353,17 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
       )}
 
       {/* Sign In Form Container */}
-      <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-0 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-70px)] overflow-y-auto">
+      <div className="absolute box-border content-stretch flex flex-col gap-[32px] items-start left-1/2 -translate-x-1/2 pb-8 pt-[24px] px-[24px] top-[35px] w-[448px] max-h-[calc(100vh-50px)] overflow-hidden">
         {/* Header */}
         <div className="content-stretch flex flex-col gap-[8px] items-start relative shrink-0 w-full">
-          <div className="h-[48px] relative shadow-[0px_4px_8px_0px_rgba(0,0,0,0.15)] shrink-0 w-full">
+          <div className="h-[48px] relative shrink-0 w-full">
             <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[48px] left-1/2 text-[48px] text-center text-nowrap text-white top-[-5px] -translate-x-1/2 whitespace-pre">
               Waterways
             </p>
           </div>
-          <div className="h-[28px] opacity-90 relative shadow-[0px_3px_6px_0px_rgba(0,0,0,0.12)] shrink-0 w-full">
-            <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[28px] left-1/2 text-[20px] text-center text-nowrap text-white top-[-2.2px] -translate-x-1/2 whitespace-pre">
-              Navigate your water journey
+          <div className="h-[20px] opacity-90 relative shrink-0 w-full">
+            <p className="absolute font-['Arimo',_sans-serif] font-normal leading-[20px] left-1/2 text-[16px] text-center text-nowrap text-white top-[-1px] -translate-x-1/2 whitespace-pre">
+              Navigate Your Water Journey
             </p>
           </div>
         </div>
