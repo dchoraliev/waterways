@@ -88,10 +88,10 @@ function ThemedAppShell() {
     const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
 
     Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
+      .then((response: Notifications.NotificationResponse | null) => {
         if (response) handleResponse(response);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.warn('[Notifications] Failed to read last response:', error);
       });
 

@@ -66,7 +66,7 @@ type ObservationRow = {
   location: string | null; // EWKB geography hex string
   user_id: string | null;
   trip_id: string | null;
-  created_at: string;
+  created_at: string | null;
   observation: string | null;
   categories: string[] | null;
   observation_media: string[] | null;
@@ -219,12 +219,17 @@ export async function fetchObservations(
  * Fetch observations from the last 24 hours from Supabase.
  * Returns observations sorted by creation time (most recent first).
  */
-export async function fetchDailyObservations(): Promise<Observation[]> {
+export async function fetchDailyObservations(
+  params: Pick<ObservationQueryParams, 'userId'> = {}
+): Promise<Observation[]> {
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
   const oneDayAgoISO = oneDayAgo.toISOString();
 
-  const result = await fetchObservations({ since: oneDayAgoISO });
+  const result = await fetchObservations({
+    since: oneDayAgoISO,
+    userId: params.userId,
+  });
   return result.observations;
 }
 
@@ -253,6 +258,7 @@ export async function fetchObservationCategories(): Promise<
   // Process the data to ensure keywords are properly parsed
   const processedData = (data || []).map((category) => ({
     ...category,
+    is_active: category.is_active ?? true,
     keywords: (() => {
       if (!category.keywords) return null;
       if (Array.isArray(category.keywords)) return category.keywords;

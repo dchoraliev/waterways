@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FilterOptions } from '@waterways/shared';
+import type { AdminObservationUserOption } from '../api/users';
+import { AdminUserFilter } from './AdminUserFilter';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -38,9 +40,10 @@ interface HeaderProps {
   mapAlertMessage?: string;
   onExportCSV: () => void;
   onAccountClick?: () => void;
-  filteredUserId?: string | null;
-  filteredUserName?: string;
-  onClearUserFilter?: () => void;
+  adminUserOptions?: AdminObservationUserOption[];
+  selectedAdminUserId?: string | null;
+  onAdminUserFilterChange?: (userId: string | null) => void;
+  adminUserFilterLoading?: boolean;
   onDailyReportClick?: () => void;
   projects?: Array<{ id: string; name: string }>;
   onAdminClick?: () => void;
@@ -56,9 +59,10 @@ export function Header({
   onExportCSV,
   onAccountClick,
   onAdminClick,
-  filteredUserId,
-  filteredUserName,
-  onClearUserFilter,
+  adminUserOptions,
+  selectedAdminUserId,
+  onAdminUserFilterChange,
+  adminUserFilterLoading,
   onDailyReportClick,
   projects,
 }: HeaderProps) {
@@ -131,66 +135,55 @@ export function Header({
     setMapAlertOpen(false);
   };
 
+  const showAdminUserFilter = Boolean(user?.isAdmin && onAdminUserFilterChange);
+  // Hide projects filter when admin user filter is active — the row has no room for both
+  const showProjectFilter = Boolean(user && !showAdminUserFilter);
+
   return (
     <>
       <header className="bg-blue-200 border-b">
-        <div className="px-4 py-3 flex items-center gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 shrink-0 min-w-0">
-            <WaveIcon className="size-8 text-blue-700" />
-            <h1 className="whitespace-nowrap">Waterways Observation System</h1>
-            <button
-              ref={mapAlertTriggerRef}
-              type="button"
-              aria-label="Map data status"
-              aria-hidden={!mapAlertMessage}
-              className={
-                mapAlertMessage
-                  ? 'size-8 flex items-center justify-center rounded-md text-amber-600 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500'
-                  : 'size-8 invisible'
-              }
-              onMouseEnter={mapAlertMessage ? openMapAlert : undefined}
-              onMouseLeave={mapAlertMessage ? closeMapAlert : undefined}
-              onFocus={mapAlertMessage ? openMapAlert : undefined}
-              onBlur={mapAlertMessage ? closeMapAlert : undefined}
-            >
-              <Info className="size-4" />
-            </button>
-          </div>
+        <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
+          {/* Logo + title */}
+          <WaveIcon className="size-8 text-blue-700 shrink-0" />
+          <h1 className="shrink-0 whitespace-nowrap">Waterways Observation System</h1>
+          <button
+            ref={mapAlertTriggerRef}
+            type="button"
+            aria-label="Map data status"
+            aria-hidden={!mapAlertMessage}
+            className={
+              mapAlertMessage
+                ? 'size-8 flex items-center justify-center rounded-md text-amber-600 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 shrink-0'
+                : 'size-8 invisible shrink-0'
+            }
+            onMouseEnter={mapAlertMessage ? openMapAlert : undefined}
+            onMouseLeave={mapAlertMessage ? closeMapAlert : undefined}
+            onFocus={mapAlertMessage ? openMapAlert : undefined}
+            onBlur={mapAlertMessage ? closeMapAlert : undefined}
+          >
+            <Info className="size-4" />
+          </button>
 
-          <div className="flex-1 min-w-0 flex items-center gap-3">
-            {filteredUserId && filteredUserName && (
-              <div className="hidden lg:flex items-center gap-2 text-sm bg-blue-100 text-blue-900 px-3 py-1.5 rounded-md">
-                <User className="size-4" />
-                <span className="whitespace-nowrap">Filtering by: {filteredUserName}</span>
-                <button
-                  onClick={onClearUserFilter}
-                  className="hover:bg-blue-200 rounded-full size-5 flex items-center justify-center"
-                >
-                  ×
-                </button>
-              </div>
+          {/* Filters — grow to fill available space */}
+          <div className="flex items-center gap-2 flex-1 flex-wrap min-w-0">
+            {showAdminUserFilter && (
+              <AdminUserFilter
+                users={adminUserOptions ?? []}
+                selectedUserId={selectedAdminUserId ?? null}
+                onChange={onAdminUserFilterChange!}
+                loading={adminUserFilterLoading ?? false}
+              />
             )}
-          </div>
 
-          <div className="flex items-center gap-2 min-w-0">
             <DateRangeFilter
               dateFrom={filters.dateFrom}
               dateTo={filters.dateTo}
-              onChange={({ dateFrom, dateTo }) =>
-                onFilterChange({
-                  ...filters,
-                  dateFrom,
-                  dateTo,
-                })
-              }
+              onChange={({ dateFrom, dateTo }) => onFilterChange({ ...filters, dateFrom, dateTo })}
             />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-[165px] justify-between bg-background font-normal"
-                >
+                <Button variant="outline" size="sm" className="shrink-0 bg-background font-normal">
                   {getTypeFilterLabel()}
                   <ChevronDown className="size-4 ml-2 opacity-50" />
                 </Button>
@@ -223,15 +216,15 @@ export function Header({
               placeholder="Search keywords..."
               value={filters.keywords}
               onChange={(e) => handleFilterChange('keywords', e.target.value)}
-              className="w-[220px] bg-background"
+              className="min-w-[160px] flex-1 bg-background h-8 text-sm"
             />
 
-            {user && (
+            {showProjectFilter && (
               <Select
                 value={filters.myProjects || 'all'}
                 onValueChange={(value: string) => handleFilterChange('myProjects', value)}
               >
-                <SelectTrigger className="w-[170px] bg-background">
+                <SelectTrigger size="sm" className="w-[160px] bg-background shrink-0">
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999]">
@@ -250,23 +243,21 @@ export function Header({
                 </SelectContent>
               </Select>
             )}
+          </div>
 
-            <Button onClick={onDailyReportClick} variant="outline" size="sm" className="shrink-0">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button onClick={onDailyReportClick} variant="outline" size="sm">
               <CalendarDays className="size-4 mr-2" />
               Daily Report
             </Button>
-            <Button onClick={handleExportClick} variant="outline" size="sm" className="shrink-0">
+            <Button onClick={handleExportClick} variant="outline" size="sm">
               <Download className="size-4 mr-2" />
               Export CSV
             </Button>
 
             {!user && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => onAccountClick?.()}
-                className="shrink-0"
-              >
+              <Button variant="default" size="sm" onClick={() => onAccountClick?.()}>
                 <LogIn className="size-4 mr-2" />
                 Login
               </Button>
@@ -275,7 +266,7 @@ export function Header({
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="shrink-0">
+                  <Button variant="outline" size="sm">
                     <User className="size-4 mr-2" />
                     {visibleUserName}
                   </Button>
@@ -290,11 +281,7 @@ export function Header({
                   {user?.role === 'admin' && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => {
-                          onAdminClick?.();
-                        }}
-                      >
+                      <DropdownMenuItem onClick={() => onAdminClick?.()}>
                         <Shield className="size-4 mr-2" />
                         Admin
                       </DropdownMenuItem>

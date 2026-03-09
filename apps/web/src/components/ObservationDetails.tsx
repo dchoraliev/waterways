@@ -2,7 +2,7 @@ import { Observation } from '../types/observation';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
-import { Calendar, Clock, MapPin, User, X, UserX, Trash2, Filter, Trash } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, X, UserX, Trash2, Trash } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -13,7 +13,6 @@ interface ObservationDetailsProps {
   onClose: () => void;
   onDeleteObservation?: (observationId: string) => void;
   onDeleteAllUserObservations?: (userId: string) => void;
-  onFilterByUser?: (userId: string) => void;
   onBanUser?: (userId: string) => void;
 }
 
@@ -23,7 +22,6 @@ export function ObservationDetails({
   onClose,
   onDeleteObservation,
   onDeleteAllUserObservations,
-  onFilterByUser,
   onBanUser,
 }: ObservationDetailsProps) {
   const { user } = useAuth();
@@ -45,12 +43,6 @@ export function ObservationDetails({
       onDeleteObservation?.(observation.id);
       onClose();
     }
-  };
-
-  const handleFilterByUser = () => {
-    onFilterByUser?.(observation.userId);
-    toast.success(`Filtering observations by ${observation.observerName}`);
-    onClose();
   };
 
   const handleDeleteAllUserPosts = () => {
@@ -92,15 +84,6 @@ export function ObservationDetails({
           <div className="p-4 bg-gray-50 border-b border-gray-200">
             <p className="text-xs text-muted-foreground mb-2">Admin Actions</p>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleFilterByUser}
-                className="w-full justify-start"
-              >
-                <Filter className="size-4 mr-2" />
-                Filter by User
-              </Button>
               <Button
                 size="sm"
                 variant="outline"

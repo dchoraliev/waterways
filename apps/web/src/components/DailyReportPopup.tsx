@@ -1,39 +1,50 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { fetchDailyObservations } from '../api/observations';
 import { Observation } from '../types/observation';
 import { Clock, MapPin, User, FileText, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DailyReportPopupProps {
   open: boolean;
   onClose: () => void;
+  selectedUserId?: string | null;
 }
 
-export function DailyReportPopup({ open, onClose }: DailyReportPopupProps) {
+export function DailyReportPopup({ open, onClose, selectedUserId = null }: DailyReportPopupProps) {
+  const { user, refreshSession } = useAuth();
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const filteredUserId = user?.isAdmin ? (selectedUserId ?? undefined) : undefined;
+
+  const loadDailyObservations = useCallback(
+    async (refreshAuth = false) => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (refreshAuth) {
+          await refreshSession();
+        }
+
+        const data = await fetchDailyObservations({ userId: filteredUserId });
+        setObservations(data);
+      } catch (err) {
+        console.error('Failed to load daily observations:', err);
+        setError('Failed to load observations. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filteredUserId, refreshSession]
+  );
 
   useEffect(() => {
     if (open) {
-      loadDailyObservations();
+      void loadDailyObservations(true);
     }
-  }, [open]);
-
-  const loadDailyObservations = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchDailyObservations();
-      setObservations(data);
-    } catch (err) {
-      console.error('Failed to load daily observations:', err);
-      setError('Failed to load observations. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadDailyObservations, open]);
 
   const formatTimeAgo = (createdAt: string) => {
     const observationDate = new Date(createdAt);
@@ -57,6 +68,9 @@ export function DailyReportPopup({ open, onClose }: DailyReportPopupProps) {
             Daily Report
           </DialogTitle>
           <DialogDescription>Observations added in the last 24 hours</DialogDescription>
+          {filteredUserId && (
+            <p className="text-sm text-muted-foreground">Filtered to the selected user</p>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">
@@ -71,7 +85,7 @@ export function DailyReportPopup({ open, onClose }: DailyReportPopupProps) {
             <div className="text-center py-12 text-red-600">
               <p>{error}</p>
               <button
-                onClick={loadDailyObservations}
+                onClick={() => void loadDailyObservations(true)}
                 className="mt-2 text-blue-600 hover:underline"
               >
                 Try again
