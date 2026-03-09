@@ -66,10 +66,7 @@ export function ObservationDetails({
         {/* Header */}
         <div className="flex items-start justify-between p-4 border-b border-gray-200">
           <div className="flex-1">
-            <h2 className="font-semibold text-lg text-neutral-950">{observation.location.name}</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {observation.type} recorded by {observation.observerName}
-            </p>
+            <h2 className="font-semibold text-lg text-neutral-950">{observation.type}</h2>
           </div>
           <button
             onClick={onClose}
@@ -133,7 +130,15 @@ export function ObservationDetails({
               <Calendar className="size-4 mt-0.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">Date</p>
-                <p className="text-sm">{observation.date}</p>
+                <p className="text-sm">
+                  {(() => {
+                    const dateObj = new Date(observation.createdAt);
+                    const month = dateObj.getUTCMonth() + 1;
+                    const day = dateObj.getUTCDate();
+                    const year = dateObj.getUTCFullYear();
+                    return `${month}/${day}/${year}`;
+                  })()}
+                </p>
               </div>
             </div>
 
@@ -141,7 +146,14 @@ export function ObservationDetails({
               <Clock className="size-4 mt-0.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">Time</p>
-                <p className="text-sm">{observation.timestamp}</p>
+                <p className="text-sm">
+                  {(() => {
+                    const dateObj = new Date(observation.createdAt);
+                    const hours = String(dateObj.getUTCHours()).padStart(2, '0');
+                    const minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
+                    return `${hours}:${minutes} UTC`;
+                  })()}
+                </p>
               </div>
             </div>
 
@@ -157,8 +169,7 @@ export function ObservationDetails({
               <MapPin className="size-4 mt-0.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">Location</p>
-                <p className="text-sm">{observation.location.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm">
                   {observation.location.lat.toFixed(4)}, {observation.location.lng.toFixed(4)}
                 </p>
               </div>
@@ -167,13 +178,16 @@ export function ObservationDetails({
 
           <Separator />
 
-          <div>
-            <h3 className="font-medium mb-2">Project</h3>
-            <p className="text-sm">{observation.projectName}</p>
-          </div>
+          {observation.projectName &&
+            observation.projectName.toLowerCase() !== 'untitled project' && (
+              <div>
+                <h3 className="font-medium mb-2">Project</h3>
+                <p className="text-sm">{observation.projectName}</p>
+              </div>
+            )}
 
           <div>
-            <h3 className="font-medium mb-2">Observation</h3>
+            <h3 className="font-medium mb-2">Description</h3>
             <p className="text-sm">{observation.observation}</p>
           </div>
 

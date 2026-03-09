@@ -119,6 +119,7 @@ export function MapView({
   const [isSatellite, setIsSatellite] = useState(false);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [categories, setCategories] = useState<ObservationCategory[]>([]);
+  const [, setClickedObservationId] = useState<string | null>(null);
 
   // Load categories from database
   useEffect(() => {
@@ -344,29 +345,58 @@ export function MapView({
           </div>
 
           <div className="p-2 space-y-2 overflow-y-auto max-h-[400px]">
-            {selectedCluster.observations.map((obs) => (
-              <button
-                key={obs.id}
-                onClick={() => {
-                  setSelectedCluster(null);
-                  onObservationClick(obs);
-                }}
-                className="w-full text-left p-3 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Color indicator dot */}
-                  <div
-                    className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-                    style={{ backgroundColor: getObservationTypeColor(obs, categories) }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-neutral-950 font-medium mb-1">Observation #{obs.id}</p>
-                    <p className="text-sm text-gray-600">Type: {obs.type}</p>
-                    <p className="text-sm text-gray-600">Date: {obs.date}</p>
+            {selectedCluster.observations.map((obs) => {
+              const createdAtDate = new Date(obs.createdAt);
+              const formattedDate = Number.isNaN(createdAtDate.getTime())
+                ? obs.date
+                : `${createdAtDate.getUTCMonth() + 1}/${createdAtDate.getUTCDate()}/${createdAtDate.getUTCFullYear()}`;
+
+              let observationNumber = null;
+              if (obs.projectName && obs.projectName.toLowerCase() !== 'untitled project') {
+                const projectObservations = observations
+                  .filter((o) => o.projectName === obs.projectName)
+                  .sort(
+                    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                  );
+
+                observationNumber = projectObservations.findIndex((o) => o.id === obs.id) + 1;
+              }
+
+              return (
+                <button
+                  key={obs.id}
+                  onClick={() => {
+                    setClickedObservationId(obs.id);
+                    setSelectedCluster(null);
+                    onObservationClick(obs);
+                  }}
+                  className="w-full text-left p-3 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Color indicator dot */}
+                    <div
+                      className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
+                      style={{ backgroundColor: getObservationTypeColor(obs, categories) }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      {obs.projectName &&
+                      obs.projectName.toLowerCase() !== 'untitled project' &&
+                      observationNumber ? (
+                        <>
+                          <p className="text-neutral-950 font-medium mb-1">
+                            {obs.projectName} #{observationNumber}
+                          </p>
+                          <p className="text-sm text-gray-600">{obs.type}</p>
+                        </>
+                      ) : (
+                        <p className="text-neutral-950 font-medium mb-1">{obs.type}</p>
+                      )}
+                      <p className="text-sm text-gray-600">{formattedDate}</p>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

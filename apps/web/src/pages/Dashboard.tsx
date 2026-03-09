@@ -447,6 +447,7 @@ export function Dashboard() {
     );
   }
 
+  if (user) console.log('Dashboard passing projects:', user.projects);
   if (adminOpen) {
     return (
       <Suspense fallback={null}>
