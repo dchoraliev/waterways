@@ -3,12 +3,14 @@ import { createPortal } from 'react-dom';
 import { DayPicker, type DateRange } from 'react-day-picker';
 import { CalendarDays } from 'lucide-react';
 import { Button } from './ui/button';
+import { cn } from './ui/utils';
 import 'react-day-picker/dist/style.css';
 
 interface DateRangeFilterProps {
   dateFrom: string;
   dateTo: string;
   onChange: (next: { dateFrom: string; dateTo: string }) => void;
+  className?: string;
 }
 
 interface DateRangePreset {
@@ -115,7 +117,7 @@ function getDefaultPresets(): DateRangePreset[] {
   ];
 }
 
-export function DateRangeFilter({ dateFrom, dateTo, onChange }: DateRangeFilterProps) {
+export function DateRangeFilter({ dateFrom, dateTo, onChange, className }: DateRangeFilterProps) {
   const triggerRef = useRef<globalThis.HTMLButtonElement | null>(null);
   const popoverRef = useRef<globalThis.HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -198,7 +200,8 @@ export function DateRangeFilter({ dateFrom, dateTo, onChange }: DateRangeFilterP
       <Button
         ref={triggerRef}
         variant="outline"
-        className="w-[240px] justify-between bg-background"
+        size="sm"
+        className={cn('w-[240px] justify-between bg-background', className)}
         onClick={handleToggle}
       >
         <span className="truncate">{formatRangeLabel(appliedRange)}</span>

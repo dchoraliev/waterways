@@ -23,6 +23,16 @@ export interface Observation {
   projectName: string | null;
 }
 
+interface FilteredObservationRow {
+  id: string;
+  created_at: string | null;
+  categories: string[] | null;
+  latitude: number | null;
+  longitude: number | null;
+  observation: string | null;
+  project_name: string | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
@@ -354,9 +364,9 @@ const MapScreen: React.FC = () => {
 
         if (error) throw error;
 
-        const formatted: Observation[] = (data || [])
-          .filter((o: any) => o.latitude != null && o.longitude != null)
-          .map((o: any) => ({
+        const formatted: Observation[] = ((data ?? []) as FilteredObservationRow[])
+          .filter((o) => o.latitude != null && o.longitude != null)
+          .map((o) => ({
             id: String(o.id),
             type:
               Array.isArray(o.categories) && o.categories.length > 0

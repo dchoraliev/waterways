@@ -8,7 +8,7 @@ import {
   deleteAllUserObservations,
   type ObservationBounds,
 } from '../api/observations';
-import { banUser } from '../api/users';
+import { banUser, fetchAdminObservationUsers, type AdminObservationUserOption } from '../api/users';
 import { exportToCSV } from '../utils/csvExport';
 import { Observation } from '../types/observation';
 import { toast } from 'sonner';
@@ -56,7 +56,7 @@ function toUtcNextDayStartIso(dateString: string): string | undefined {
 }
 
 export function Dashboard() {
-  const { user } = useAuth();
+  const { user, sessionVersion } = useAuth();
   const MIN_QUERY_ZOOM = 4;
   const AGGREGATE_CLUSTER_MAX_ZOOM = 9;
   const DETAILED_QUERY_LIMIT = 500;
@@ -71,7 +71,9 @@ export function Dashboard() {
   const [dataDisplayMode, setDataDisplayMode] = useState<'aggregate' | 'detailed'>('detailed');
   const [isResultsTruncated, setIsResultsTruncated] = useState(false);
   const [bannedUsers, setBannedUsers] = useState<Set<string>>(new Set());
-  const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
+  const [adminUserOptions, setAdminUserOptions] = useState<AdminObservationUserOption[]>([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTER_OPTIONS);
   const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -134,10 +136,11 @@ export function Dashboard() {
           types: [...activeFilters.types].sort(),
           keywords: activeFilters.keywords.trim().toLowerCase(),
           myProjects: activeFilters.myProjects,
+          userId: user?.isAdmin ? selectedAdminUserId : null,
         },
       });
     },
-    []
+    [selectedAdminUserId, user?.isAdmin]
   );
 
   // Load category list for the type filter
@@ -160,6 +163,51 @@ export function Dashboard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.isAdmin) {
+      setAdminUserOptions([]);
+      setAdminUsersLoading(false);
+      setSelectedAdminUserId(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setAdminUsersLoading(true);
+        const nextUsers = await fetchAdminObservationUsers();
+
+        if (!cancelled) {
+          setAdminUserOptions(nextUsers);
+          if (
+            selectedAdminUserId &&
+            !nextUsers.some((option) => option.id === selectedAdminUserId)
+          ) {
+            setSelectedAdminUserId(null);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load admin observation users:', err);
+        if (!cancelled) {
+          setAdminUserOptions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setAdminUsersLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAdminUserId, sessionVersion, user?.id, user?.isAdmin]);
+
+  useEffect(() => {
+    observationsCacheRef.current.clear();
+  }, [selectedAdminUserId, sessionVersion, user?.id, user?.isAdmin]);
 
   // Load observations from Supabase using DB-side filtering
   useEffect(() => {
@@ -233,6 +281,7 @@ export function Dashboard() {
             types: filters.types,
             keywords: filters.keywords,
             projectId: filters.myProjects,
+            userId: user?.isAdmin ? (selectedAdminUserId ?? undefined) : undefined,
             limit: requestLimit,
             offset: 0,
           });
@@ -264,7 +313,17 @@ export function Dashboard() {
       cancelled = true;
       globalThis.clearTimeout(timer);
     };
-  }, [mapBounds, filters, mapZoom, setLoading, buildCacheKey]);
+  }, [
+    mapBounds,
+    filters,
+    mapZoom,
+    setLoading,
+    buildCacheKey,
+    selectedAdminUserId,
+    sessionVersion,
+    user?.id,
+    user?.isAdmin,
+  ]);
 
   // Reset showLogin when user state changes
   useEffect(() => {
@@ -288,6 +347,7 @@ export function Dashboard() {
     try {
       const res = await deleteObservation(observationId);
       if (res.success) {
+        observationsCacheRef.current.clear();
         setObservations((prev) => prev.filter((obs) => obs.id !== observationId));
         toast.success('Observation deleted successfully');
       } else {
@@ -304,6 +364,7 @@ export function Dashboard() {
     try {
       const res = await deleteAllUserObservations(userId);
       if (res.success) {
+        observationsCacheRef.current.clear();
         setObservations((prev) => prev.filter((obs) => obs.userId !== userId));
         toast.success('All user observations deleted successfully');
       } else {
@@ -316,14 +377,11 @@ export function Dashboard() {
     }
   };
 
-  const handleFilterByUser = (userId: string) => {
-    setFilteredUserId(userId);
-  };
-
   const handleBanUser = async (userId: string) => {
     try {
       const res = await banUser(userId);
       if (res.success) {
+        observationsCacheRef.current.clear();
         setBannedUsers((prev) => new Set([...prev, userId]));
         // Optionally remove their observations from view immediately
         setObservations((prev) => prev.filter((obs) => obs.userId !== userId));
@@ -338,7 +396,7 @@ export function Dashboard() {
     }
   };
 
-  // Keep admin-specific filters on the client side
+  // Keep only local moderation visibility on the client side
   const filteredObservations = useMemo(() => {
     return observations.filter((obs) => {
       // Filter out banned users
@@ -346,14 +404,9 @@ export function Dashboard() {
         return false;
       }
 
-      // Admin filter by specific user
-      if (filteredUserId && obs.userId !== filteredUserId) {
-        return false;
-      }
-
       return true;
     });
-  }, [observations, bannedUsers, filteredUserId]);
+  }, [observations, bannedUsers]);
 
   const handleObservationClick = useCallback((observation: Observation) => {
     setSelectedObservation(observation);
@@ -364,14 +417,6 @@ export function Dashboard() {
     setMapBounds({ ne: view.ne, sw: view.sw });
     setMapZoom(view.zoom);
   }, []);
-
-  const filteredUserName = useMemo(() => {
-    if (!filteredUserId) {
-      return undefined;
-    }
-
-    return observations.find((observation) => observation.userId === filteredUserId)?.observerName;
-  }, [filteredUserId, observations]);
 
   const topMapAlertMessage = useMemo(() => {
     if (!isResultsTruncated || loading || mapZoom < MIN_QUERY_ZOOM) {
@@ -420,9 +465,10 @@ export function Dashboard() {
         onExportCSV={handleExportCSV}
         onAccountClick={handleAccountClick}
         onAdminClick={handleAdminClick}
-        filteredUserId={filteredUserId}
-        filteredUserName={filteredUserName}
-        onClearUserFilter={() => setFilteredUserId(null)}
+        adminUserOptions={adminUserOptions}
+        selectedAdminUserId={selectedAdminUserId}
+        onAdminUserFilterChange={setSelectedAdminUserId}
+        adminUserFilterLoading={adminUsersLoading}
         onDailyReportClick={() => setDailyReportOpen(true)}
         projects={user?.projects || []}
       />
@@ -445,11 +491,14 @@ export function Dashboard() {
           onClose={() => setDetailsOpen(false)}
           onDeleteObservation={handleDeleteObservation}
           onDeleteAllUserObservations={handleDeleteAllUserObservations}
-          onFilterByUser={handleFilterByUser}
           onBanUser={handleBanUser}
         />
 
-        <DailyReportPopup open={dailyReportOpen} onClose={() => setDailyReportOpen(false)} />
+        <DailyReportPopup
+          open={dailyReportOpen}
+          onClose={() => setDailyReportOpen(false)}
+          selectedUserId={selectedAdminUserId}
+        />
       </Suspense>
     </div>
   );

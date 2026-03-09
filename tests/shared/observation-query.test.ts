@@ -33,6 +33,7 @@ describe('observation-query shared helpers', () => {
         keywords: '  algae  ',
         projectId: 'project-1',
         myProjectsOnly: true,
+        userId: 'user-7',
         since: '2026-02-20T00:00:00.000Z',
         until: '2026-03-01T00:00:00.000Z',
         limit: 1000,
@@ -50,6 +51,7 @@ describe('observation-query shared helpers', () => {
         p_keywords: 'algae',
         p_project_id: 'project-1',
         p_my_projects_only: true,
+        p_user_id: 'user-7',
         p_since: '2026-02-20T00:00:00.000Z',
         p_until: '2026-03-01T00:00:00.000Z',
         p_limit: 1000,
@@ -67,6 +69,7 @@ describe('observation-query shared helpers', () => {
       expect(args.p_project_id).toBeNull();
       expect(args.p_keywords).toBeNull();
       expect(args.p_categories).toBeNull();
+      expect(args.p_user_id).toBeNull();
     });
   });
 

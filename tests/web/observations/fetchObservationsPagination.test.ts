@@ -45,6 +45,7 @@ describe('fetchObservations pagination metadata', () => {
       limit: 600,
       offset: 0,
       keywords: '  algae  ',
+      userId: 'user-1',
     });
 
     expect(supabase.rpc).toHaveBeenCalledWith(
@@ -53,6 +54,7 @@ describe('fetchObservations pagination metadata', () => {
         p_limit: 600,
         p_offset: 0,
         p_keywords: 'algae',
+        p_user_id: 'user-1',
       })
     );
 

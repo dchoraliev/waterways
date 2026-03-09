@@ -11,6 +11,7 @@ export interface ObservationQueryParams {
   keywords?: string;
   projectId?: string;
   myProjectsOnly?: boolean;
+  userId?: string;
   since?: string;
   until?: string;
   limit?: number;
@@ -28,6 +29,7 @@ export interface ObservationRpcArgs {
   p_keywords: string | null;
   p_project_id: string | null;
   p_my_projects_only: boolean;
+  p_user_id: string | null;
   p_since: string | null;
   p_until: string | null;
   p_limit: number | null;
@@ -55,6 +57,7 @@ export function buildObservationRpcArgs(params: ObservationQueryParams = {}): Ob
     p_keywords: params.keywords?.trim() ? params.keywords.trim() : null,
     p_project_id: params.projectId && params.projectId !== 'all' ? params.projectId : null,
     p_my_projects_only: params.myProjectsOnly ?? false,
+    p_user_id: params.userId?.trim() ? params.userId.trim() : null,
     p_since: params.since ?? null,
     p_until: params.until ?? null,
     p_limit: params.limit ?? null,

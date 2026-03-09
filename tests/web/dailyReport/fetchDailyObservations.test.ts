@@ -31,6 +31,19 @@ describe('fetchDailyObservations', () => {
     );
   });
 
+  it('passes through an admin user filter when provided', async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({ data: [], error: null });
+
+    await fetchDailyObservations({ userId: 'admin-filter-user' });
+
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'get_filtered_observations',
+      expect.objectContaining({
+        p_user_id: 'admin-filter-user',
+      })
+    );
+  });
+
   it('maps rpc rows to observations', async () => {
     (supabase.rpc as jest.Mock).mockResolvedValue({
       data: [
