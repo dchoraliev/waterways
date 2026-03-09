@@ -99,6 +99,7 @@ interface MapViewProps {
   observations: Observation[];
   isTruncated?: boolean;
   onObservationClick: (observation: Observation) => void;
+  onClusterOpen?: () => void;
   onBoundsChange?: (view: { ne: [number, number]; sw: [number, number]; zoom: number }) => void;
   loading?: boolean;
   zoomTooLow?: boolean;
@@ -107,11 +108,12 @@ interface MapViewProps {
 export function MapView({
   observations,
   onObservationClick,
+  onClusterOpen,
   onBoundsChange,
   loading = false,
   zoomTooLow = false,
   isTruncated = false,
-}: MapViewProps) {
+}: Readonly<MapViewProps>) {
   // 🇺🇸 Start centered on the US and don't recenter on filters
   const [center, setCenter] = useState<[number, number]>([39.5, -98.35]);
   const [zoom, setZoom] = useState(4);
@@ -160,6 +162,7 @@ export function MapView({
 
   const handleMarkerClick = (cluster: Cluster) => {
     if (cluster.isCluster) {
+      onClusterOpen?.();
       if (zoom < 10) {
         const nextZoom = Math.min(zoom + 2, 18);
         setCenter([cluster.lat, cluster.lng]);
@@ -186,7 +189,7 @@ export function MapView({
         zoom={zoom}
         provider={isSatellite ? satelliteProvider : osmProvider}
         onBoundsChanged={({ center, zoom, bounds }) => {
-          setCenter(center as [number, number]);
+          setCenter(center);
           setZoom(zoom);
           onBoundsChange?.({
             ne: bounds.ne,

@@ -11,6 +11,7 @@ interface ObservationDetailsProps {
   observation: Observation | null;
   open: boolean;
   onClose: () => void;
+  showBackdrop?: boolean;
   onDeleteObservation?: (observationId: string) => void;
   onDeleteAllUserObservations?: (userId: string) => void;
   onBanUser?: (userId: string) => void;
@@ -20,17 +21,18 @@ export function ObservationDetails({
   observation,
   open,
   onClose,
+  showBackdrop = false,
   onDeleteObservation,
   onDeleteAllUserObservations,
   onBanUser,
-}: ObservationDetailsProps) {
+}: Readonly<ObservationDetailsProps>) {
   const { user } = useAuth();
   const isAdmin = user?.isAdmin || false;
 
   if (!observation || !open) return null;
 
   const handleBanUser = () => {
-    if (window.confirm(`Are you sure you want to ban ${observation.observerName}?`)) {
+    if (globalThis.confirm(`Are you sure you want to ban ${observation.observerName}?`)) {
       onBanUser?.(observation.userId);
       // Only show the specific user banned toast
       toast.success(`User ${observation.observerName} has been banned`);
@@ -39,7 +41,7 @@ export function ObservationDetails({
   };
 
   const handleDeletePost = () => {
-    if (window.confirm('Are you sure you want to delete this observation?')) {
+    if (globalThis.confirm('Are you sure you want to delete this observation?')) {
       onDeleteObservation?.(observation.id);
       onClose();
     }
@@ -47,7 +49,7 @@ export function ObservationDetails({
 
   const handleDeleteAllUserPosts = () => {
     if (
-      window.confirm(
+      globalThis.confirm(
         `Are you sure you want to delete ALL observations by ${observation.observerName}? This action cannot be undone.`
       )
     ) {
@@ -59,10 +61,20 @@ export function ObservationDetails({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-[1000]" onClick={onClose} />
+      {showBackdrop && (
+        <button
+          type="button"
+          aria-label="Close observation details"
+          className="fixed inset-0 bg-black/50 z-[1000]"
+          onClick={onClose}
+        />
+      )}
 
       {/* Side panel */}
-      <div className="fixed left-4 top-4 bottom-4 w-[400px] bg-white rounded-lg shadow-2xl z-[1001] flex flex-col">
+      <div
+        data-observation-details-panel="true"
+        className="fixed left-4 top-4 bottom-4 w-[400px] bg-white rounded-lg shadow-2xl z-[1001] flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-start justify-between p-4 border-b border-gray-200">
           <div className="flex-1">
@@ -197,7 +209,7 @@ export function ObservationDetails({
               <div className="space-y-2">
                 {observation.photos.map((photo, index) => (
                   <ImageWithFallback
-                    key={index}
+                    key={`${photo}-${index}`}
                     src={photo}
                     alt={`Observation photo ${index + 1}`}
                     className="rounded-lg object-cover w-full h-48"
@@ -211,8 +223,8 @@ export function ObservationDetails({
             <div>
               <h3 className="font-medium mb-2">Videos</h3>
               <div className="space-y-2">
-                {observation.videos.map((_, index) => (
-                  <div key={index} className="text-sm text-muted-foreground">
+                {observation.videos.map((video, index) => (
+                  <div key={`${video}-${index}`} className="text-sm text-muted-foreground">
                     Video clip {index + 1}
                   </div>
                 ))}

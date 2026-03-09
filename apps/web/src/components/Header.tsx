@@ -245,57 +245,56 @@ export function Header({
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button onClick={onDailyReportClick} variant="outline" size="sm">
+          {user?.isAdmin && (
+            <Button onClick={onDailyReportClick} variant="outline" size="sm" className="shrink-0">
               <CalendarDays className="size-4 mr-2" />
               Daily Report
             </Button>
-            <Button onClick={handleExportClick} variant="outline" size="sm">
-              <Download className="size-4 mr-2" />
-              Export CSV
+          )}
+          <Button onClick={handleExportClick} variant="outline" size="sm" className="shrink-0">
+            <Download className="size-4 mr-2" />
+            Export CSV
+          </Button>
+
+          {!user && (
+            <Button variant="default" size="sm" onClick={() => onAccountClick?.()}>
+              <LogIn className="size-4 mr-2" />
+              Login
             </Button>
+          )}
 
-            {!user && (
-              <Button variant="default" size="sm" onClick={() => onAccountClick?.()}>
-                <LogIn className="size-4 mr-2" />
-                Login
-              </Button>
-            )}
-
-            {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <User className="size-4 mr-2" />
-                    {visibleUserName}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 z-[9999]">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p>{visibleUserName}</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  {user?.role === 'admin' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onAdminClick?.()}>
-                        <Shield className="size-4 mr-2" />
-                        Admin
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="size-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <User className="size-4 mr-2" />
+                  {visibleUserName}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 z-[9999]">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p>{visibleUserName}</p>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                {user?.role === 'admin' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onAdminClick?.()}>
+                      <Shield className="size-4 mr-2" />
+                      Admin
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="size-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </header>
 

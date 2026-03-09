@@ -14,9 +14,26 @@ export interface AdminObservationUserOption {
   searchValue: string;
 }
 
+export interface BannedUserRecord {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  status: string | null;
+  bannedAt: string | null;
+  createdAt: string;
+  displayName: string;
+}
+
+export interface BannedUsersQueryOptions {
+  since?: string;
+  until?: string;
+  search?: string;
+}
+
 function normalizeText(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function getShortUserId(userId: string): string {
@@ -39,11 +56,12 @@ export function buildAdminObservationUserLabels(user: {
   const shortUserId = getShortUserId(user.id);
 
   const displayName = fullName || email || `User ${shortUserId}`;
-  const secondaryLabel = fullName
-    ? email || `ID ${shortUserId}`
-    : email
-      ? `ID ${shortUserId}`
-      : null;
+  let secondaryLabel: string | null = null;
+  if (fullName) {
+    secondaryLabel = email || `ID ${shortUserId}`;
+  } else if (email) {
+    secondaryLabel = `ID ${shortUserId}`;
+  }
   const displayLabel = secondaryLabel ? `${displayName} (${secondaryLabel})` : displayName;
   const searchValue = [displayName, fullName, email, user.id, shortUserId]
     .filter(Boolean)
@@ -116,6 +134,146 @@ export async function banUser(userId: string): Promise<UpdateResult> {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
   }
+}
+
+export async function unbanUser(userId: string): Promise<UpdateResult> {
+  try {
+    const client = supabase as unknown as {
+      rpc: (
+        fn: string,
+        args: Record<string, unknown>
+      ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+
+    const { data, error } = await client.rpc('rpc_unban_user', { target_user: userId });
+    if (error) {
+      console.error('Error unbanning user (RPC):', error);
+      return { success: false, error: error.message, data };
+    }
+    return { success: true, data };
+  } catch (err: unknown) {
+    console.error('Exception unbanning user (RPC):', err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+export async function fetchBannedUsers(
+  options: BannedUsersQueryOptions = {}
+): Promise<BannedUserRecord[]> {
+  const { since, until, search } = options;
+
+  type AdminBannedUsersQuery = {
+    eq: (column: string, value: unknown) => AdminBannedUsersQuery;
+    order: (column: string, options?: Record<string, unknown>) => AdminBannedUsersQuery;
+    gte: (column: string, value: string) => AdminBannedUsersQuery;
+    lt: (column: string, value: string) => AdminBannedUsersQuery;
+    then: PromiseLike<{
+      data: unknown[] | null;
+      error: { message?: string; details?: unknown } | null;
+    }>['then'];
+  };
+
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => AdminBannedUsersQuery;
+    };
+  };
+
+  const query = client
+    .from('users')
+    .select('id, first_name, last_name, email, status, banned_at, created_at')
+    .eq('status', 'banned')
+    .order('created_at', { ascending: false });
+
+  let { data, error } = await query;
+
+  if (error) {
+    const rawDetails = (error as { details?: unknown }).details;
+    const detailsText = typeof rawDetails === 'string' ? rawDetails : '';
+    const details = `${error.message ?? ''} ${detailsText}`.toLowerCase();
+    const missingBannedAt = details.includes('banned_at') && details.includes('does not exist');
+
+    if (missingBannedAt) {
+      const fallback = await client
+        .from('users')
+        .select('id, first_name, last_name, email, status, created_at')
+        .eq('status', 'banned')
+        .order('created_at', { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
+  }
+
+  if (error) {
+    console.error('Error fetching banned users:', error);
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    status: string | null;
+    banned_at?: string | null;
+    created_at: string;
+  }>;
+
+  const mapped = rows.map((row) => {
+    const firstName = normalizeText(row.first_name);
+    const lastName = normalizeText(row.last_name);
+    const email = normalizeText(row.email);
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    const displayName = fullName || email || `User ${getShortUserId(row.id)}`;
+    const bannedAt = (row as { banned_at?: string | null }).banned_at ?? null;
+
+    return {
+      id: row.id,
+      firstName,
+      lastName,
+      email,
+      status: row.status,
+      bannedAt,
+      createdAt: row.created_at,
+      displayName,
+    } satisfies BannedUserRecord;
+  });
+
+  const rangeFiltered = mapped.filter((row: BannedUserRecord) => {
+    const effectiveTimestamp = row.bannedAt ?? row.createdAt;
+    const time = new Date(effectiveTimestamp).getTime();
+
+    if (!Number.isFinite(time)) {
+      return false;
+    }
+
+    if (since) {
+      const sinceTime = new Date(since).getTime();
+      if (Number.isFinite(sinceTime) && time < sinceTime) {
+        return false;
+      }
+    }
+
+    if (until) {
+      const untilTime = new Date(until).getTime();
+      if (Number.isFinite(untilTime) && time >= untilTime) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  const searchTerm = search?.trim().toLowerCase();
+  if (!searchTerm) {
+    return rangeFiltered;
+  }
+
+  return rangeFiltered.filter((row: BannedUserRecord) => {
+    const haystack = [row.displayName, row.email, row.id].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(searchTerm);
+  });
 }
 
 /**

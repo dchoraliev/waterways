@@ -478,6 +478,10 @@ export function Dashboard() {
         <MapView
           observations={filteredObservations}
           onObservationClick={handleObservationClick}
+          onClusterOpen={() => {
+            setDetailsOpen(false);
+            setSelectedObservation(null);
+          }}
           onBoundsChange={handleMapBoundsChange}
           loading={loading}
           zoomTooLow={mapZoom < MIN_QUERY_ZOOM}

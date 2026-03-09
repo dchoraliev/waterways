@@ -77,7 +77,29 @@ type ObservationRow = {
   observer_last_name: string | null;
   latitude: number | null;
   longitude: number | null;
+  deleted?: boolean | null;
   total_count?: number | string | null;
+};
+
+type DailyObservationRow = {
+  id: string;
+  location: string | null;
+  user_id: string | null;
+  created_at: string;
+  observation: string | null;
+  categories: string[] | null;
+  observation_media: string[] | null;
+  deleted?: boolean | null;
+  observer: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+  } | null;
+  trip: {
+    project: {
+      name: string | null;
+    } | null;
+  } | null;
 };
 
 export interface FetchObservationsResult {
@@ -189,7 +211,9 @@ export async function fetchObservations(
   }
 
   const rows = data ?? [];
-  const observations = rows.map(mapRowToObservation);
+  const observations = rows
+    .filter((row) => (row as ObservationRow).deleted !== true)
+    .map(mapRowToObservation);
   const totalCountRaw = rows[0]?.total_count;
   const parsedTotalFromString =
     typeof totalCountRaw === 'string' ? Number.parseInt(totalCountRaw, 10) : Number.NaN;
@@ -231,6 +255,116 @@ export async function fetchDailyObservations(
     userId: params.userId,
   });
   return result.observations;
+}
+
+export interface ObservationRangeOptions {
+  since: string;
+  until?: string;
+  userId?: string;
+}
+
+export interface DeletedObservationListOptions {
+  since?: string;
+  until?: string;
+  userId?: string;
+  search?: string;
+  limit?: number;
+}
+
+export interface DeletedObservationRecord {
+  id: string;
+  userId: string;
+  observerName: string;
+  projectName: string;
+  observation: string;
+  categories: string[];
+  createdAt: string;
+  deletedAt: string | null;
+}
+
+export async function fetchObservationsForRangeWithRelations(
+  options: ObservationRangeOptions
+): Promise<Observation[]> {
+  const { since, until, userId } = options;
+
+  let query = supabase
+    .from('observations')
+    .select(
+      `
+      id,
+      location,
+      user_id,
+      created_at,
+      observation,
+      categories,
+      observation_media,
+      observer:users!observations_user_id_fkey(first_name, last_name, email),
+      trip:trips!observations_trip_id_fkey(
+        project:projects!trips_project_id_fkey(name)
+      )
+    `
+    )
+    .or('deleted.is.false,deleted.is.null')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false });
+
+  if (until) {
+    query = query.lt('created_at', until);
+  }
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching daily observations with relationships:', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => {
+    const dailyRow = row as DailyObservationRow;
+    const parsed = parseEwkbPoint(dailyRow.location);
+
+    const firstName = dailyRow.observer?.first_name?.trim() ?? '';
+    const lastName = dailyRow.observer?.last_name?.trim() ?? '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const observerName = fullName || dailyRow.observer?.email?.trim() || 'Anonymous';
+
+    const projectName = dailyRow.trip?.project?.name?.trim() || 'Untitled Project';
+    const created = new Date(dailyRow.created_at);
+    const categories = Array.isArray(dailyRow.categories) ? dailyRow.categories : [];
+    const media = Array.isArray(dailyRow.observation_media) ? dailyRow.observation_media : [];
+
+    return {
+      id: dailyRow.id,
+      projectName,
+      journeyStartLocation: projectName,
+      location: {
+        lat: parsed.lat,
+        lng: parsed.lng,
+        name: 'Observation location',
+      },
+      createdAt: dailyRow.created_at,
+      timestamp: created.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      date: [
+        created.getFullYear(),
+        String(created.getMonth() + 1).padStart(2, '0'),
+        String(created.getDate()).padStart(2, '0'),
+      ].join('-'),
+      observation: dailyRow.observation ?? '',
+      observerName,
+      userId: dailyRow.user_id ?? '',
+      photos: media,
+      videos: [],
+      type: categories[0] ?? 'Observation',
+      keywords: categories,
+    } satisfies Observation;
+  });
 }
 
 export async function fetchObservationCategories(): Promise<
@@ -341,6 +475,7 @@ export async function fetchObservationTypes(): Promise<string[]> {
       const { data, error } = await supabase
         .from('observations')
         .select('categories')
+        .or('deleted.is.false,deleted.is.null')
         .range(from, to);
 
       if (error) {
@@ -416,16 +551,108 @@ export async function fetchObservationYears(
  */
 export type DeleteResult = { success: boolean; error?: string; data?: unknown };
 
+function isMissingDeletedColumnError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const maybeMessage = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  const maybeDetails = 'details' in error && typeof error.details === 'string' ? error.details : '';
+  const fullText = `${maybeMessage} ${maybeDetails}`.toLowerCase();
+
+  return (
+    fullText.includes('column') &&
+    fullText.includes('deleted') &&
+    fullText.includes('does not exist')
+  );
+}
+
+function isMissingColumnError(error: unknown, columnName: string): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const maybeMessage = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  const maybeDetails = 'details' in error && typeof error.details === 'string' ? error.details : '';
+  const fullText = `${maybeMessage} ${maybeDetails}`.toLowerCase();
+
+  return (
+    fullText.includes('column') &&
+    fullText.includes(columnName.toLowerCase()) &&
+    fullText.includes('does not exist')
+  );
+}
+
 export async function deleteObservation(observationId: string): Promise<DeleteResult> {
+  const softDeletePatch: Record<string, unknown> = {
+    deleted: true,
+    deleted_at: new Date().toISOString(),
+  };
+
   const { error, data } = await supabase
     .from('observations')
-    .delete()
-    .select('*')
-    .eq('id', observationId);
+    .update(softDeletePatch as never)
+    .eq('id', observationId)
+    .select('id');
 
   if (error) {
-    console.error('Error deleting observation:', error);
+    console.error('Error soft deleting observation:', {
+      observationId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+
+    if (isMissingDeletedColumnError(error)) {
+      const fallback = await supabase
+        .from('observations')
+        .delete()
+        .eq('id', observationId)
+        .select('id');
+
+      if (fallback.error) {
+        console.error('Fallback hard delete failed:', {
+          observationId,
+          message: fallback.error.message,
+          details: fallback.error.details,
+          hint: fallback.error.hint,
+          code: fallback.error.code,
+        });
+        return { success: false, error: fallback.error.message, data: fallback.data };
+      }
+
+      return {
+        success: true,
+        data: fallback.data,
+      };
+    }
+
+    if (isMissingColumnError(error, 'deleted_at')) {
+      const retry = await supabase
+        .from('observations')
+        .update({ deleted: true } as never)
+        .eq('id', observationId)
+        .select('id');
+
+      if (retry.error) {
+        return { success: false, error: retry.error.message, data: retry.data };
+      }
+
+      return { success: true, data: retry.data };
+    }
+
     return { success: false, error: error.message, data };
+  }
+
+  const updatedRows = Array.isArray(data) ? data.length : 0;
+  if (updatedRows === 0) {
+    return {
+      success: false,
+      error:
+        'No observation was updated. It may already be deleted or your account does not have permission to delete it.',
+      data,
+    };
   }
 
   return { success: true, data };
@@ -435,14 +662,277 @@ export async function deleteObservation(observationId: string): Promise<DeleteRe
  * Delete all observations by a specific user from Supabase.
  */
 export async function deleteAllUserObservations(userId: string): Promise<DeleteResult> {
+  const softDeletePatch: Record<string, unknown> = {
+    deleted: true,
+    deleted_at: new Date().toISOString(),
+  };
+
   const { error, data } = await supabase
     .from('observations')
-    .delete()
-    .select('*')
-    .eq('user_id', userId);
+    .update(softDeletePatch as never)
+    .eq('user_id', userId)
+    .select('id');
 
   if (error) {
-    console.error('Error deleting user observations:', error);
+    console.error('Error soft deleting user observations:', {
+      userId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+
+    if (isMissingDeletedColumnError(error)) {
+      const fallback = await supabase
+        .from('observations')
+        .delete()
+        .eq('user_id', userId)
+        .select('id');
+
+      if (fallback.error) {
+        console.error('Fallback hard delete for user observations failed:', {
+          userId,
+          message: fallback.error.message,
+          details: fallback.error.details,
+          hint: fallback.error.hint,
+          code: fallback.error.code,
+        });
+        return { success: false, error: fallback.error.message, data: fallback.data };
+      }
+
+      return {
+        success: true,
+        data: fallback.data,
+      };
+    }
+
+    if (isMissingColumnError(error, 'deleted_at')) {
+      const retry = await supabase
+        .from('observations')
+        .update({ deleted: true } as never)
+        .eq('user_id', userId)
+        .select('id');
+
+      if (retry.error) {
+        return { success: false, error: retry.error.message, data: retry.data };
+      }
+
+      return { success: true, data: retry.data };
+    }
+
+    return { success: false, error: error.message, data };
+  }
+
+  const updatedRows = Array.isArray(data) ? data.length : 0;
+  if (updatedRows === 0) {
+    return {
+      success: false,
+      error:
+        'No observations were updated. They may already be deleted or your account does not have permission to delete them.',
+      data,
+    };
+  }
+
+  return { success: true, data };
+}
+
+export async function fetchDeletedObservationsForAdmin(
+  options: DeletedObservationListOptions = {}
+): Promise<DeletedObservationRecord[]> {
+  const { since, until, userId, search, limit = 1000 } = options;
+
+  type AdminDeletedPostsQuery = {
+    eq: (column: string, value: unknown) => AdminDeletedPostsQuery;
+    order: (column: string, options?: Record<string, unknown>) => AdminDeletedPostsQuery;
+    limit: (value: number) => AdminDeletedPostsQuery;
+    gte: (column: string, value: string) => AdminDeletedPostsQuery;
+    lt: (column: string, value: string) => AdminDeletedPostsQuery;
+    then: PromiseLike<{
+      data: unknown[] | null;
+      error: { message?: string; details?: unknown } | null;
+    }>['then'];
+  };
+
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => AdminDeletedPostsQuery;
+    };
+  };
+
+  const query = client
+    .from('observations')
+    .select(
+      `
+      id,
+      user_id,
+      created_at,
+      deleted_at,
+      observation,
+      categories,
+      observer:users!observations_user_id_fkey(first_name, last_name, email),
+      trip:trips!observations_trip_id_fkey(
+        project:projects!trips_project_id_fkey(name)
+      )
+    `
+    )
+    .eq('deleted', true)
+    .order('deleted_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  let filteredQuery = query;
+  if (userId) {
+    filteredQuery = filteredQuery.eq('user_id', userId);
+  }
+
+  let { data, error } = await filteredQuery;
+
+  if (error) {
+    const rawDetails = (error as { details?: unknown }).details;
+    const detailsText = typeof rawDetails === 'string' ? rawDetails : '';
+    const details = `${error.message ?? ''} ${detailsText}`.toLowerCase();
+    const missingDeletedAt = details.includes('deleted_at') && details.includes('does not exist');
+
+    if (missingDeletedAt) {
+      const fallbackBase = client
+        .from('observations')
+        .select(
+          `
+          id,
+          user_id,
+          created_at,
+          observation,
+          categories,
+          observer:users!observations_user_id_fkey(first_name, last_name, email),
+          trip:trips!observations_trip_id_fkey(
+            project:projects!trips_project_id_fkey(name)
+          )
+        `
+        )
+        .eq('deleted', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      const fallbackQuery = userId ? fallbackBase.eq('user_id', userId) : fallbackBase;
+      const fallbackResult = await fallbackQuery;
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+  }
+
+  if (error) {
+    console.error('Error fetching deleted observations for admin:', error);
+    return [];
+  }
+
+  const searchTerm = search?.trim().toLowerCase();
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    user_id: string | null;
+    created_at: string | null;
+    deleted_at?: string | null;
+    observation: string | null;
+    categories: string[] | null;
+    observer?: {
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+    } | null;
+    trip?: { project?: { name: string | null } | null } | null;
+  }>;
+
+  const mapped = rows.map((row) => {
+    const firstName = row.observer?.first_name?.trim() ?? '';
+    const lastName = row.observer?.last_name?.trim() ?? '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const observerName = fullName || row.observer?.email?.trim() || 'Anonymous';
+
+    return {
+      id: row.id,
+      userId: row.user_id ?? '',
+      observerName,
+      projectName: row.trip?.project?.name?.trim() || 'Untitled Project',
+      observation: row.observation ?? '',
+      categories: Array.isArray(row.categories) ? row.categories : [],
+      createdAt: row.created_at ?? '',
+      deletedAt: row.deleted_at ?? null,
+    } satisfies DeletedObservationRecord;
+  });
+
+  const rangeFiltered = mapped.filter((item: DeletedObservationRecord) => {
+    const deletedTimeRaw = item.deletedAt;
+    if (!deletedTimeRaw) {
+      return false;
+    }
+
+    const time = new Date(deletedTimeRaw).getTime();
+
+    if (!Number.isFinite(time)) {
+      return false;
+    }
+
+    if (since) {
+      const sinceTime = new Date(since).getTime();
+      if (Number.isFinite(sinceTime) && time < sinceTime) {
+        return false;
+      }
+    }
+
+    if (until) {
+      const untilTime = new Date(until).getTime();
+      if (Number.isFinite(untilTime) && time >= untilTime) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (!searchTerm) {
+    return rangeFiltered;
+  }
+
+  return rangeFiltered.filter((item: DeletedObservationRecord) => {
+    const haystack = [
+      item.observerName,
+      item.projectName,
+      item.observation,
+      item.categories.join(' '),
+      item.userId,
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return haystack.includes(searchTerm);
+  });
+}
+
+export async function restoreObservation(observationId: string): Promise<DeleteResult> {
+  const { error, data } = await supabase
+    .from('observations')
+    .update({ deleted: false, deleted_at: null } as never)
+    .eq('id', observationId)
+    .eq('deleted', true)
+    .select('id');
+
+  if (error) {
+    console.error('Error restoring observation:', error);
+    return { success: false, error: error.message, data };
+  }
+
+  return { success: true, data };
+}
+
+export async function restoreAllUserObservations(userId: string): Promise<DeleteResult> {
+  const { error, data } = await supabase
+    .from('observations')
+    .update({ deleted: false, deleted_at: null } as never)
+    .eq('user_id', userId)
+    .eq('deleted', true)
+    .select('id');
+
+  if (error) {
+    console.error('Error restoring all user observations:', error);
     return { success: false, error: error.message, data };
   }
 
