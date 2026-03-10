@@ -337,14 +337,23 @@ Download artifacts from the [EAS Dashboard](https://expo.dev).
 
 #### CI/CD builds (GitLab pipeline)
 
-The GitLab pipeline can trigger EAS iOS builds automatically. The job `eas_build_ios_development` is defined in `.gitlab-ci.yml`.
+The GitLab pipeline exposes two manual EAS iOS jobs in `.gitlab-ci.yml`:
+
+- `eas_build_ios_shared`: builds the shared team development client from `main`
+- `eas_build_ios_sandbox`: builds an isolated sandbox development client for feature branches and merge requests
 
 **How to trigger a CI build:**
 
 | Trigger | Behavior |
 |---|---|
-| Push to `main` | Job appears as a **manual** play button in the pipeline |
-| Run pipeline from GitLab web UI (**CI/CD → Pipelines → Run pipeline**) | Job runs **automatically** |
+| Push to `main` | `eas_build_ios_shared` appears as a **manual** play button |
+| Push to a non-`main` branch | `eas_build_ios_sandbox` appears as a **manual** play button |
+| Merge request pipeline | `eas_build_ios_sandbox` appears as a **manual** play button |
+| Run pipeline from GitLab web UI (**CI/CD → Pipelines → Run pipeline**) | `eas_build_ios_sandbox` appears as a **manual** play button |
+
+The sandbox job uses a separate iOS bundle identifier and app scheme, so it does not overwrite the shared team build on a tester's device.
+
+The shared and sandbox variant selectors are already defined in `.gitlab-ci.yml`. In GitLab's UI you only need to add secret CI/CD variables such as `EXPO_TOKEN` unless you want to override backend settings for CI.
 
 **Required setup — `EXPO_TOKEN`:**
 
