@@ -99,11 +99,10 @@ export const DraftJourneysProvider: React.FC<PropsWithChildren> = ({ children })
   };
 
   const getDraftByTripId = async (tripId: string): Promise<JourneyDraft> => {
+    // Check for existing draft to preserve metadata (createdAt, projectId, status)
     const existingDraft = drafts.find((d) => d.id === tripId);
-    if (existingDraft) {
-      return existingDraft;
-    }
 
+    // Always reload observations from database to get fresh transcriptions
     const rows = await getObservationsByTripId(tripId);
 
     const draftObservations: Observation[] = await Promise.all(
@@ -117,28 +116,43 @@ export const DraftJourneysProvider: React.FC<PropsWithChildren> = ({ children })
           mediaFilePath = mediaRecord?.local_file_path ?? null;
         }
 
+        // Check if this observation was manually edited in the existing draft
+        const existingObs = existingDraft?.observations.find((o) => o.id === row.id);
+        const wasManuallyEdited = existingObs?.manuallyEdited ?? false;
+
         return {
           id: row.id,
           time: new Date(row.created_at).toLocaleString(),
           location: `${row.latitude}, ${row.longitude}`,
-          description: row.observation || 'Some observation',
+          // Use database transcription, or keep manually edited description
+          description:
+            wasManuallyEdited && existingObs?.description
+              ? existingObs.description
+              : (row.observation ?? ''),
           tags: row.category_id ? [row.category_id] : [],
           hasAudio: !!row.audio_media_id,
-          hasMedia: !!entry || !!row.local_media_id, // Has media if either marked or has local_media_id
+          hasMedia: !!entry || !!row.local_media_id,
           mediaType: entry?.mediaType ?? null,
           mediaTimestamp: entry?.secondsElapsed ?? null,
           mediaFilePath: mediaFilePath,
           status: 'Offline',
+          // Preserve manual edits
+          category:
+            wasManuallyEdited && existingObs?.category
+              ? existingObs.category
+              : (row.category_id ?? null),
+          keyword: wasManuallyEdited && existingObs?.keyword ? existingObs.keyword : null,
+          manuallyEdited: wasManuallyEdited,
         };
       })
     );
 
     const draft: JourneyDraft = {
       id: tripId,
-      createdAt: Date.now(),
-      status: 'draft',
+      createdAt: existingDraft?.createdAt ?? Date.now(),
+      status: existingDraft?.status ?? 'draft',
       observations: draftObservations,
-      projectId: null,
+      projectId: existingDraft?.projectId ?? null,
     };
 
     return draft;
