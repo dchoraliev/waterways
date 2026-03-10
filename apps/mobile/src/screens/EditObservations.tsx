@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   InteractionManager,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,6 +21,11 @@ import { classifyObservation, CATEGORIES } from '../services/ObservationClassifi
 import { createReviewScreenStyles } from '../styles/ReviewScreen.styles';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
+import LocationPickerModal, {
+  LatLng,
+  OtherObservation,
+  LeafletMapView,
+} from '../components/LocationPickerModal';
 
 export default function EditObservationScreen() {
   const { tripId, observationIndex } = useLocalSearchParams();
@@ -35,16 +41,18 @@ export default function EditObservationScreen() {
   const [keyword, setKeyword] = useState('');
   const [draft, setDraft] = useState<JourneyDraft | null>(null);
 
+  // Map state
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [otherObservations, setOtherObservations] = useState<OtherObservation[]>([]);
+  const [previewMapReady, setPreviewMapReady] = useState(false);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const keywordInputRef = useRef<TextInput>(null);
 
   const index = Number(observationIndex);
   const placeholderColor = colors.textMuted;
-
-  // Dynamic categories loaded from CATEGORIES mapping (fallback handled below)
   const categoryEntries = Object.entries(CATEGORIES);
 
-  // FIX 1: Added getDraftByTripId and index to dependency array
   useEffect(() => {
     (async () => {
       const loadedDraft = await getDraftByTripId(tripId as string);
@@ -53,27 +61,38 @@ export default function EditObservationScreen() {
       if (obs) {
         setDescription(obs.description);
         setLocation(obs.location || '');
-        // If the observation has no category, use fallback from CATEGORIES.
         const fallback =
           Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
         setCategory(obs.category ?? fallback);
         setKeyword(obs.keyword || '');
         setDraft(loadedDraft);
+
+        // Build sibling observations for map context
+        if (loadedDraft?.observations) {
+          const others: OtherObservation[] = loadedDraft.observations
+            .map((o, i) => {
+              if (i === index) return null;
+              const coords = parseLocationCoords(o.location || '');
+              if (!coords) return null;
+              return {
+                id: o.id,
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                description: o.description,
+              } as OtherObservation;
+            })
+            .filter((o): o is OtherObservation => o !== null);
+          setOtherObservations(others);
+        }
       }
     })();
-    // Intentionally not depending on CATEGORIES (it's a mutable module-level object).
   }, [tripId, observationIndex, getDraftByTripId, index]);
 
-  // FIX 2: Moved classification logic into the description change handler
-  // instead of using a useEffect with setState calls
   const handleDescriptionChange = useCallback((text: string) => {
     setDescription(text);
-
     if (text) {
       const result = classifyObservation(text);
       setKeyword(result.keyword || '');
-
-      // If classifier returns OTHERS, map to the fallback category.
       if (result.category === 'OTHERS') {
         const fallback =
           Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
@@ -86,7 +105,6 @@ export default function EditObservationScreen() {
 
   const handleSave = async () => {
     if (!draft) return;
-
     const updated = [...draft.observations];
     updated[index] = {
       ...updated[index],
@@ -95,27 +113,30 @@ export default function EditObservationScreen() {
       category,
       keyword,
       manuallyEdited: true,
-      // Preserve media fields
       hasMedia: updated[index].hasMedia,
       mediaType: updated[index].mediaType,
       mediaTimestamp: updated[index].mediaTimestamp,
       mediaFilePath: updated[index].mediaFilePath,
     };
-
-    await saveDraft({
-      ...draft,
-      observations: updated,
-    });
-
+    await saveDraft({ ...draft, observations: updated });
     router.back();
   };
 
-  // FIX 3: Use global.setTimeout instead of bare setTimeout to satisfy linter
   const handleKeywordFocus = useCallback(() => {
     InteractionManager.runAfterInteractions(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     });
   }, []);
+
+  const handleLocationConfirm = useCallback((coords: LatLng) => {
+    setLocation(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
+    setLocationPickerVisible(false);
+    // Reset preview so it reloads with new coordinates
+    setPreviewMapReady(false);
+  }, []);
+
+  const currentLatLng = useMemo(() => parseLocationCoords(location), [location]);
+  const hasLocation = currentLatLng !== null;
 
   return (
     <SafeAreaView style={reviewStyles.root} edges={['top']}>
@@ -133,6 +154,7 @@ export default function EditObservationScreen() {
           >
             <Text style={editStyles.titleText}>Edit Observation</Text>
 
+            {/* Description */}
             <Text style={editStyles.label}>Description</Text>
             <TextInput
               value={description}
@@ -145,19 +167,57 @@ export default function EditObservationScreen() {
               blurOnSubmit={true}
             />
 
+            {/* Location */}
             <Text style={editStyles.label}>Location</Text>
-            <TextInput
-              value={location}
-              onChangeText={setLocation}
-              style={editStyles.textInput}
-              placeholderTextColor={placeholderColor}
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
 
+            {/* Inline map preview — only shown when location is set */}
+            {hasLocation && (
+              <TouchableOpacity
+                onPress={() => setLocationPickerVisible(true)}
+                activeOpacity={0.9}
+                style={editStyles.mapPreviewContainer}
+              >
+                {/* Non-interactive preview map */}
+                <LeafletMapView
+                  currentLocation={currentLatLng}
+                  otherObservations={otherObservations}
+                  interactive={false}
+                  onLoad={() => setPreviewMapReady(true)}
+                  style={editStyles.mapPreview}
+                />
+
+                {/* Loading shimmer while tiles load */}
+                {!previewMapReady && (
+                  <View style={editStyles.mapPreviewLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  </View>
+                )}
+
+                {/* "Edit location" overlay badge */}
+                <View style={editStyles.mapPreviewBadge}>
+                  <Text style={editStyles.mapPreviewBadgeText}> Tap to edit location</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Coordinates row / tap-to-set button */}
+            <TouchableOpacity
+              onPress={() => setLocationPickerVisible(true)}
+              activeOpacity={0.75}
+              style={[editStyles.textInput, editStyles.locationButton]}
+            >
+              <Text
+                style={[editStyles.locationButtonText, !location && { color: placeholderColor }]}
+                numberOfLines={1}
+              >
+                {location || 'Tap to set location on map'}
+              </Text>
+              <Text style={editStyles.locationIcon}>📍</Text>
+            </TouchableOpacity>
+
+            {/* Category */}
             <Text style={editStyles.label}>Category</Text>
             <View style={editStyles.categoryGrid}>
-              {/* Category tiles from CATEGORIES */}
               {categoryEntries.map(
                 ([catName, data]: [
                   string,
@@ -190,6 +250,7 @@ export default function EditObservationScreen() {
               )}
             </View>
 
+            {/* Keyword */}
             <Text style={editStyles.label}>Keyword</Text>
             <TextInput
               ref={keywordInputRef}
@@ -203,13 +264,13 @@ export default function EditObservationScreen() {
               onFocus={handleKeywordFocus}
             />
 
+            {/* Buttons */}
             <View style={editStyles.buttonContainer}>
               <PrimaryButton
                 label="Save Changes"
                 onPress={handleSave}
                 style={editStyles.saveButton}
               />
-
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={editStyles.discardButton}
@@ -221,8 +282,26 @@ export default function EditObservationScreen() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Full-screen location picker modal */}
+      <LocationPickerModal
+        visible={locationPickerVisible}
+        currentLocation={currentLatLng}
+        otherObservations={otherObservations}
+        onConfirm={handleLocationConfirm}
+        onCancel={() => setLocationPickerVisible(false)}
+      />
     </SafeAreaView>
   );
+}
+
+function parseLocationCoords(locationStr: string): LatLng | null {
+  if (!locationStr) return null;
+  const parts = locationStr.split(',').map((s) => parseFloat(s.trim()));
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return { latitude: parts[0], longitude: parts[1] };
+  }
+  return null;
 }
 
 const createEditObservationStyles = (themeColors: AppColors) =>
@@ -249,6 +328,56 @@ const createEditObservationStyles = (themeColors: AppColors) =>
       marginBottom: 16,
       fontSize: 16,
     },
+    // Inline map preview
+    mapPreviewContainer: {
+      height: 150,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      marginBottom: 10,
+      position: 'relative',
+    },
+    mapPreview: {
+      flex: 1,
+    },
+    mapPreviewLoading: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: themeColors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    mapPreviewBadge: {
+      position: 'absolute',
+      bottom: 10,
+      alignSelf: 'center',
+      backgroundColor: 'rgba(20,20,20,0.72)',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 16,
+    },
+    mapPreviewBadgeText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    // Location row
+    locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 48,
+    },
+    locationButtonText: {
+      color: themeColors.textPrimary,
+      fontSize: 16,
+      flex: 1,
+    },
+    locationIcon: {
+      fontSize: 18,
+      marginLeft: 8,
+    },
+    // Category
     categoryGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -263,10 +392,6 @@ const createEditObservationStyles = (themeColors: AppColors) =>
       borderWidth: 1,
       borderColor: themeColors.border,
     },
-    categoryButtonSelected: {
-      backgroundColor: themeColors.primarySoft,
-      borderColor: themeColors.primary,
-    },
     categoryButtonText: {
       color: themeColors.textMuted,
       fontSize: 14,
@@ -275,6 +400,7 @@ const createEditObservationStyles = (themeColors: AppColors) =>
     categoryButtonTextSelected: {
       color: themeColors.textPrimary,
     },
+    // Buttons
     buttonContainer: {
       gap: 12,
       marginTop: 8,
