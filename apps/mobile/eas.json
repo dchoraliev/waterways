@@ -7,7 +7,18 @@
     "development": {
       "environment": "development",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "autoIncrement": "buildNumber"
+      }
+    },
+    "development_sandbox": {
+      "environment": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "autoIncrement": "buildNumber"
+      }
     },
     "preview": {
       "environment": "preview",

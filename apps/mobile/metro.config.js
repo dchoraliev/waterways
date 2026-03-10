@@ -1,5 +1,5 @@
 const { getDefaultConfig } = require('@expo/metro-config');
-const path = require('path');
+const path = require('node:path');
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
@@ -14,10 +14,11 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
 ];
+config.resolver.disableHierarchicalLookup = true;
 
 // 3. Mirror tsconfig/workspace aliases so Metro can resolve shared imports at runtime.
 config.resolver.extraNodeModules = {
-  ...(config.resolver.extraNodeModules || {}),
+  ...config.resolver.extraNodeModules,
   '@waterways/shared': path.resolve(monorepoRoot, 'packages/shared'),
   '@shared': path.resolve(monorepoRoot, 'packages/shared/src'),
 };

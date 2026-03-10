@@ -8,6 +8,16 @@ image: node:20
 default:
   interruptible: true
 
+# Create only one pipeline per commit.
+# If a branch has an open MR, prefer the MR pipeline and skip the duplicate push pipeline.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
 # Define stages - combine check stages to reduce overhead
 stages:
   - install
@@ -93,7 +103,8 @@ test:
   stage: build
   interruptible: false
   needs:
-    - install_dependencies
+    - job: install_dependencies
+      optional: true
   before_script:
     - yarn install --frozen-lockfile --prefer-offline
     - npx eas-cli --version
@@ -108,18 +119,44 @@ test:
     policy: pull
 
 # iOS Development Build (device) — manual trigger
-eas_build_ios_development:
+eas_build_ios_shared:
   extends: .eas_build_base
+  resource_group: eas-ios-development-shared
+  variables:
+    APP_VARIANT: shared
+    APP_DISPLAY_NAME: Waterways
+    IOS_BUNDLE_ID: com.waterways.mobile
+    EXPO_SCHEME: waterways
   script:
     - cd apps/mobile
-    - EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build
-        --non-interactive
-        --platform ios
-        --profile development
+    - >-
+      EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build --non-interactive --platform ios --profile development
   rules:
-    - if: $CI_PIPELINE_SOURCE == "web"
-      when: always
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+    - when: never
+
+# iOS Development Sandbox Build (device) — isolated app variant for feature work
+eas_build_ios_sandbox:
+  extends: .eas_build_base
+  variables:
+    APP_VARIANT: sandbox
+    APP_DISPLAY_NAME: Waterways Sandbox
+    IOS_BUNDLE_ID: com.waterways.mobile.sandbox
+    EXPO_SCHEME: waterways-sandbox
+  script:
+    - cd apps/mobile
+    - >-
+      EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build --non-interactive --platform ios --profile development_sandbox
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main"'
       when: manual
       allow_failure: true
     - when: never

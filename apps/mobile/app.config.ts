@@ -1,16 +1,25 @@
-import 'dotenv/config';
-import path from 'path';
+import path from 'node:path';
 import dotenv from 'dotenv';
 
 // Load your .env from the root (you uploaded it at repo root)
 dotenv.config({
   path: path.resolve(__dirname, '../../.env'),
+  quiet: true,
 });
+
+const appVariant = process.env.APP_VARIANT ?? 'shared';
+const isSandboxVariant = appVariant === 'sandbox';
+const appName =
+  process.env.APP_DISPLAY_NAME ?? (isSandboxVariant ? 'Waterways Sandbox' : 'Waterways');
+const appScheme = process.env.EXPO_SCHEME ?? (isSandboxVariant ? 'waterways-sandbox' : 'waterways');
+const iosBundleIdentifier =
+  process.env.IOS_BUNDLE_ID ??
+  (isSandboxVariant ? 'com.waterways.mobile.sandbox' : 'com.waterways.mobile');
 
 export default {
   expo: {
-    name: 'Waterways',
-    scheme: 'waterways',
+    name: appName,
+    scheme: appScheme,
     slug: 'mobile',
     owner: 'waterwaysse4330',
     version: '1.0.0',
@@ -37,7 +46,7 @@ export default {
     },
 
     ios: {
-      bundleIdentifier: 'com.waterways.mobile',
+      bundleIdentifier: iosBundleIdentifier,
       supportsTablet: true,
       config: {
         usesNonExemptEncryption: false,
@@ -67,11 +76,13 @@ export default {
     plugins: ['expo-router', 'expo-notifications', './plugins/withAndroidCompatibility.js'],
 
     experiments: {
+      autolinkingModuleResolution: true,
       typedRoutes: true,
     },
 
     // Load the Supabase env vars for mobile app
     extra: {
+      APP_VARIANT: appVariant,
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       eas: {

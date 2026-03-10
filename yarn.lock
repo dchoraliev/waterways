@@ -6269,10 +6269,10 @@ expect@^30.0.0:
     jest-mock "30.2.0"
     jest-util "30.2.0"
 
-expo-application@~55.0.8:
-  version "55.0.8"
-  resolved "https://registry.yarnpkg.com/expo-application/-/expo-application-55.0.8.tgz#5e216efde0f414d2bb8b3989d47151ba75c461ef"
-  integrity sha512-PeZk4Zj8LlzRcRtK3J4ouSPBoi9lroYsRbbz/0HEvx+uB6HIaM1qfzgpcctvjkdJJfnidBQNyieW5BVO/qUQ6w==
+expo-application@~7.0.8:
+  version "7.0.8"
+  resolved "https://registry.yarnpkg.com/expo-application/-/expo-application-7.0.8.tgz#320af0d6c39b331456d3bc833b25763c702d23db"
+  integrity sha512-qFGyxk7VJbrNOQWBbE09XUuGuvkOgFS9QfToaK2FdagM2aQ+x3CvGV2DuVgl/l4ZxPgIf3b/MNh9xHpwSwn74Q==
 
 expo-asset@~12.0.10:
   version "12.0.10"
@@ -6459,16 +6459,17 @@ expo-network@^8.0.8:
   resolved "https://registry.yarnpkg.com/expo-network/-/expo-network-8.0.8.tgz#d8eb25b60a93b010e635192f343d3a955a763df5"
   integrity sha512-dgrL8UHAmWofqeY4UEjWskCl/RoQAM0DG6PZR8xz2WZt+6aQEboQgFRXowCfhbKZ71d16sNuKXtwBEsp2DtdNw==
 
-expo-notifications@^55.0.11:
-  version "55.0.11"
-  resolved "https://registry.yarnpkg.com/expo-notifications/-/expo-notifications-55.0.11.tgz#659c861b5ecb81de07fa21cad483e3cf3b970362"
-  integrity sha512-nx9OIx0qJh6HWKW2Jq8uF365q56eDFcAnDMMKOpA3eEFhBy6IzTJNrq9AGdOoylWI4OeVW0Z6wxEXPZOan+9VA==
+expo-notifications@~0.32.16:
+  version "0.32.16"
+  resolved "https://registry.yarnpkg.com/expo-notifications/-/expo-notifications-0.32.16.tgz#1a1304b89efedd7cdeba92de39b21f09fb2db2c7"
+  integrity sha512-QQD/UA6v7LgvwIJ+tS7tSvqJZkdp0nCSj9MxsDk/jU1GttYdK49/5L2LvE/4U0H7sNBz1NZAyhDZozg8xgBLXw==
   dependencies:
-    "@expo/image-utils" "^0.8.12"
+    "@expo/image-utils" "^0.8.8"
+    "@ide/backoff" "^1.0.0"
     abort-controller "^3.0.0"
     badgin "^1.1.5"
-    expo-application "~55.0.8"
-    expo-constants "~55.0.7"
+    expo-application "~7.0.8"
+    expo-constants "~18.0.13"
 
 expo-router@~6.0.23:
   version "6.0.23"
@@ -10194,10 +10195,10 @@ react-native-is-edge-to-edge@^1.1.6, react-native-is-edge-to-edge@^1.2.1:
   resolved "https://registry.yarnpkg.com/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.2.1.tgz#64e10851abd9d176cbf2b40562f751622bde3358"
   integrity sha512-FLbPWl/MyYQWz+KwqOZsSyj2JmLKglHatd3xLZWskXOpRaio4LfEDEz8E/A6uD8QoTHW6Aobw1jbEwK7KMgR7Q==
 
-react-native-maps@^1.27.1:
-  version "1.27.1"
-  resolved "https://registry.yarnpkg.com/react-native-maps/-/react-native-maps-1.27.1.tgz#399aafcc0dec367c2bf30d34141d411f50b0bbd0"
-  integrity sha512-wGMFwo7oy1MhRogLj203f193VeY1WD/wXaJKQP7pNRUzcExmqhD3wrQyE1aRneD4ffNO0VkaqCIdcToT0aI7AQ==
+react-native-maps@1.20.1:
+  version "1.20.1"
+  resolved "https://registry.yarnpkg.com/react-native-maps/-/react-native-maps-1.20.1.tgz#f613364886b2f72db56cafcd2bd7d3a35f470dfb"
+  integrity sha512-NZI3B5Z6kxAb8gzb2Wxzu/+P2SlFIg1waHGIpQmazDSCRkNoHNY4g96g+xS0QPSaG/9xRBbDNnd2f2/OW6t6LQ==
   dependencies:
     "@types/geojson" "^7946.0.13"
 
@@ -10232,10 +10233,10 @@ react-native-vector-icons@^10.3.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
-react-native-webview@^13.16.1:
-  version "13.16.1"
-  resolved "https://registry.yarnpkg.com/react-native-webview/-/react-native-webview-13.16.1.tgz#d5a6483fcb823eac704bd2a3d82c263771c6ede3"
-  integrity sha512-If0eHhoEdOYDcHsX+xBFwHMbWBGK1BvGDQDQdVkwtSIXiq1uiqjkpWVP2uQ1as94J0CzvFE9PUNDuhiX0Z6ubw==
+react-native-webview@13.15.0:
+  version "13.15.0"
+  resolved "https://registry.yarnpkg.com/react-native-webview/-/react-native-webview-13.15.0.tgz#b6d2f8d8dd65897db76659ddd8198d2c74ec5a79"
+  integrity sha512-Vzjgy8mmxa/JO6l5KZrsTC7YemSdq+qB01diA0FqjUTaWGAGwuykpJ73MDj3+mzBSlaDxAEugHzTtkUQkQEQeQ==
   dependencies:
     escape-string-regexp "^4.0.0"
     invariant "2.2.4"
