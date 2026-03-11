@@ -475,7 +475,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       onPartialResults: handlePartialResults,
       onError: handleError,
       onStateChange: handleServiceStateChange,
-      onWakeWordDetected: handleWakeWordDetected, // service calls this when wake word confirmed
+      onWakeWordDetected: handleWakeWordDetected,
     });
 
     if (success) {
