@@ -76,12 +76,27 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const recState = useAudioRecorderState(recorder);
 
   const isRecording = !!recState?.isRecording;
-  const [recordingCountdown, setRecordingCountdown] = useState(0); // 0 = not recording, 1-15 = countdown
-  const recordingCountdownRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
+
+  // Ref mirror of isRecording — avoids stale closure issues in onWakeWordDetected.
+  // React state updates are async; by the time the wake word fires after a
+  // recording stops, the inline callback may still see the old isRecording value.
+  const isRecordingRef = useRef(false);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  const [recordingCountdown, setRecordingCountdown] = useState(0);
+  const recordingCountdownRef = useRef(0); // ref mirror for same reason
+  const recordingCountdownTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
   const processingWakeWordRef = useRef(false);
   const stopObservationRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const loadObservationsRef = useRef<((activeTripId: string) => Promise<void>) | null>(null);
   const startCameraWindowRef = useRef<((observationId: string) => void) | null>(null);
+
+  // Keep recordingCountdownRef in sync
+  useEffect(() => {
+    recordingCountdownRef.current = recordingCountdown;
+  }, [recordingCountdown]);
 
   // --- Wake word state ---
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
@@ -130,9 +145,33 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     return () => globalThis.clearInterval(t);
   }, []);
 
-  // --- Wake word integration ---
+  // --- Audio session helpers ---
+  //
+  // iOS has one shared audio session. Both @react-native-voice/voice and
+  // expo-audio compete for it. The safe ownership cycle is:
+  //
+  //   START RECORDING:
+  //     1. wakeWordStop()          — voice releases the session
+  //     2. setAudioMode(recording) — expo-audio claims it
+  //     3. recorder.record()
+  //
+  //   STOP RECORDING:
+  //     1. recorder.stop()         — expo-audio finishes
+  //     2. setAudioMode(playback)  — reset category (150ms delay for release)
+  //     3. wakeWordStart()         — voice claims it again
+  //
+  // Never call setAudioModeAsync while either session is active.
+
+  const configureRecordingAudioMode = useCallback(async () => {
+    await setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+    });
+  }, []);
+
   const configureIdleAudioMode = useCallback(async () => {
     try {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 150));
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
@@ -147,15 +186,20 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     threshold: 0.85,
     locale: 'en-US',
     continuous: true,
-    recordingDelayMs: 0, // We handle recording ourselves with expo-audio
-    recordingDurationMs: 0, // Disable useWakeWord's built-in recording
+    recordingDelayMs: 0,
+    recordingDurationMs: 0, // We handle recording ourselves with expo-audio
     onWakeWordDetected: (_match: WakeWordMatch) => {
-      // Only process if not already recording
-      if (processingWakeWordRef.current || isRecording || recordingCountdown > 0) {
+      // Use refs here — this callback is an inline function and would capture
+      // stale React state values (isRecording, recordingCountdown) from the
+      // render in which useWakeWord was last called.
+      if (
+        processingWakeWordRef.current ||
+        isRecordingRef.current ||
+        recordingCountdownRef.current > 0
+      ) {
+        console.log('[JourneyScreen] Wake word ignored — already recording or processing');
         return;
       }
-
-      // Start 15-second recording countdown
       startObservationRecording();
     },
     onError: (error) => {
@@ -168,7 +212,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     },
   });
 
-  // Store wake word control functions in refs to avoid dependency issues
+  // Store wake word control functions in refs to avoid stale closure issues
   const wakeWordStartRef = useRef(wakeWord.startListening);
   const wakeWordStopRef = useRef(wakeWord.stop);
 
@@ -190,7 +234,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   useFocusEffect(
     useCallback(() => {
-      const shouldEnableWakeWord = Platform.OS === 'android' && !isExpoGo() && wakeWord.isAvailable;
+      const shouldEnableWakeWord = !isExpoGo() && wakeWord.isAvailable;
 
       if (!shouldEnableWakeWord) {
         setWakeWordEnabled(false);
@@ -200,7 +244,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       let active = true;
       (async () => {
         try {
-          await configureIdleAudioMode();
           await wakeWordStopRef.current();
         } catch {
           // noop
@@ -217,12 +260,14 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         setWakeWordEnabled(false);
         void wakeWordStopRef.current();
       };
-    }, [wakeWord.isAvailable, configureIdleAudioMode])
+    }, [wakeWord.isAvailable])
   );
 
-  // Start observation recording with 15-second countdown
+  // Start observation recording with 15-second countdown.
+  // Stops the wake word listener first so expo-audio can safely claim
+  // the iOS audio session.
   const startObservationRecording = useCallback(async () => {
-    if (!tripId || processingWakeWordRef.current || isRecording) return;
+    if (!tripId || processingWakeWordRef.current || isRecordingRef.current) return;
 
     processingWakeWordRef.current = true;
 
@@ -235,32 +280,27 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         return;
       }
 
-      // Set audio mode
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      });
+      // Step 1: stop voice session so it releases the audio session
+      await wakeWordStopRef.current();
 
-      // Reset recorder
-      try {
-        await recorder.stop();
-      } catch {
-        // Ignore
-      }
+      // Step 2: claim the session for recording
+      await configureRecordingAudioMode();
 
+      // Step 3: prepare and start recording
       await recorder.prepareToRecordAsync();
       await recorder.record();
 
       // Start 15-second countdown
       setRecordingCountdown(15);
-      recordingCountdownRef.current = globalThis.setInterval(() => {
+      recordingCountdownRef.current = 15;
+      recordingCountdownTimerRef.current = globalThis.setInterval(() => {
         setRecordingCountdown((prev) => {
-          if (prev <= 1) {
-            // Countdown finished, stop recording
+          const next = prev <= 1 ? 0 : prev - 1;
+          recordingCountdownRef.current = next;
+          if (next === 0) {
             void stopObservationRecordingRef.current?.();
-            return 0;
           }
-          return prev - 1;
+          return next;
         });
       }, 1000);
     } catch (e) {
@@ -268,32 +308,36 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       showToast('Failed to start recording');
       processingWakeWordRef.current = false;
       setRecordingCountdown(0);
+      recordingCountdownRef.current = 0;
+      // Restart wake word since we stopped it above
+      void wakeWordStartRef.current();
     }
-  }, [tripId, isRecording, recorder]);
+  }, [tripId, recorder, configureRecordingAudioMode]);
 
-  // Stop observation recording and save
+  // Stop observation recording and save.
+  // Resets the audio session and hands it back to the wake word listener.
   const stopObservationRecording = useCallback(async () => {
     // Clear countdown timer
-    if (recordingCountdownRef.current) {
-      globalThis.clearInterval(recordingCountdownRef.current);
-      recordingCountdownRef.current = null;
+    if (recordingCountdownTimerRef.current) {
+      globalThis.clearInterval(recordingCountdownTimerRef.current);
+      recordingCountdownTimerRef.current = null;
     }
     setRecordingCountdown(0);
+    recordingCountdownRef.current = 0;
 
     try {
+      // Step 1: stop recorder
       await recorder.stop();
 
       const fileUri = recorder.uri;
       if (!fileUri) {
         showToast('Recording failed');
-        processingWakeWordRef.current = false;
         return;
       }
 
       const userId = await getCurrentUserId();
       if (!userId) {
         showToast('Not logged in');
-        processingWakeWordRef.current = false;
         return;
       }
 
@@ -307,7 +351,10 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       console.error('[JourneyScreen] Failed to save observation:', e);
       showToast('Failed to save observation');
     } finally {
+      // Step 2: reset audio category now that expo-audio has released it
       await configureIdleAudioMode();
+      // Step 3: hand the session back to the wake word listener
+      await wakeWordStartRef.current();
       processingWakeWordRef.current = false;
     }
   }, [tripId, recorder, configureIdleAudioMode]);
@@ -319,8 +366,8 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   // Cleanup countdown timer on unmount
   useEffect(() => {
     return () => {
-      if (recordingCountdownRef.current) {
-        globalThis.clearInterval(recordingCountdownRef.current);
+      if (recordingCountdownTimerRef.current) {
+        globalThis.clearInterval(recordingCountdownTimerRef.current);
       }
     };
   }, []);
@@ -359,7 +406,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   // Start 10-second camera window
   const startCameraWindow = useCallback((observationId: string) => {
-    // Clear any existing timer
     if (cameraWindowTimerRef.current) {
       globalThis.clearInterval(cameraWindowTimerRef.current);
     }
@@ -368,7 +414,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     setCameraWindowActive(true);
     setCameraWindowSecondsLeft(10);
 
-    // Countdown timer
     cameraWindowTimerRef.current = globalThis.setInterval(() => {
       setCameraWindowSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -401,10 +446,8 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   // Start observation button
   const onStartObservationPress = useCallback(async () => {
     if (recordingCountdown > 0) {
-      // Stop recording early
       await stopObservationRecording();
     } else {
-      // Start recording
       await startObservationRecording();
     }
   }, [recordingCountdown, startObservationRecording, stopObservationRecording]);
@@ -445,12 +488,10 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         end_longitude: endCoordinates.longitude,
       });
 
-      // Stop location tracking when journey ends, regardless of success or failure
       stopLocationTracking();
 
       await transcribeTripAudio(tripId);
 
-      // Clear the active trip from storage so a new one can be created next time
       await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
 
       showToast('Journey ended. Transcriptions complete!');
@@ -464,7 +505,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   }, [tripId, router, endingJourney]);
 
   const obsCount = observations.length;
-  const shouldRenderWakeWordStatus = Platform.OS === 'android';
+  const shouldRenderWakeWordStatus = true;
   const wakeWordStatusText = isExpoGo()
     ? 'Wake word disabled in Expo Go'
     : recordingCountdown > 0
@@ -472,7 +513,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       : !wakeWord.isAvailable
         ? 'Wake word unavailable in this build/device'
         : wakeWordEnabled
-          ? '💡 Say “Hey Wade, Start Recording”'
+          ? '💡 Say "Hey Wade, Start Recording"'
           : wakeWord.lastError
             ? `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`
             : 'Wake word is starting…';

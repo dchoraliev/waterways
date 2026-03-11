@@ -55,6 +55,7 @@ export interface VoiceEventCallbacks {
   onPartialResults?: (results: RecognitionResult[]) => void;
   onError?: (error: RecognitionError) => void;
   onStateChange?: (state: RecognitionState) => void;
+  onWakeWordDetected?: () => void;
 }
 
 class VoiceRecognitionService {
@@ -71,9 +72,17 @@ class VoiceRecognitionService {
 
   private isInitialized = false;
   private shouldContinue = false;
+  private wakeWordDetected = false;
 
+  // Increased from 50ms — iOS fires multiple result events for the same
+  // utterance in quick succession; 300ms prevents duplicate wake word triggers
   private lastEventAt = 0;
-  private readonly EVENT_DEBOUNCE_MS = 50;
+  private readonly EVENT_DEBOUNCE_MS = 300;
+
+  // Cooldown after wake word fires — prevents the same utterance being
+  // detected 2-3 times before the restart cycle completes
+  private wakeWordCooldownUntil = 0;
+  private readonly WAKE_WORD_COOLDOWN_MS = 2000;
 
   private consecutiveErrors = 0;
   private readonly MAX_CONSECUTIVE_ERRORS = 3;
@@ -137,6 +146,8 @@ class VoiceRecognitionService {
 
     try {
       this.shouldContinue = !!this.config.continuous;
+      this.wakeWordDetected = false;
+      this.wakeWordCooldownUntil = 0;
       this.clearRestartTimeout();
       this.setState('initializing');
 
@@ -160,6 +171,8 @@ class VoiceRecognitionService {
     }
 
     this.shouldContinue = false;
+    this.wakeWordDetected = false;
+    this.wakeWordCooldownUntil = 0;
     this.clearRestartTimeout();
     this.setState('stopping');
 
@@ -174,6 +187,8 @@ class VoiceRecognitionService {
 
   public async cancel(): Promise<void> {
     this.shouldContinue = false;
+    this.wakeWordDetected = false;
+    this.wakeWordCooldownUntil = 0;
     this.clearRestartTimeout();
 
     try {
@@ -187,6 +202,8 @@ class VoiceRecognitionService {
 
   public async destroy(): Promise<void> {
     this.shouldContinue = false;
+    this.wakeWordDetected = false;
+    this.wakeWordCooldownUntil = 0;
     this.clearRestartTimeout();
 
     try {
@@ -235,19 +252,54 @@ class VoiceRecognitionService {
     this.consecutiveErrors = 0;
 
     const value = event.value ?? [];
-    if (value.length) {
-      const now = Date.now();
-      const results: RecognitionResult[] = value
-        .slice(0, this.config.maxAlternatives ?? value.length)
-        .map((text, index) => ({
-          text,
-          confidence: this.estimateConfidence(text, index),
-          isFinal: true,
-          timestamp: now,
-        }));
+    if (!value.length) return;
 
-      this.callbacks.onResults?.(results);
+    const now = Date.now();
+
+    // --- Wake word gating ---
+    if (this.config.wakeWord) {
+      const wakeWord = this.config.wakeWord.toLowerCase().trim();
+
+      if (!this.wakeWordDetected) {
+        const heard = value.some((t) => t.toLowerCase().includes(wakeWord));
+
+        if (heard) {
+          // Cooldown check — prevents duplicate triggers from multiple iOS
+          // result events fired for the same utterance
+          if (now < this.wakeWordCooldownUntil) {
+            console.log('[VoiceService] Wake word suppressed by cooldown');
+            this.scheduleRestart();
+            return;
+          }
+
+          this.wakeWordCooldownUntil = now + this.WAKE_WORD_COOLDOWN_MS;
+          this.callbacks.onWakeWordDetected?.();
+          this.scheduleRestart();
+        } else {
+          if (this.shouldContinue) {
+            this.scheduleRestart();
+          } else {
+            this.setState('idle');
+          }
+        }
+        return; // never fire onResults in wake word mode
+      }
+
+      // Wake word already detected — this is the command utterance
+      this.wakeWordDetected = false;
     }
+    // --- End wake word gating ---
+
+    const results: RecognitionResult[] = value
+      .slice(0, this.config.maxAlternatives ?? value.length)
+      .map((text, index) => ({
+        text,
+        confidence: this.estimateConfidence(text, index),
+        isFinal: true,
+        timestamp: now,
+      }));
+
+    this.callbacks.onResults?.(results);
 
     if (this.shouldContinue) {
       this.scheduleRestart();
@@ -260,6 +312,9 @@ class VoiceRecognitionService {
     if (!this.config.returnPartialResults) return;
     if (this.shouldDebounce()) return;
     if (!this.isListening()) return;
+
+    // Don't surface partial results until wake word has been confirmed
+    if (this.config.wakeWord && !this.wakeWordDetected) return;
 
     const value = event.value ?? [];
     if (value.length) {
