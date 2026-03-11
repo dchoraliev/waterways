@@ -5,8 +5,11 @@
  * - Continuous listening for wake word
  * - Automatic transition to recording mode after detection
  * - Robust error handling and recovery
- * - Fuzzy matching for improved accuracy
  * - Proper cleanup and lifecycle management
+ *
+ * Wake word detection is handled entirely by VoiceRecognitionService.
+ * This hook reacts to onWakeWordDetected callbacks and manages the
+ * recording lifecycle — it does NOT do its own speech matching.
  *
  * Usage:
  * ```tsx
@@ -34,7 +37,7 @@ import AudioRecordingService, {
   RecordingResult,
   RecordingStopReason,
 } from '../services/AudioRecordingService';
-import { detectWakeWordWithVariations, WakeWordMatch } from '../utils/stringMatching';
+import { WakeWordMatch } from '../utils/stringMatching';
 import { hasNativeModules } from '../utils/platformDetection';
 
 export type WakeWordState =
@@ -48,14 +51,10 @@ export type WakeWordState =
 
 export interface WakeWordConfig {
   wakeWord: string;
-  threshold?: number; // Confidence threshold for wake word detection (0-1)
+  threshold?: number;
   locale?: string;
-  continuous?: boolean; // Keep listening after wake word
+  continuous?: boolean;
   maxAlternatives?: number;
-  secondaryThresholdOffset?: number;
-  boostedSensitivityDurationMs?: number;
-  primedWindowMs?: number;
-  minPrefixConfidence?: number;
   onWakeWordDetected?: (match: WakeWordMatch) => void;
   onTranscript?: (text: string, isFinal: boolean) => void;
   onError?: (error: RecognitionError) => void;
@@ -110,10 +109,6 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     locale = 'en-US',
     continuous = true,
     maxAlternatives = 5,
-    secondaryThresholdOffset = 0.12,
-    boostedSensitivityDurationMs = 4000,
-    primedWindowMs = 1800,
-    minPrefixConfidence = 0.78,
     onWakeWordDetected,
     onTranscript,
     onError,
@@ -122,6 +117,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     recordingDelayMs = 1000,
     recordingDurationMs = 10000,
   } = config;
+
   const EXTERNAL_RECORDING_COOLDOWN_MS = 1200;
 
   // State
@@ -157,9 +153,6 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   const recordingStopTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const ignoreResultsRef = useRef(false);
   const onStateChangeRef = useRef(onStateChange);
-  const primedUntilRef = useRef<number | null>(null);
-  const lastPrefixMatchRef = useRef<WakeWordMatch | null>(null);
-  const boostedUntilRef = useRef<number | null>(null);
 
   useEffect(() => {
     onStateChangeRef.current = onStateChange;
@@ -247,88 +240,6 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     }
   }, [recordingDurationMs, stopAudioRecording, updateState]);
 
-  const resetSensitivityGuards = useCallback(() => {
-    primedUntilRef.current = null;
-    lastPrefixMatchRef.current = null;
-    boostedUntilRef.current = null;
-  }, []);
-
-  const extendPrimedWindow = useCallback(
-    (match: WakeWordMatch) => {
-      primedUntilRef.current = Date.now() + primedWindowMs;
-      lastPrefixMatchRef.current = match;
-    },
-    [primedWindowMs]
-  );
-
-  const markBoostedSensitivity = useCallback(() => {
-    boostedUntilRef.current = Date.now() + boostedSensitivityDurationMs;
-  }, [boostedSensitivityDurationMs]);
-
-  const isPrimedActive = useCallback(() => {
-    return (primedUntilRef.current ?? 0) > Date.now();
-  }, []);
-
-  const isBoostedActive = useCallback(() => {
-    return (boostedUntilRef.current ?? 0) > Date.now();
-  }, []);
-
-  const getEffectiveThreshold = useCallback(() => {
-    if (isBoostedActive()) {
-      return Math.max(0.5, threshold - secondaryThresholdOffset);
-    }
-    if (isPrimedActive()) {
-      return Math.max(0.55, threshold - secondaryThresholdOffset / 2);
-    }
-    return threshold;
-  }, [isBoostedActive, isPrimedActive, threshold, secondaryThresholdOffset]);
-
-  const evaluateWakeWordMatch = useCallback(
-    (match: WakeWordMatch): { shouldTrigger: boolean; enrichedMatch: WakeWordMatch } => {
-      let shouldTrigger = match.isMatch;
-
-      if (match.stage === 'prefix') {
-        const prefixConfidence = match.segments?.prefix?.confidence ?? match.confidence;
-        if (prefixConfidence >= Math.max(minPrefixConfidence, threshold - 0.05)) {
-          extendPrimedWindow(match);
-        }
-      }
-
-      if (!shouldTrigger && isPrimedActive() && match.stage === 'full') {
-        const primedThreshold = Math.max(0.6, threshold - secondaryThresholdOffset / 2);
-        if (match.confidence >= primedThreshold) {
-          shouldTrigger = true;
-        }
-      }
-
-      if (
-        !shouldTrigger &&
-        match.confidence >= Math.max(0.6, threshold - secondaryThresholdOffset)
-      ) {
-        markBoostedSensitivity();
-      }
-
-      if (shouldTrigger) {
-        resetSensitivityGuards();
-        const enrichedMatch: WakeWordMatch = match.isMatch
-          ? match
-          : { ...match, isMatch: true, stage: match.stage ?? 'full' };
-        return { shouldTrigger: true, enrichedMatch };
-      }
-
-      return { shouldTrigger: false, enrichedMatch: match };
-    },
-    [
-      extendPrimedWindow,
-      isPrimedActive,
-      markBoostedSensitivity,
-      minPrefixConfidence,
-      resetSensitivityGuards,
-      secondaryThresholdOffset,
-      threshold,
-    ]
-  );
-
   const triggerWakeWordFlow = useCallback(
     (match: WakeWordMatch) => {
       setLastWakeWordMatch(match);
@@ -345,9 +256,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       clearRecordingTimers();
 
       if (recordingDurationMs <= 0) {
-        // External recording mode: parent handles recording lifecycle.
-        // Keep recognition in listening mode after a short cooldown so
-        // repeated wake words can still be detected reliably.
+        // External recording mode
         isRecordingMode.current = false;
         ignoreResultsRef.current = true;
 
@@ -383,131 +292,55 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     ]
   );
 
-  // Initialize service
-  useEffect(() => {
-    const recognitionService = voiceService.current;
-    const recordingService = audioService.current;
-
-    const init = async () => {
-      if (!hasNativeModules()) {
-        setIsAvailable(false);
-        updateState('idle');
-        return;
-      }
-
-      const success = await recognitionService.initialize({
-        locale,
-        continuous: true, // Always use continuous mode internally
-        maxAlternatives,
-        returnPartialResults: true,
-        wakeWord,
-        wakeWordThreshold: threshold,
-      });
-
-      setIsAvailable(success);
-
-      if (!success) {
-        updateState('error');
-      }
+  // Called by VoiceRecognitionService when wake word is confirmed.
+  // This is the single entry point for wake word detection — the hook
+  // does NOT do its own speech matching.
+  const handleWakeWordDetected = useCallback(() => {
+    console.log('[useWakeWord] Wake word confirmed by service');
+    const match: WakeWordMatch = {
+      isMatch: true,
+      confidence: 1,
+      stage: 'full',
     };
+    triggerWakeWordFlow(match);
+  }, [triggerWakeWordFlow]);
 
-    void init();
-
-    // Cleanup - stop listening but don't destroy singleton service
-    return () => {
-      if (recognitionService.isListening()) {
-        recognitionService.stop();
-      }
-      if (transitionTimeout.current) {
-        globalThis.clearTimeout(transitionTimeout.current);
-      }
-      clearRecordingTimers();
-      if (recordingService.isRecording()) {
-        recordingService.stopRecording('manual').catch(() => {
-          /* noop */
-        });
-      }
-    };
-  }, [locale, maxAlternatives, wakeWord, threshold, clearRecordingTimers, updateState]);
-
-  // Handle recognition results
+  // Handle final recognition results — command transcription only.
+  // Wake word detection has already been handled by the service.
   const handleResults = useCallback(
     (results: RecognitionResult[]) => {
       if (results.length === 0) return;
+      if (ignoreResultsRef.current) return;
 
-      const bestResult = results[0];
-      const text = bestResult.text;
-
-      console.log(
-        `[useWakeWord] Results - Mode: ${isRecordingMode.current ? 'recording' : 'listening'}, Text: "${text}"`
-      );
-
-      if (!isRecordingMode.current && ignoreResultsRef.current) {
-        return;
-      }
+      const text = results[0].text;
+      console.log(`[useWakeWord] Command result: "${text}"`);
 
       if (isRecordingMode.current) {
-        // Recording mode - capture transcription
         setFinalTranscript(text);
         onTranscript?.(text, true);
 
         if (!continuous) {
-          // Stop after recording if not continuous
           updateState('processing');
           voiceService.current.stop();
         }
-      } else {
-        // Listening mode - check for wake word
-        const effectiveThreshold = getEffectiveThreshold();
-        const match = detectWakeWordWithVariations(text, wakeWord, effectiveThreshold);
-        const { shouldTrigger, enrichedMatch } = evaluateWakeWordMatch(match);
-
-        console.log(
-          `[useWakeWord] Wake check - Stage: ${match.stage ?? 'unknown'} | Confidence: ${match.confidence.toFixed(2)} | Trigger: ${shouldTrigger}`
-        );
-
-        if (shouldTrigger) {
-          triggerWakeWordFlow(enrichedMatch);
-        }
       }
+      // No wake word check here — the service handles that before onResults fires
     },
-    [
-      wakeWord,
-      continuous,
-      getEffectiveThreshold,
-      evaluateWakeWordMatch,
-      triggerWakeWordFlow,
-      onTranscript,
-      updateState,
-    ]
+    [continuous, onTranscript, updateState]
   );
 
-  // Handle partial results
+  // Handle partial results — transcription only, no wake word matching.
   const handlePartialResults = useCallback(
     (results: RecognitionResult[]) => {
       if (results.length === 0) return;
+      if (ignoreResultsRef.current) return;
+      if (!isRecordingMode.current) return; // no partials during wake word listening phase
 
       const text = results[0].text;
       setPartialTranscript(text);
-
-      if (isRecordingMode.current) {
-        // Show partial transcription
-        onTranscript?.(text, false);
-      } else {
-        // In listening mode, check partial results for faster response
-        const effectiveThreshold = getEffectiveThreshold();
-        const match = detectWakeWordWithVariations(text, wakeWord, effectiveThreshold);
-        const { shouldTrigger, enrichedMatch } = evaluateWakeWordMatch(match);
-
-        if (shouldTrigger) {
-          console.log(
-            `[useWakeWord] Wake word detected (partial) - Stage: ${match.stage ?? 'unknown'} | Confidence: ${match.confidence.toFixed(2)}`
-          );
-          triggerWakeWordFlow(enrichedMatch);
-        }
-      }
+      onTranscript?.(text, false);
     },
-    [wakeWord, getEffectiveThreshold, evaluateWakeWordMatch, triggerWakeWordFlow, onTranscript]
+    [onTranscript]
   );
 
   // Handle errors
@@ -539,7 +372,6 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   // Handle state changes from service
   const handleServiceStateChange = useCallback(
     (serviceState: RecognitionState) => {
-      // Map service state to wake word state
       switch (serviceState) {
         case 'idle':
           if (state !== 'idle') {
@@ -564,6 +396,52 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     [state, updateState]
   );
 
+  // Initialize service
+  useEffect(() => {
+    const recognitionService = voiceService.current;
+    const recordingService = audioService.current;
+
+    const init = async () => {
+      if (!hasNativeModules()) {
+        setIsAvailable(false);
+        updateState('idle');
+        return;
+      }
+
+      const success = await recognitionService.initialize({
+        locale,
+        continuous: true,
+        maxAlternatives,
+        returnPartialResults: true,
+        wakeWord,
+        wakeWordThreshold: threshold,
+      });
+
+      setIsAvailable(success);
+
+      if (!success) {
+        updateState('error');
+      }
+    };
+
+    void init();
+
+    return () => {
+      if (recognitionService.isListening()) {
+        recognitionService.stop();
+      }
+      if (transitionTimeout.current) {
+        globalThis.clearTimeout(transitionTimeout.current);
+      }
+      clearRecordingTimers();
+      if (recordingService.isRecording()) {
+        recordingService.stopRecording('manual').catch(() => {
+          /* noop */
+        });
+      }
+    };
+  }, [locale, maxAlternatives, wakeWord, threshold, clearRecordingTimers, updateState]);
+
   // Start listening for wake word
   const startListening = useCallback(async (): Promise<boolean> => {
     if (!isAvailable) {
@@ -578,12 +456,13 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     setLastError(null);
     setDebugInfo((prev) => ({ ...prev, consecutiveErrors: 0 }));
     ignoreResultsRef.current = false;
-    resetSensitivityGuards();
+
     if (transitionTimeout.current) {
       globalThis.clearTimeout(transitionTimeout.current);
       transitionTimeout.current = null;
     }
     clearRecordingTimers();
+
     if (audioService.current.isRecording()) {
       await audioService.current.stopRecording('manual');
     }
@@ -596,6 +475,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       onPartialResults: handlePartialResults,
       onError: handleError,
       onStateChange: handleServiceStateChange,
+      onWakeWordDetected: handleWakeWordDetected, // service calls this when wake word confirmed
     });
 
     if (success) {
@@ -611,9 +491,9 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     handlePartialResults,
     handleError,
     handleServiceStateChange,
+    handleWakeWordDetected,
     updateState,
     clearRecordingTimers,
-    resetSensitivityGuards,
   ]);
 
   // Stop listening
@@ -628,10 +508,9 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       await stopAudioRecording('manual');
     }
     isRecordingMode.current = false;
-    resetSensitivityGuards();
     await voiceService.current.stop();
     updateState('idle');
-  }, [clearRecordingTimers, resetSensitivityGuards, stopAudioRecording, updateState]);
+  }, [clearRecordingTimers, stopAudioRecording, updateState]);
 
   // Reset to initial state
   const reset = useCallback(() => {
@@ -645,8 +524,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       totalDetections: 0,
       lastDetectionTime: null,
     });
-    resetSensitivityGuards();
-  }, [resetSensitivityGuards]);
+  }, []);
 
   return {
     // Control methods
@@ -672,7 +550,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     // Debugging
     debugInfo,
 
-    // Voice service instance for advanced features (battery stats, etc.)
+    // Voice service instance for advanced features
     voiceService: voiceService.current,
   };
 }
