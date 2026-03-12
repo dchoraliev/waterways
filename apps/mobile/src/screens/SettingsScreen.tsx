@@ -8,6 +8,9 @@ import {
   Pressable,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createSettingsStyles, createSettingsTokens } from '../styles/SettingsScreen.styles';
@@ -25,7 +28,7 @@ interface UserProfile {
 
 interface SettingsScreenProps {
   onNavigateToProjects?: () => void;
-  onSignOutSuccess: () => void; // New prop for sign-out action
+  onSignOutSuccess: () => void;
 }
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -40,6 +43,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Dialog state
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -67,7 +71,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showNameOnMap, setShowNameOnMap] = useState(true);
 
-  // Used to prevent multiple rapid updates
   const [isUpdatingShowNameOnMap, setIsUpdatingShowNameOnMap] = useState(false);
 
   const loadUserProfile = async () => {
@@ -137,10 +140,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
-  // Fetch the user's email on mount using the existing getSession
   useEffect(() => {
-    loadUserProfile();
-    loadLocalSettings();
+    const loadAll = async () => {
+      setIsInitialLoading(true);
+      await Promise.all([loadUserProfile(), loadLocalSettings()]);
+      setIsInitialLoading(false);
+    };
+    loadAll();
   }, []);
 
   const handleDarkModeToggle = async (value: boolean) => {
@@ -172,13 +178,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const handleSignOut = async () => {
     setLoading(true);
     try {
-      // Use existing signOut function
       const { error } = await signOut();
 
       if (error) {
         Alert.alert('Sign Out Failed', error.message);
       } else {
-        onSignOutSuccess(); // Navigate back to login screen via prop
+        onSignOutSuccess();
       }
     } catch (_error) {
       console.error('Sign Out error:', _error);
@@ -425,9 +430,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
-  const handleShowNameOnMapToggle = async (value: boolean) => {
-    if (isUpdatingShowNameOnMap) return;
-
+  const performShowNameOnMapUpdate = async (value: boolean) => {
     const {
       data: { session },
       error: sessionError,
@@ -461,190 +464,229 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
+  const handleShowNameOnMapToggle = async (value: boolean) => {
+    if (isUpdatingShowNameOnMap) return;
+
+    // If turning OFF, show confirmation
+    if (!value) {
+      Alert.alert(
+        'Hide Name on Map?',
+        'Hiding your name may decrease collaboration opportunities with other researchers. Are you sure?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Hide Name',
+            style: 'destructive',
+            onPress: () => performShowNameOnMapUpdate(value),
+          },
+        ]
+      );
+      return;
+    }
+
+    // If turning ON, update immediately
+    await performShowNameOnMapUpdate(value);
+  };
+
   return (
     <SafeAreaView style={styles.root} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.headerCentered}>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Manage your WaDE preferences and data.</Text>
+      {isInitialLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={tokens.primary} />
+          <Text style={{ color: tokens.text, marginTop: 16 }}>Loading settings...</Text>
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.headerCentered}>
+            <Text style={styles.title}>Settings</Text>
+            <Text style={styles.subtitle}>Manage your WaDE preferences and data.</Text>
+          </View>
 
-        {/* Profile */}
-        {userProfile && (
+          {/* Profile */}
+          {userProfile && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Profile Information</Text>
+              <View style={styles.cardBody}>
+                <View style={styles.profileRow}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.profileName}>{userProfile.name}</Text>
+                    <Text style={styles.profileEmail}>{userProfile.email}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.separator} />
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Member since</Text>
+                  <Text style={styles.metaValue}>October 2025</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Total journeys</Text>
+                  <Text style={styles.metaValue}>0</Text>
+                </View>
+
+                <View style={{ height: 12 }} />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.button, styles.buttonOutline]}
+                  onPress={handleSignOut}
+                  disabled={loading}
+                >
+                  <Ionicons name="log-out-outline" size={18} color={tokens.text} />
+                  <Text style={[styles.buttonText, styles.buttonTextOutline]}>
+                    {loading ? 'Signing out...' : 'Sign Out'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Quick Nav */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Profile Information</Text>
+            <Text style={styles.cardTitle}>Navigation</Text>
             <View style={styles.cardBody}>
-              <View style={styles.profileRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials}</Text>
+              <Pressable
+                onPress={handleMyProjects}
+                style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
+              >
+                <View style={styles.navLeft}>
+                  <Ionicons name="folder-outline" size={20} color={tokens.primary} />
+                  <View>
+                    <Text style={styles.navLabel}>My Projects</Text>
+                    <Text style={styles.navSubLabel}>View and manage your research projects.</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.profileName}>{userProfile.name}</Text>
-                  <Text style={styles.profileEmail}>{userProfile.email}</Text>
+                <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Account Management */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Account Management</Text>
+            <View style={styles.cardBody}>
+              <View style={styles.rowBetween}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="mail-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.rowLabel}>Change email address</Text>
                 </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.button, styles.buttonOutline, styles.buttonSm]}
+                  onPress={() => setShowEmailDialog(true)}
+                >
+                  <Text style={[styles.buttonText, styles.buttonTextOutline]}>Change</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.rowBetween}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="lock-closed-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.rowLabel}>Change password</Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.button, styles.buttonOutline, styles.buttonSm]}
+                  onPress={() => setShowPasswordDialog(true)}
+                >
+                  <Text style={[styles.buttonText, styles.buttonTextOutline]}>Change</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.separator} />
 
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Member since</Text>
-                <Text style={styles.metaValue}>October 2025</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Total journeys</Text>
-                <Text style={styles.metaValue}>0</Text>
-              </View>
-
-              <View style={{ height: 12 }} />
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.button, styles.buttonOutline]}
-                onPress={handleSignOut}
-                disabled={loading}
-              >
-                <Ionicons name="log-out-outline" size={18} color={tokens.text} />
-                <Text style={[styles.buttonText, styles.buttonTextOutline]}>
-                  {loading ? 'Signing out...' : 'Sign Out'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Quick Nav */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Navigation</Text>
-          <View style={styles.cardBody}>
-            <Pressable
-              onPress={handleMyProjects}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
-            >
-              <View style={styles.navLeft}>
-                <Ionicons name="folder-outline" size={20} color={tokens.primary} />
-                <View>
-                  <Text style={styles.navLabel}>My Projects</Text>
-                  <Text style={styles.navSubLabel}>View and manage your research projects.</Text>
+              <View style={styles.rowBetween}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="trash-outline" size={20} color={tokens.destructive} />
+                  <Text style={[styles.rowLabel, { color: tokens.destructive }]}>
+                    Delete account
+                  </Text>
                 </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.button, styles.buttonDestructive, styles.buttonSm]}
+                  onPress={() => setShowDeleteDialog(true)}
+                >
+                  <Text style={[styles.buttonText, styles.buttonTextSolid]}>Delete</Text>
+                </TouchableOpacity>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
-            </Pressable>
+            </View>
           </View>
-        </View>
 
-        {/* Account Management */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Account Management</Text>
-          <View style={styles.cardBody}>
-            <View style={styles.rowBetween}>
-              <View style={styles.rowLeft}>
-                <Ionicons name="mail-outline" size={20} color={tokens.primary} />
-                <Text style={styles.rowLabel}>Change email address</Text>
-              </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.button, styles.buttonOutline, styles.buttonSm]}
-                onPress={() => setShowEmailDialog(true)}
+          {/* Notifications */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Notifications</Text>
+            <View style={styles.cardBody}>
+              <Pressable
+                onPress={() => setShowNotificationsDialog(true)}
+                style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
               >
-                <Text style={[styles.buttonText, styles.buttonTextOutline]}>Change</Text>
-              </TouchableOpacity>
+                <View style={styles.navLeft}>
+                  <Ionicons name="notifications-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.navLabel}>Customize notifications</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
+              </Pressable>
             </View>
+          </View>
 
-            <View style={styles.rowBetween}>
-              <View style={styles.rowLeft}>
-                <Ionicons name="lock-closed-outline" size={20} color={tokens.primary} />
-                <Text style={styles.rowLabel}>Change password</Text>
+          {/* Display */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Display</Text>
+            <View style={styles.cardBody}>
+              <View style={styles.switchRow}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="person-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.rowLabel}>Show my name on map</Text>
+                </View>
+                <Switch
+                  value={showNameOnMap}
+                  onValueChange={handleShowNameOnMapToggle}
+                  disabled={isUpdatingShowNameOnMap}
+                />
               </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.button, styles.buttonOutline, styles.buttonSm]}
-                onPress={() => setShowPasswordDialog(true)}
+              <View style={styles.switchRow}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="moon-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.rowLabel}>Dark mode</Text>
+                </View>
+                <Switch value={mode === 'dark'} onValueChange={handleDarkModeToggle} />
+              </View>
+            </View>
+          </View>
+
+          {/* Legal */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Legal</Text>
+            <View style={styles.cardBody}>
+              <Pressable
+                onPress={() =>
+                  Alert.alert('Terms', 'Terms & Conditions screen not wired in this file.')
+                }
+                style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
               >
-                <Text style={[styles.buttonText, styles.buttonTextOutline]}>Change</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.rowBetween}>
-              <View style={styles.rowLeft}>
-                <Ionicons name="trash-outline" size={20} color={tokens.destructive} />
-                <Text style={[styles.rowLabel, { color: tokens.destructive }]}>Delete account</Text>
-              </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.button, styles.buttonDestructive, styles.buttonSm]}
-                onPress={() => setShowDeleteDialog(true)}
-              >
-                <Text style={[styles.buttonText, styles.buttonTextSolid]}>Delete</Text>
-              </TouchableOpacity>
+                <View style={styles.navLeft}>
+                  <Ionicons name="document-text-outline" size={20} color={tokens.mutedText} />
+                  <Text style={styles.navLabel}>Terms and Conditions</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
+              </Pressable>
             </View>
           </View>
-        </View>
 
-        {/* Notifications */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notifications</Text>
-          <View style={styles.cardBody}>
-            <Pressable
-              onPress={() => setShowNotificationsDialog(true)}
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
-            >
-              <View style={styles.navLeft}>
-                <Ionicons name="notifications-outline" size={20} color={tokens.primary} />
-                <Text style={styles.navLabel}>Customize notifications</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Display */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Display</Text>
-          <View style={styles.cardBody}>
-            <View style={styles.switchRow}>
-              <View style={styles.rowLeft}>
-                <Ionicons name="person-outline" size={20} color={tokens.primary} />
-                <Text style={styles.rowLabel}>Show my name on map</Text>
-              </View>
-              <Switch
-                value={showNameOnMap}
-                onValueChange={handleShowNameOnMapToggle}
-                disabled={isUpdatingShowNameOnMap}
-              />
-            </View>
-            <View style={styles.switchRow}>
-              <View style={styles.rowLeft}>
-                <Ionicons name="moon-outline" size={20} color={tokens.primary} />
-                <Text style={styles.rowLabel}>Dark mode</Text>
-              </View>
-              <Switch value={mode === 'dark'} onValueChange={handleDarkModeToggle} />
-            </View>
-          </View>
-        </View>
-
-        {/* Legal */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Legal</Text>
-          <View style={styles.cardBody}>
-            <Pressable
-              onPress={() =>
-                Alert.alert('Terms', 'Terms & Conditions screen not wired in this file.')
-              }
-              style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
-            >
-              <View style={styles.navLeft}>
-                <Ionicons name="document-text-outline" size={20} color={tokens.mutedText} />
-                <Text style={styles.navLabel}>Terms and Conditions</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={{ height: 18 }} />
-      </ScrollView>
+          <View style={{ height: 18 }} />
+        </ScrollView>
+      )}
 
       {/* Change Email Modal */}
       <SheetModal
@@ -653,6 +695,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         description="Update your email address. You'll need to enter your current password to confirm."
         onClose={() => setShowEmailDialog(false)}
         styles={styles}
+        useKeyboardAvoidingView
       >
         <Field label="New email address" styles={styles}>
           <TextInput
@@ -713,9 +756,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <SheetModal
         visible={showPasswordDialog}
         title="Change Password"
-        description="Enter your current password and choose a new one. Passwords must be at least 4 characters long and include at least one special character."
+        description="Enter your current password and choose a new one. Passwords must be at least 8 characters long and include at least one special character."
         onClose={() => setShowPasswordDialog(false)}
         styles={styles}
+        useKeyboardAvoidingView
       >
         <Field label="Current password" styles={styles}>
           <TextInput
@@ -766,6 +810,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </TouchableOpacity>
         </View>
       </SheetModal>
+
       {/* Delete Account Modal */}
       <DeletePasswordModal
         visible={showDeleteDialog}
@@ -841,6 +886,7 @@ function SheetModal({
   onClose,
   children,
   styles,
+  useKeyboardAvoidingView = false,
 }: {
   visible: boolean;
   title: string;
@@ -848,18 +894,32 @@ function SheetModal({
   onClose: () => void;
   children: React.ReactNode;
   styles: SettingsStyles;
+  useKeyboardAvoidingView?: boolean;
 }) {
+  const content = (
+    <>
+      <View style={styles.sheetHeader}>
+        <Text style={styles.sheetTitle}>{title}</Text>
+        {!!description && <Text style={styles.sheetDesc}>{description}</Text>}
+      </View>
+      <View style={styles.sheetBody}>{children}</View>
+    </>
+  );
+
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheetWrap}>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            {!!description && <Text style={styles.sheetDesc}>{description}</Text>}
-          </View>
-          <View style={styles.sheetBody}>{children}</View>
-        </View>
+        {useKeyboardAvoidingView ? (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.sheet}
+          >
+            {content}
+          </KeyboardAvoidingView>
+        ) : (
+          <View style={styles.sheet}>{content}</View>
+        )}
       </View>
     </Modal>
   );
