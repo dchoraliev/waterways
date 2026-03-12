@@ -1,305 +1,262 @@
-// apps/mobile/src/screens/PermissionsScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Mic, MapPin, Camera as CameraIcon, CheckCircle2, Circle, Info } from 'lucide-react-native';
-
-import * as Location from 'expo-location';
-import { Camera as ExpoCamera } from 'expo-camera';
-import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
-import * as Notifications from 'expo-notifications';
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createPermissionsScreenStyles } from '../styles/PermissionsScreen.styles';
+import { usePermissions } from '../contexts/PermissionsContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-type PermissionState = 'prompt' | 'granted' | 'denied';
-type ExpoPermissionStatus = 'undetermined' | 'granted' | 'denied';
-
-const PERMISSIONS_ONBOARDING_KEY = 'permissions_onboarding_completed_v1';
-
-const PermissionsScreen: React.FC = () => {
+export default function PermissionsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const styles = React.useMemo(() => createPermissionsScreenStyles(colors), [colors]);
+  const { permissions, requestAllPermissions, openSettings, checkAllPermissions, loading } =
+    usePermissions();
+  const [hasRequestedOnce, setHasRequestedOnce] = useState(false);
 
-  const [micPermission, setMicPermission] = useState<PermissionState>('prompt');
-  const [locationPermission, setLocationPermission] = useState<PermissionState>('prompt');
-  const [cameraPermission, setCameraPermission] = useState<PermissionState>('prompt');
-  const [notificationPermission, setNotificationPermission] = useState<PermissionState>('prompt');
-
-  const [checking, setChecking] = useState(true);
-  const [skipping, setSkipping] = useState(false);
-
-  // First-time-only logic + initial permission check
   useEffect(() => {
-    const init = async () => {
-      try {
-        // 1) Check if onboarding already completed
-        const stored = await AsyncStorage.getItem(PERMISSIONS_ONBOARDING_KEY);
-        if (stored === 'true') {
-          // User has already gone through permissions once → skip screen entirely
-          setSkipping(true);
-          router.replace('/home'); // go straight to HomeRoute
-          return;
-        }
+    checkAllPermissions();
+  }, [checkAllPermissions]);
 
-        // 2) First time: check current OS permission statuses
-        const loc = await Location.getForegroundPermissionsAsync();
-        setLocationPermission(mapExpoStatus(loc.status));
+  // If all permissions granted, navigate to home
+  useEffect(() => {
+    if (permissions.allGranted) {
+      router.replace('/');
+    }
+  }, [permissions.allGranted, router]);
 
-        const audioPerm = await getRecordingPermissionsAsync();
-        setMicPermission(mapExpoStatus(audioPerm.status));
+  const handleRequestPermissions = async () => {
+    setHasRequestedOnce(true);
+    const granted = await requestAllPermissions();
 
-        const cam = await ExpoCamera.getCameraPermissionsAsync();
-        setCameraPermission(mapExpoStatus(cam.status));
-
-        const notificationSettings = await Notifications.getPermissionsAsync();
-        setNotificationPermission(mapExpoStatus(notificationSettings.status));
-      } catch (e) {
-        console.log('Error checking permissions', e);
-      } finally {
-        setChecking(false);
-      }
-    };
-
-    init();
-  }, [router]);
-
-  const allRequiredGranted = micPermission === 'granted' && locationPermission === 'granted';
-
-  function mapExpoStatus(status: ExpoPermissionStatus | undefined): PermissionState {
-    if (!status || status === 'undetermined') return 'prompt';
-    if (status === 'granted') return 'granted';
-    return 'denied';
-  }
-
-  const requestLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(mapExpoStatus(status));
-    } catch (e) {
-      console.log('Error requesting location permission', e);
+    if (granted) {
+      router.replace('/');
     }
   };
 
-  const requestMic = async () => {
-    try {
-      const { status } = await requestRecordingPermissionsAsync();
-      setMicPermission(mapExpoStatus(status));
-    } catch (e) {
-      console.log('Error requesting mic permission', e);
-    }
+  const handleOpenSettings = async () => {
+    await openSettings();
   };
 
-  const requestCamera = async () => {
-    try {
-      const { status } = await ExpoCamera.requestCameraPermissionsAsync();
-      setCameraPermission(mapExpoStatus(status));
-    } catch (e) {
-      console.log('Error requesting camera permission', e);
-    }
-  };
+  const missingPermissions = [];
+  if (!permissions.camera) missingPermissions.push('Camera');
+  if (!permissions.microphone) missingPermissions.push('Microphone');
+  if (!permissions.location) missingPermissions.push('Location');
 
-  const requestNotifications = async () => {
-    try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      setNotificationPermission(mapExpoStatus(status));
-    } catch (e) {
-      console.log('Error requesting notification permission', e);
-    }
-  };
-
-  const handleContinue = async () => {
-    if (!allRequiredGranted) return;
-
-    try {
-      await AsyncStorage.setItem(PERMISSIONS_ONBOARDING_KEY, 'true');
-    } catch (e) {
-      console.log('Error saving permissions onboarding flag', e);
-    }
-
-    router.replace('/home'); // 👈 send them to your HomeRoute
-  };
-
-  // While we’re either skipping or still checking, show a tiny loader
-  if (checking || skipping) {
-    return (
-      <SafeAreaView style={styles.root}>
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: colors.textMuted }}>Preparing your app…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const showSettingsButton = hasRequestedOnce && !permissions.allGranted;
 
   return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.iconWrapper}>
-            <Info size={24} color={colors.primary} />
-          </View>
-          <Text style={styles.title}>Enable permissions</Text>
-          <Text style={styles.subtitle}>
-            We use your microphone, location, and camera to capture rich observations.
-          </Text>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Icon */}
+        <View style={[styles.iconCircle, { backgroundColor: colors.primary + '20' }]}>
+          <Text style={styles.iconText}>🔒</Text>
         </View>
 
-        {/* Location */}
-        <PermissionCard
-          styles={styles}
-          icon={<MapPin size={20} color={colors.primary} />}
-          title="Location"
-          description="Needed to map your observations along the waterway."
-          state={locationPermission}
-          required
-          onRequest={requestLocation}
-          label="Foreground location"
-        />
+        {/* Title */}
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Permissions Required</Text>
 
-        {/* Microphone */}
-        <PermissionCard
-          styles={styles}
-          icon={<Mic size={20} color={colors.primary} />}
-          title="Microphone"
-          description="Record spoken observations during your journey."
-          state={micPermission}
-          required
-          onRequest={requestMic}
-          label="Audio recording"
-        />
+        {/* Description */}
+        <Text style={[styles.description, { color: colors.textMuted }]}>
+          Waterways needs access to your device&apos;s camera, microphone, and location to record
+          observations.
+        </Text>
 
-        {/* Camera (optional) */}
-        <PermissionCard
-          styles={styles}
-          icon={<CameraIcon size={20} color={colors.primary} />}
-          title="Camera"
-          description="Capture photos and short clips of your surroundings."
-          state={cameraPermission}
-          required={false}
-          onRequest={requestCamera}
-          label="Photo & video"
-        />
+        {/* Permission Cards */}
+        <View style={styles.permissionsList}>
+          <PermissionCard
+            icon="📷"
+            title="Camera"
+            description="Take photos and videos of your observations"
+            granted={permissions.camera}
+            colors={colors}
+          />
+          <PermissionCard
+            icon="🎙️"
+            title="Microphone"
+            description="Record audio observations during your journey"
+            granted={permissions.microphone}
+            colors={colors}
+          />
+          <PermissionCard
+            icon="📍"
+            title="Location"
+            description="Track your journey path and observation locations"
+            granted={permissions.location}
+            colors={colors}
+          />
+        </View>
 
-        {/* Notifications (optional) */}
-        <PermissionCard
-          styles={styles}
-          icon={<Info size={20} />}
-          title="Notifications"
-          description="Get reminders to review and submit draft journeys."
-          state={notificationPermission}
-          required={false}
-          onRequest={requestNotifications}
-          label="Draft reminders"
-        />
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          {!showSettingsButton ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+              onPress={handleRequestPermissions}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Grant Permissions</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+                onPress={handleOpenSettings}
+              >
+                <Text style={styles.primaryButtonText}>Open Settings</Text>
+              </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Microphone and location are required. Camera and notifications are optional.
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.primaryButton, !allRequiredGranted && styles.primaryButtonDisabled]}
-            disabled={!allRequiredGranted}
-            onPress={handleContinue}
-          >
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </TouchableOpacity>
+              <Text style={[styles.settingsHint, { color: colors.textMuted }]}>
+                Some permissions were denied. Please enable {missingPermissions.join(', ')} in your
+                device settings.
+              </Text>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
-};
-
-/* ---- Reusable Components ---- */
+}
 
 interface PermissionCardProps {
-  styles: ReturnType<typeof createPermissionsScreenStyles>;
-  icon: React.ReactNode;
+  icon: string;
   title: string;
   description: string;
-  state: PermissionState;
-  required?: boolean;
-  onRequest: () => void;
-  label: string;
+  granted: boolean;
+  colors: {
+    surface: string;
+    textPrimary: string;
+    textMuted: string;
+  };
 }
 
-const PermissionCard: React.FC<PermissionCardProps> = ({
-  styles,
-  icon,
-  title,
-  description,
-  state,
-  required = true,
-  onRequest,
-  label,
-}) => {
-  const isGranted = state === 'granted';
-  const IconComp = isGranted ? CheckCircle2 : Circle;
-
+function PermissionCard({ icon, title, description, granted, colors }: PermissionCardProps) {
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeaderRow}>
-        <View style={styles.cardTitleRow}>
-          <View style={styles.cardIcon}>{icon}</View>
-          <View>
-            <Text style={styles.cardTitle}>{title}</Text>
-            <Text style={styles.cardDescription}>{description}</Text>
-          </View>
+    <View style={[styles.permissionCard, { backgroundColor: colors.surface }]}>
+      <View style={styles.permissionHeader}>
+        <Text style={styles.permissionIcon}>{icon}</Text>
+        <View style={styles.permissionTitleContainer}>
+          <Text style={[styles.permissionTitle, { color: colors.textPrimary }]}>{title}</Text>
+          {granted && (
+            <View style={[styles.grantedBadge, { backgroundColor: '#10B981' }]}>
+              <Text style={styles.grantedText}>✓ Granted</Text>
+            </View>
+          )}
         </View>
-        <StatusBadge styles={styles} state={state} required={required} />
       </View>
-
-      <View style={styles.cardBodyRow}>
-        <View style={styles.statusIndicator}>
-          <IconComp size={16} color={isGranted ? '#16A34A' : '#6B7280'} />
-          <Text style={styles.statusIndicatorText}>{label}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.actionButton} onPress={onRequest}>
-          <Text style={styles.actionButtonText}>{isGranted ? 'Granted' : 'Enable'}</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={[styles.permissionDescription, { color: colors.textMuted }]}>{description}</Text>
     </View>
   );
-};
-
-interface StatusBadgeProps {
-  styles: ReturnType<typeof createPermissionsScreenStyles>;
-  state: PermissionState;
-  required?: boolean;
 }
 
-const StatusBadge: React.FC<StatusBadgeProps> = ({ styles, state, required = true }) => {
-  const isGranted = state === 'granted';
-  const label = isGranted ? 'Granted' : state === 'denied' ? 'Denied' : 'Not set';
-
-  return (
-    <View
-      style={[
-        styles.badge,
-        isGranted
-          ? styles.badgeGranted
-          : state === 'denied'
-            ? styles.badgeDenied
-            : styles.badgeNeutral,
-      ]}
-    >
-      <Text style={styles.badgeText}>
-        {label}
-        {!required ? ' · Optional' : ''}
-      </Text>
-    </View>
-  );
-};
-
-export default PermissionsScreen;
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  content: {
+    padding: 24,
+    paddingTop: 40,
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  iconText: {
+    fontSize: 48,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  permissionsList: {
+    width: '100%',
+    gap: 16,
+    marginBottom: 32,
+  },
+  permissionCard: {
+    borderRadius: 12,
+    padding: 16,
+  },
+  permissionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  permissionIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  permissionTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  permissionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  grantedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  grantedText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  permissionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginLeft: 44,
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 16,
+  },
+  primaryButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  settingsHint: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+});

@@ -346,6 +346,11 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   // Handle errors
   const handleError = useCallback(
     (error: RecognitionError) => {
+      // Ignore "no speech detected" timeout - this is a normal part of continuous listening
+      if (error.code === 'recognition_fail' && error.message?.includes('No speech detected')) {
+        return;
+      }
+
       if (error.isRecoverable) {
         if (isRecordingMode.current) {
           isRecordingMode.current = false;

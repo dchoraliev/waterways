@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Slot, useRouter } from 'expo-router';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { DraftJourneysProvider } from '../hooks/useDraftJourneys';
+import { PermissionsProvider, usePermissions } from '../contexts/PermissionsContext';
 import * as Notifications from 'expo-notifications';
 import TripRecoveryModal from '../components/TripRecoveryModal';
 import {
@@ -13,6 +14,34 @@ import {
   resumeTrip,
   type IncompleteTrip,
 } from '../services/TripRecoveryService';
+
+function PermissionsGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const segments = useSegments();
+  const { permissions, checkAllPermissions } = usePermissions();
+  const [hasChecked, setHasChecked] = useState(false);
+
+  useEffect(() => {
+    checkAllPermissions().then(() => setHasChecked(true));
+  }, [checkAllPermissions]);
+
+  useEffect(() => {
+    if (!hasChecked) return;
+
+    const inPermissionsScreen = segments[0] === 'permissions';
+
+    // If not all permissions granted and not already on permissions screen, redirect
+    if (!permissions.allGranted && !inPermissionsScreen) {
+      router.replace('/permissions');
+    }
+    // If all permissions granted and on permissions screen, go to home
+    else if (permissions.allGranted && inPermissionsScreen) {
+      router.replace('/');
+    }
+  }, [hasChecked, permissions.allGranted, segments, router]);
+
+  return <>{children}</>;
+}
 
 function ThemedAppShell() {
   const router = useRouter();
@@ -109,13 +138,17 @@ function ThemedAppShell() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <DraftJourneysProvider>
-        <TripRecoveryModal
-          visible={showRecoveryModal}
-          trip={incompleteTrip}
-          onResume={handleResumeTrip}
-          onDiscard={handleDiscardTrip}
-        />
-        <Slot />
+        <PermissionsProvider>
+          <PermissionsGate>
+            <TripRecoveryModal
+              visible={showRecoveryModal}
+              trip={incompleteTrip}
+              onResume={handleResumeTrip}
+              onDiscard={handleDiscardTrip}
+            />
+            <Slot />
+          </PermissionsGate>
+        </PermissionsProvider>
       </DraftJourneysProvider>
     </View>
   );
