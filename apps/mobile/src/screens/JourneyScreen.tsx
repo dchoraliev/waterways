@@ -203,6 +203,11 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       startObservationRecording();
     },
     onError: (error) => {
+      // Ignore "no speech detected" timeout - this is normal when wake word listening
+      if (error.code === 'recognition_fail' && error.message?.includes('No speech detected')) {
+        return;
+      }
+
       if (!error.isRecoverable) {
         console.error('[JourneyScreen] Wake word error:', error);
       }
@@ -286,6 +291,18 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       // Step 2: claim the session for recording
       await configureRecordingAudioMode();
 
+      // Step 2.5: Reset recorder if it's in a bad state
+      try {
+        // Stop any existing recording
+        if (recState?.isRecording) {
+          await recorder.stop();
+        }
+        // Give the system a moment to fully release the previous recording
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 100));
+      } catch (resetError) {
+        console.log('[JourneyScreen] Recorder reset (expected):', resetError);
+      }
+
       // Step 3: prepare and start recording
       await recorder.prepareToRecordAsync();
       await recorder.record();
@@ -312,7 +329,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       // Restart wake word since we stopped it above
       void wakeWordStartRef.current();
     }
-  }, [tripId, recorder, configureRecordingAudioMode]);
+  }, [tripId, recorder, configureRecordingAudioMode, recState]);
 
   // Stop observation recording and save.
   // Resets the audio session and hands it back to the wake word listener.
@@ -461,9 +478,12 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
     router.push({
       pathname: ROUTES.cameraCapture,
-      params: { observationId: lastObservationId },
+      params: {
+        observationId: lastObservationId,
+        secondsElapsed: String(Math.floor(secondsElapsed)),
+      },
     });
-  }, [lastObservationId, router]);
+  }, [lastObservationId, secondsElapsed, router]);
 
   // End journey button
   const onEndJourneyPress = useCallback(async () => {
