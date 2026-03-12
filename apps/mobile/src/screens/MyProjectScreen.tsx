@@ -4,6 +4,7 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { leaveProject, createProject, joinProjectWithCode } from '../services/projectService';
 import type { Project } from '../types/project.types';
@@ -42,7 +44,6 @@ const MyProjectsScreen: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
 
-  const loading = authLoading || projectsLoading;
   const placeholderColor = colors.textMuted;
 
   useEffect(() => {
@@ -141,23 +142,23 @@ const MyProjectsScreen: React.FC = () => {
     ]);
   };
 
-  if (loading || !userId) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#1D4ED8" />
-      </View>
-    );
-  }
-
   const isCreator = (project: Project) => project.created_by === userId;
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>‹ Back</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>My Projects</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>My Projects</Text>
+        </View>
+        <Pressable
+          onPress={() => router.replace({ pathname: '/home', params: { tab: 'settings' } })}
+          style={styles.closeButton}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
+      </View>
 
       {/* Action Buttons */}
       <View style={styles.actionButtonsContainer}>
@@ -309,47 +310,62 @@ const MyProjectsScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <ProjectManagementModal
-        visible={!!managingProject}
-        project={managingProject}
-        userId={userId}
-        onClose={() => setManagingProject(null)}
-        onProjectDisbanded={() => {
-          setManagingProject(null);
-          if (userId) loadProjects(userId);
-        }}
-      />
-    </View>
+      {userId && (
+        <ProjectManagementModal
+          visible={!!managingProject}
+          project={managingProject}
+          userId={userId}
+          onClose={() => setManagingProject(null)}
+          onProjectDisbanded={() => {
+            setManagingProject(null);
+            loadProjects(userId);
+          }}
+        />
+      )}
+    </SafeAreaView>
   );
 };
 
 const createMyProjectScreenStyles = (themeColors: AppColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: themeColors.background },
-    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    backButton: {
-      paddingHorizontal: 24,
-      paddingTop: 45,
-      paddingBottom: 10,
+    container: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+      paddingHorizontal: 16,
+      paddingTop: 24,
+      paddingBottom: 16,
     },
-    backButtonText: {
-      color: '#60A5FA',
-      fontSize: 16,
-      fontWeight: '600',
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    headerRow: {
+      marginBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    headerText: {
+      flex: 1,
+      marginRight: 12,
     },
     title: {
       fontSize: 20,
       fontWeight: '600',
       color: themeColors.textPrimary,
-      paddingHorizontal: 24,
-      paddingTop: 10,
-      paddingBottom: 16,
-      textAlign: 'center',
+    },
+    closeButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      backgroundColor: themeColors.background,
+    },
+    closeButtonText: {
+      color: themeColors.textPrimary,
+      fontSize: 12,
     },
     actionButtonsContainer: {
       flexDirection: 'row',
       gap: 12,
-      paddingHorizontal: 24,
       marginBottom: 16,
     },
     actionButton: {
@@ -374,7 +390,7 @@ const createMyProjectScreenStyles = (themeColors: AppColors) =>
     joinButtonText: {
       color: themeColors.primary,
     },
-    listContent: { paddingHorizontal: 24, paddingBottom: 24 },
+    listContent: { paddingBottom: 24 },
     projectCard: {
       width: '100%',
       borderRadius: 16,

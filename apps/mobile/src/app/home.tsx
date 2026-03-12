@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import TopAppBar from '../components/TopAppBar';
 import BottomNav, { BottomTabKey } from '../components/BottomNav';
 import HomeScreen from '../screens/HomeScreen';
@@ -13,7 +13,9 @@ import { ROUTES } from '../constants/routes';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function HomeRoute() {
-  const [currentTab, setCurrentTab] = useState<BottomTabKey>('home');
+  const params = useLocalSearchParams();
+  const initialTab = (params.tab as BottomTabKey) || 'home';
+  const [currentTab, setCurrentTab] = useState<BottomTabKey>(initialTab);
   const router = useRouter();
   const { colors } = useTheme();
 
