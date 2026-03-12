@@ -20,11 +20,13 @@ import TagPill from './TagPill';
 import locationIcon from '../assets/icons/location-pin.png';
 import editIcon from '../assets/icons/edit.png';
 import mediaIcon from '../assets/icons/media_attached_icon.png';
+import { SyncStatus } from '../database/SyncStatus';
+import { CATEGORIES } from '../services/ObservationClassifier';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
 import videoIcon from '../assets/icons/video_attached.png';
 
-export type ObservationStatus = 'Offline' | 'Synced' | 'Error';
+export type ObservationStatus = SyncStatus;
 
 export interface Observation {
   id: string;
@@ -132,6 +134,13 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
   const isPhoto = observation.mediaType === 'photo';
   const isVideo = observation.mediaType === 'video';
 
+  function getCategoryColor(cat: string): string {
+    const category = Object.entries(CATEGORIES).find(
+      ([key]) => key.toLowerCase() === cat.toLowerCase()
+    );
+    return category ? category[1].color : '#6B7280'; // default to gray if not found
+  }
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -148,7 +157,9 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
 
         <View style={styles.headerRight}>
           {status && (
-            <View style={[styles.statusBadge, status === 'Offline' && styles.statusOffline]}>
+            <View
+              style={[styles.statusBadge, status === SyncStatus.PENDING && styles.statusOffline]}
+            >
               <Text style={styles.statusText}>{status}</Text>
             </View>
           )}
@@ -262,23 +273,6 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
     </View>
   );
 };
-
-function getCategoryColor(cat: string): string {
-  switch (cat) {
-    case 'Infrastructure':
-      return '#3B82F6';
-    case 'Environmental':
-      return '#10B981';
-    case 'Wildlife':
-      return '#F59E0B';
-    case 'Hazards':
-      return '#EF4444';
-    case 'General':
-      return '#9CA3AF';
-    default:
-      return '#6B7280';
-  }
-}
 
 function createObservationCardStyles(themeColors: AppColors) {
   return StyleSheet.create({

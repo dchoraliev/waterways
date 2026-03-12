@@ -35,6 +35,31 @@ function guessMimeType(path: string): string {
   }
 }
 
+/**
+ * Check if the transcription is a Whisper default response (no actual speech).
+ * Whisper returns these generic phrases when there's silence or no detectable speech.
+ */
+function isWhisperDefaultResponse(text: string): boolean {
+  // Normalize: lowercase and remove punctuation for flexible matching
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?]/g, '');
+
+  // Common Whisper default responses when no speech is detected (English only)
+  const defaults = [
+    'thanks for watching',
+    'thank you for watching',
+    'subscribe',
+    'like and subscribe',
+    'please subscribe',
+    'thank you',
+    '', // Empty string
+  ];
+
+  return defaults.includes(normalized);
+}
+
 export async function transcribeTripAudio(tripId: string): Promise<void> {
   const db = await getDatabase();
 
@@ -102,7 +127,12 @@ export async function transcribeTripAudio(tripId: string): Promise<void> {
         continue;
       }
 
-      const transcript = (data?.text ?? '').trim();
+      const rawTranscript = (data?.text ?? '').trim();
+
+      // FIXED: Replace Whisper default responses with "No speech detected"
+      const transcript = isWhisperDefaultResponse(rawTranscript)
+        ? 'No speech detected'
+        : rawTranscript;
 
       console.log(
         `[TranscriptionService] Got transcript for observation ${observation_id}:`,

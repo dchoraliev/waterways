@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, KeyboardAvoidingView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   sendResetPasswordEmail,
@@ -99,112 +99,119 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView style={styles.root}>
-        <View style={styles.centerWrapper}>
-          {/* Logo */}
-          <View style={styles.logoWrapper}>
-            <Image source={waterwaysLogo} style={styles.logoImage} />
-          </View>
-          <Text style={styles.title}>Reset Password</Text>
-          <Text style={styles.subtitle}>Verify your email to change your password</Text>
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingHorizontal: 20,
+          paddingBottom: 300,
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Logo */}
+        <View style={styles.logoWrapper}>
+          <Image source={waterwaysLogo} style={styles.logoImage} />
+        </View>
+        <Text style={styles.title}>Reset Password</Text>
+        <Text style={styles.subtitle}>Verify your email to change your password</Text>
 
-          {/* ================================================== */}
-          {/* EMAIL + OTP IN THE SAME EXACT CARD VIEW            */}
-          {/* ================================================== */}
-          {!showChangePass && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Verify Email</Text>
-              <Text style={styles.cardDescription}>
-                Enter your email and we’ll send you a verification code.
-              </Text>
+        {/* ================================================== */}
+        {/* EMAIL + OTP IN THE SAME EXACT CARD VIEW            */}
+        {/* ================================================== */}
+        {!showChangePass && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Verify Email</Text>
+            <Text style={styles.cardDescription}>
+              Enter your email and we&apos;ll send you a verification code.
+            </Text>
 
-              {/* EMAIL INPUT */}
-              <TextInputField
-                label="Email"
-                placeholder="you@example.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
+            {/* EMAIL INPUT */}
+            <TextInputField
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
 
-              {/* SEND CODE BUTTON (HIDDEN AFTER PRESS) */}
-              {!showOtpField && (
-                <PrimaryButton
-                  label="Send Code"
-                  onPress={handleSendEmail}
-                  disabled={!canSubmitEmail}
-                  style={styles.submitButton}
-                />
-              )}
-
-              {/* OTP FIELD + VERIFY BUTTON (SHOWS AFTER SEND) */}
-              {showOtpField && (
-                <>
-                  <TextInputField
-                    label="Verification Code"
-                    placeholder="123456"
-                    value={otp}
-                    onChangeText={setOtp}
-                    keyboardType="numeric"
-                    maxLength={6}
-                  />
-
-                  <PrimaryButton
-                    label="Verify Code"
-                    onPress={handleVerifyOtp}
-                    disabled={!canSubmitOtp}
-                    style={styles.submitButton}
-                  />
-
-                  <TouchableOpacity onPress={handleSendEmail}>
-                    <Text style={styles.footerLink}>Resend Code</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              <View style={styles.footerRow}>
-                <TouchableOpacity onPress={onBackToLogin}>
-                  <Text style={styles.footerLink}>Back to Sign In</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ================================================== */}
-          {/* PASSWORD RESET VIEW — SAME CARD SIZE / STYLE       */}
-          {/* ================================================== */}
-          {showChangePass && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Set New Password</Text>
-              <Text style={styles.cardDescription}>Enter your new password below.</Text>
-
-              <TextInputField
-                label="New Password"
-                placeholder="******"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-
-              <TextInputField
-                label="Confirm Password"
-                placeholder="******"
-                secureTextEntry
-                value={confirm}
-                onChangeText={setConfirm}
-              />
-
+            {/* SEND CODE BUTTON (HIDDEN AFTER PRESS) */}
+            {!showOtpField && (
               <PrimaryButton
-                label="Reset Password"
-                onPress={handleResetPassword}
-                disabled={!canSubmitPassword}
+                label="Send Code"
+                onPress={handleSendEmail}
+                disabled={!canSubmitEmail}
                 style={styles.submitButton}
               />
+            )}
+
+            {/* OTP FIELD + VERIFY BUTTON (SHOWS AFTER SEND) */}
+            {showOtpField && (
+              <>
+                <TextInputField
+                  label="Verification Code"
+                  placeholder="123456"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+
+                <PrimaryButton
+                  label="Verify Code"
+                  onPress={handleVerifyOtp}
+                  disabled={!canSubmitOtp}
+                  style={styles.submitButton}
+                />
+
+                <TouchableOpacity onPress={handleSendEmail}>
+                  <Text style={styles.footerLink}>Resend Code</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={styles.footerRow}>
+              <TouchableOpacity onPress={onBackToLogin}>
+                <Text style={styles.footerLink}>Back to Sign In</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        )}
+
+        {/* ================================================== */}
+        {/* PASSWORD RESET VIEW — SAME CARD SIZE / STYLE       */}
+        {/* ================================================== */}
+        {showChangePass && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Set New Password</Text>
+            <Text style={styles.cardDescription}>Enter your new password below.</Text>
+
+            <TextInputField
+              label="New Password"
+              placeholder="******"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+
+            <TextInputField
+              label="Confirm Password"
+              placeholder="******"
+              secureTextEntry
+              value={confirm}
+              onChangeText={setConfirm}
+            />
+
+            <PrimaryButton
+              label="Reset Password"
+              onPress={handleResetPassword}
+              disabled={!canSubmitPassword}
+              style={styles.submitButton}
+            />
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };

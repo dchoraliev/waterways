@@ -105,19 +105,38 @@ export default function EditObservationScreen() {
 
   const handleSave = async () => {
     if (!draft) return;
+
+    // Update observation in memory
     const updated = [...draft.observations];
+    const currentObs = updated[index];
+
     updated[index] = {
-      ...updated[index],
+      ...currentObs,
       description,
       location,
       category,
       keyword,
       manuallyEdited: true,
-      hasMedia: updated[index].hasMedia,
-      mediaType: updated[index].mediaType,
-      mediaTimestamp: updated[index].mediaTimestamp,
-      mediaFilePath: updated[index].mediaFilePath,
+      hasMedia: currentObs.hasMedia,
+      mediaType: currentObs.mediaType,
+      mediaTimestamp: currentObs.mediaTimestamp,
+      mediaFilePath: currentObs.mediaFilePath,
     };
+
+    // CRITICAL FIX: Save observation changes to database
+    const locationCoords = parseLocationCoords(location);
+    const { updateObservationById } = await import('../database/ObservationManager');
+
+    await updateObservationById(currentObs.id, {
+      observation: description,
+      latitude: locationCoords?.latitude ?? null,
+      longitude: locationCoords?.longitude ?? null,
+      category_id: category,
+    });
+
+    console.log('[EditObservation] Saved observation to database:', currentObs.id);
+
+    // Update draft in memory
     await saveDraft({ ...draft, observations: updated });
     router.back();
   };

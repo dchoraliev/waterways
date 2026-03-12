@@ -1,18 +1,26 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useDraftJourneys } from '../hooks/useDraftJourneys';
 import { createDraftsScreenStyles } from '../styles/DraftsScreen.styles';
 import { useTheme } from '../contexts/ThemeContext';
+import { SyncStatus } from '../database/SyncStatus';
 
 const DraftsScreen: React.FC = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = React.useMemo(() => createDraftsScreenStyles(colors), [colors]);
-  const { drafts } = useDraftJourneys();
+  const { drafts, loadPendingDrafts } = useDraftJourneys();
 
-  const draftJourneys = drafts.filter((j) => j.status === 'draft');
+  const draftJourneys = drafts.filter((j) => j.status === SyncStatus.DRAFTED);
+
+  // FIXED: Reload drafts when screen comes into focus (after submissions)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadPendingDrafts();
+    }, [loadPendingDrafts])
+  );
 
   return (
     <SafeAreaView style={styles.root}>

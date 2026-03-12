@@ -42,7 +42,7 @@ const ReviewObservationsScreen = () => {
 
   const [observations, setObservations] = useState<ObservationUI[]>([]);
   const [trip, setTrip] = useState<TripRow | null>(null);
-  const [projectName, setProjectName] = useState<string>('Unknown project');
+  const [projectName, setProjectName] = useState<string>('No Project');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,23 +70,28 @@ const ReviewObservationsScreen = () => {
       if (!tripData) {
         setTrip(null);
         setObservations([]);
-        setProjectName('Unknown project');
+        setProjectName('No Project');
         setLoading(false);
         return;
       }
 
       setTrip(tripData);
 
+      // Better project name handling
       if (tripData.project_id) {
+        console.log('[ReviewObservationsScreen] Trip has project_id:', tripData.project_id);
+
         const { data: projectData } = await supabase
           .from('projects')
           .select('id, name')
           .eq('id', tripData.project_id)
           .maybeSingle();
 
-        setProjectName(projectData?.name ?? 'Unknown project');
+        console.log('[ReviewObservationsScreen] Project lookup result:', projectData);
+        setProjectName(projectData?.name ?? 'Unknown Project');
       } else {
-        setProjectName('Unknown project');
+        console.log('[ReviewObservationsScreen] Trip has no project_id');
+        setProjectName('No Project');
       }
 
       const { data: obsData, error: obsError } = await supabase
@@ -128,8 +133,15 @@ const ReviewObservationsScreen = () => {
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
   };
 
   const getTagStyle = (tag: string) => {

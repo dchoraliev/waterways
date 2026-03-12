@@ -359,6 +359,20 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
         return;
       }
 
+      // FIXED: Don't log "No speech detected" errors - these are normal during silent periods
+      const isNoSpeechError =
+        error.message?.includes('1110') ||
+        error.message?.toLowerCase().includes('no speech detected');
+
+      if (isNoSpeechError) {
+        // Treat as recoverable even if marked otherwise
+        if (isRecordingMode.current) {
+          isRecordingMode.current = false;
+          updateState('listening');
+        }
+        return;
+      }
+
       console.error('[useWakeWord] Error:', error);
 
       setLastError(error);

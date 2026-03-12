@@ -75,6 +75,15 @@ async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
 
   const fsModule = await import('expo-file-system/legacy');
 
+  // CRITICAL FIX: Check if file exists before trying to read it
+  const fileInfo = await fsModule.getInfoAsync(uri);
+  if (!fileInfo.exists) {
+    throw new Error(`File does not exist: ${uri}`);
+  }
+  if (!fileInfo.isDirectory && fileInfo.size === 0) {
+    throw new Error(`File is empty: ${uri}`);
+  }
+
   // Read file as base64
   const base64 = await fsModule.readAsStringAsync(uri, {
     encoding: fsModule.EncodingType.Base64,
@@ -255,52 +264,52 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
         await updateObservationById(obs.id, { multimedia_url: url });
         observationMediaUrls = [url];
       } else {
-        // Mark the media upload as failed so the observation is not synced
+        // FIXED: Media upload failed, but we'll still sync the observation without media
+        // This prevents one corrupted/missing media file from blocking the entire trip
+        console.warn(
+          `[SyncManager] Media upload failed for observation ${obs.id}, syncing observation without media`
+        );
         upload_failed = true;
+        // Media is already marked as ERROR in syncMedia, so no need to update it here
       }
     }
 
-    // Now sync the observation based on the media upload status
-    if (!upload_failed) {
-      // Upload the observation
-      const payload = {
-        unique_userID_localID_pair: obs.user_id + '-' + obs.id,
-        user_id: obs.user_id,
-        trip_id: supabaseTripId,
-        created_at: parseDateTime(obs.created_at),
-        location: parseLocationAsEWKT(obs.longitude, obs.latitude),
-        observation: obs.observation ?? undefined,
-        categories: obs.category_id ? [obs.category_id] : null,
-        observation_media: observationMediaUrls,
-      };
-      console.log(`[SyncManager] Preparing to sync observation - `, payload);
-      const { error } = await supabase
-        .from('observations')
-        .upsert(payload, { onConflict: 'unique_userID_localID_pair' });
+    // FIXED: Always sync the observation, even if media upload failed
+    // Upload the observation
+    const payload = {
+      unique_userID_localID_pair: obs.user_id + '-' + obs.id,
+      user_id: obs.user_id,
+      trip_id: supabaseTripId,
+      created_at: parseDateTime(obs.created_at),
+      location: parseLocationAsEWKT(obs.longitude, obs.latitude),
+      observation: obs.observation ?? undefined,
+      categories: obs.category_id ? [obs.category_id] : null,
+      observation_media: observationMediaUrls, // Will be null if media failed
+    };
+    console.log(`[SyncManager] Preparing to sync observation - `, payload);
+    const { error } = await supabase
+      .from('observations')
+      .upsert(payload, { onConflict: 'unique_userID_localID_pair' });
 
-      if (error) {
-        // Error encountered
-        failure_encountered = true;
-        console.error(
-          `[SyncManager] Sync failed for observation id ${obs.id} due to unknown error: `,
-          error
-        );
-        await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
-      } else {
-        // Update the sync status on success
-        console.log(`[SyncManager] Observation synced - ${obs.id}`);
-        await updateObservationById(obs.id, {
-          sync_status: SyncStatus.SYNCED,
-          last_synced_at: Date.now(),
-        });
-      }
-    } else {
-      // Mark the current observation as failed due to media upload failure
+    if (error) {
+      // Error encountered during observation sync
       failure_encountered = true;
       console.error(
-        `[SyncManager] Sync blocked for observations ${obs.id} due to failed media upload`
+        `[SyncManager] Sync failed for observation id ${obs.id} due to unknown error: `,
+        error
       );
       await updateObservationById(obs.id, { sync_status: SyncStatus.ERROR });
+    } else {
+      // Update the sync status on success
+      if (upload_failed) {
+        console.log(`[SyncManager] Observation synced (without media) - ${obs.id}`);
+      } else {
+        console.log(`[SyncManager] Observation synced - ${obs.id}`);
+      }
+      await updateObservationById(obs.id, {
+        sync_status: SyncStatus.SYNCED,
+        last_synced_at: Date.now(),
+      });
     }
   }
 
@@ -377,10 +386,24 @@ async function syncMedia(mediaId: string): Promise<{ success: boolean; url: stri
 
     return { success: true, url: publicUrl ?? path };
   } catch (error) {
-    console.error(
-      `[SyncManager] Sync failed: unexpected error while uploading media ${mediaId}`,
-      error
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check if it's a file not found error - these are handled gracefully
+    if (
+      errorMessage.includes('File does not exist') ||
+      errorMessage.includes('is not readable') ||
+      errorMessage.includes('is empty')
+    ) {
+      console.warn(
+        `[SyncManager] Media file missing or unreadable (will sync observation without media):`,
+        `Media ID: ${mediaId}`,
+        `Path: ${media.local_file_path}`
+      );
+    } else {
+      // Unexpected errors should still be logged as errors
+      console.error(`[SyncManager] Unexpected error while uploading media ${mediaId}:`, error);
+    }
+
     await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
     return { success: false, url: null };
   }
