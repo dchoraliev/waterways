@@ -1,13 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View, Platform } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RecentObservationItem } from '../components/RecentObservationItem';
 import { createJourneyScreenStyles } from '../styles/JourneyScreen.styles';
 
-import { updateTripById } from '../database/TripManager';
+import { updateTripById, getTripById, removeTripById } from '../database/TripManager';
 import { getObservationsByTripId } from '../database/ObservationManager';
-import { getTripById } from '../database/TripManager';
+import { SyncStatus } from '../database/SyncStatus';
 
 import { getCurrentUserId } from '../services/AuthService';
 import { getCurrentCoordinates, stopLocationTracking } from '../services/LocationService';
@@ -203,14 +211,21 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       startObservationRecording();
     },
     onError: (error) => {
-      // Ignore "no speech detected" timeout - this is normal when wake word listening
-      if (error.code === 'recognition_fail' && error.message?.includes('No speech detected')) {
+      if (error.isRecoverable) {
         return;
       }
 
-      if (!error.isRecoverable) {
-        console.error('[JourneyScreen] Wake word error:', error);
+      // FIXED: Don't log "No speech detected" errors - these are normal during silent periods
+      const isNoSpeechError =
+        error.message?.includes('1110') ||
+        error.message?.toLowerCase().includes('no speech detected');
+
+      if (isNoSpeechError) {
+        // Silent period - not a real error
+        return;
       }
+
+      console.error('[JourneyScreen] Wake word error:', error);
     },
     onStateChange: () => {
       // State changes handled internally
@@ -498,14 +513,42 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
     try {
       setEndingJourney(true);
+
+      // Check if trip has any observations
+      const observationCount = observations.length;
+
+      if (observationCount === 0) {
+        // Stop location tracking
+        stopLocationTracking();
+
+        // Clear the active trip from storage
+        await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+
+        // Delete the empty trip from database
+        await removeTripById(tripId);
+
+        // Alert user that trip wasn't saved
+        Alert.alert(
+          'Journey Not Saved',
+          'Your journey was not saved because it contains no observations.',
+          [{ text: 'OK', onPress: () => router.replace(ROUTES.home) }],
+          { cancelable: false }
+        );
+
+        return;
+      }
+
+      // Journey has observations - save as draft and proceed
       showToast('Ending journey and transcribing audio...');
 
       const endCoordinates = await getCurrentCoordinates();
 
+      // FIXED: Automatically save as draft when ending journey
       await updateTripById(tripId, {
         end_time: Date.now(),
         end_latitude: endCoordinates.latitude,
         end_longitude: endCoordinates.longitude,
+        sync_status: SyncStatus.DRAFTED, // ✅ Auto-save as draft
       });
 
       stopLocationTracking();
@@ -514,7 +557,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
       await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
 
-      showToast('Journey ended. Transcriptions complete!');
+      showToast('Journey saved as draft. Review and submit when ready!');
       router.push(`/review/${tripId}`);
     } catch (error) {
       console.error('[JourneyScreen] Failed to end journey:', error);
@@ -522,7 +565,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     } finally {
       setEndingJourney(false);
     }
-  }, [tripId, router, endingJourney]);
+  }, [tripId, router, endingJourney, observations]);
 
   const obsCount = observations.length;
   const shouldRenderWakeWordStatus = true;

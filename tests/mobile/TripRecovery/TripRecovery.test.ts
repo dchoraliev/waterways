@@ -147,7 +147,10 @@ describe('Trip Recovery System', () => {
         return Promise.resolve([]);
       });
 
-      mockGetObservationsByTripId.mockResolvedValue([]);
+      // FIXED: Return at least 1 observation (otherwise trip is considered empty and deleted)
+      mockGetObservationsByTripId.mockResolvedValue([
+        { id: 'obs-1', trip_id: mockTripId, observation: 'Test observation' },
+      ]);
 
       const incompleteTrip = await checkForIncompleteTrip();
 
@@ -185,11 +188,15 @@ describe('Trip Recovery System', () => {
         return Promise.resolve([]);
       });
 
-      mockGetObservationsByTripId.mockResolvedValue([]);
+      // FIXED: Return at least 1 observation (otherwise trip is considered empty and deleted)
+      mockGetObservationsByTripId.mockResolvedValue([
+        { id: 'obs-1', trip_id: mockTripId, observation: 'Test observation with photo' },
+      ]);
 
       const incompleteTrip = await checkForIncompleteTrip();
 
       // Should only count the 1 photo, NOT the 3 audio files
+      expect(incompleteTrip).not.toBeNull();
       expect(incompleteTrip?.mediaCount).toBe(1);
     });
   });
@@ -216,7 +223,10 @@ describe('Trip Recovery System', () => {
         return Promise.resolve([{ count: 0 }]);
       });
 
-      mockGetObservationsByTripId.mockResolvedValue([]);
+      // FIXED: Return at least 1 observation (otherwise trip is considered empty and deleted)
+      mockGetObservationsByTripId.mockResolvedValue([
+        { id: 'obs-1', trip_id: mockTripId, observation: 'Force stop test observation' },
+      ]);
 
       const incompleteTrip = await checkForIncompleteTrip();
 
@@ -320,7 +330,10 @@ describe('Trip Recovery System', () => {
         return Promise.resolve([{ count: 0 }]);
       });
 
-      mockGetObservationsByTripId.mockResolvedValue([]);
+      // FIXED: Return at least 1 observation (otherwise trip is considered empty and deleted)
+      mockGetObservationsByTripId.mockResolvedValue([
+        { id: 'obs-1', trip_id: mockTripId, observation: 'Multiple force stops test observation' },
+      ]);
 
       const firstCheck = await checkForIncompleteTrip();
       expect(firstCheck).not.toBeNull();
@@ -329,6 +342,80 @@ describe('Trip Recovery System', () => {
       const secondCheck = await checkForIncompleteTrip();
       expect(secondCheck).not.toBeNull();
       expect(secondCheck?.id).toBe(mockTripId);
+    });
+  });
+
+  describe('Test 8: Empty Journey Cleanup (0 Observations)', () => {
+    it('should delete trip and return null when trip has 0 observations', async () => {
+      const mockTrip = {
+        id: mockTripId,
+        start_time: Date.now(),
+        end_time: null,
+        sync_status: null,
+      };
+
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key) => {
+        if (key === '@waterways:active_trip_id') return Promise.resolve(mockTripId);
+        return Promise.resolve(null);
+      });
+
+      mockDb.getAllAsync.mockImplementation((query: string) => {
+        if (query.includes('SELECT id, start_time, end_time')) {
+          return Promise.resolve([mockTrip]);
+        }
+        return Promise.resolve([{ count: 0 }]);
+      });
+
+      // Empty journey - 0 observations
+      mockGetObservationsByTripId.mockResolvedValue([]);
+
+      const incompleteTrip = await checkForIncompleteTrip();
+
+      // Should return null for empty journey
+      expect(incompleteTrip).toBeNull();
+
+      // Should delete the trip from database
+      expect(mockDb.runAsync).toHaveBeenCalledWith('DELETE FROM trips WHERE id = ?', [mockTripId]);
+
+      // Should clear AsyncStorage
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@waterways:active_trip_id');
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@waterways:last_auto_save');
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@waterways:app_state');
+    });
+
+    it('should NOT delete trip when it has at least 1 observation', async () => {
+      const mockTrip = {
+        id: mockTripId,
+        start_time: Date.now(),
+        end_time: null,
+        sync_status: null,
+      };
+
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key) => {
+        if (key === '@waterways:active_trip_id') return Promise.resolve(mockTripId);
+        return Promise.resolve(null);
+      });
+
+      mockDb.getAllAsync.mockImplementation((query: string) => {
+        if (query.includes('SELECT id, start_time, end_time')) {
+          return Promise.resolve([mockTrip]);
+        }
+        return Promise.resolve([{ count: 0 }]);
+      });
+
+      // Journey has 1 observation
+      mockGetObservationsByTripId.mockResolvedValue([
+        { id: 'obs-1', trip_id: mockTripId, observation: 'At least one observation' },
+      ]);
+
+      const incompleteTrip = await checkForIncompleteTrip();
+
+      // Should return trip data for non-empty journey
+      expect(incompleteTrip).not.toBeNull();
+      expect(incompleteTrip?.observationCount).toBe(1);
+
+      // Should NOT delete the trip
+      expect(mockDb.runAsync).not.toHaveBeenCalled();
     });
   });
 });

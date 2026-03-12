@@ -1,6 +1,6 @@
 ﻿// apps/mobile/src/app/home.tsx
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import TopAppBar from '../components/TopAppBar';
@@ -28,12 +28,31 @@ export default function HomeRoute() {
     router.replace('/');
   };
 
+  // Confirmation dialog before starting a journey
+  const handleStartJourney = () => {
+    Alert.alert(
+      'Start New Journey',
+      'Are you ready to begin recording observations?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Start Journey',
+          onPress: () => router.push(ROUTES.journey),
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
   const renderContent = () => {
     switch (currentTab) {
       case 'home':
         return (
           <HomeScreen
-            onStartJourney={() => router.push(ROUTES.journey)}
+            onStartJourney={handleStartJourney}
             onViewRecordings={() => {
               // Navigate to the list of previous journeys
               router.push(ROUTES.review);

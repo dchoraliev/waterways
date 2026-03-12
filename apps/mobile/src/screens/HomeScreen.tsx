@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { createHomeScreenStyles } from '../styles/HomeScreen.styles';
 import { useTheme } from '../contexts/ThemeContext';
 import { usePermissions } from '../contexts/PermissionsContext';
@@ -34,10 +34,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.contentWrapper}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.contentWrapper}>
         <Text style={styles.title}>Welcome to WaDE</Text>
         <Text style={styles.subtitle}>Track and explore waterway deltas</Text>
 
@@ -117,7 +114,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.cardSubtitle}>Review and submit saved journeys</Text>
           </View>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </View>
   );
 };

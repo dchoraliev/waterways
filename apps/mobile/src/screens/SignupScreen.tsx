@@ -1,5 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, KeyboardAvoidingView, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  KeyboardAvoidingView,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createSignupScreenStyles } from '../styles/SignupScreen.styles';
@@ -13,17 +21,15 @@ export interface SignupScreenProps {
   onBackToLogin: () => void;
 }
 
-// Helper function to parse full name into first and last name
 const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
   const trimmedName = fullName.trim();
-  const nameParts = trimmedName.split(/\s+/); // Split by whitespace
+  const nameParts = trimmedName.split(/\s+/);
 
   if (nameParts.length === 0) {
     return { firstName: '', lastName: '' };
   } else if (nameParts.length === 1) {
     return { firstName: nameParts[0], lastName: '' };
   } else {
-    // First part is first name, everything else is last name
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
     return { firstName, lastName };
@@ -60,8 +66,21 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
 
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView style={styles.root}>
-        <View style={styles.centerWrapper}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: 80, // fixed top padding keeps header stable when keyboard
+            // opens instead of re-centering everything
+            paddingHorizontal: 20,
+            paddingBottom: 40,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <Image source={waterwaysLogo} style={styles.logoImage} />
@@ -120,7 +139,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -334,7 +334,7 @@ class VoiceRecognitionService {
   private onSpeechError = (event: SpeechErrorEvent): void => {
     const code = event.error?.code;
     const message = event.error?.message || 'Unknown error';
-    const isRecoverable = this.isRecoverableError(code);
+    const isRecoverable = this.isRecoverableError(code, message);
     const recognitionError: RecognitionError = {
       code,
       message,
@@ -361,18 +361,35 @@ class VoiceRecognitionService {
     this.setState(isRecoverable ? 'idle' : 'error');
   };
 
-  private isRecoverableError(errorCode?: string | number): boolean {
+  private isRecoverableError(errorCode?: string | number, message?: string): boolean {
     if (errorCode === undefined || errorCode === null) {
       return true;
     }
 
+    // FIXED: Handle iOS "recognition_fail" with "1110/No speech detected" in message
+    // Check message first since iOS sends error code as string "recognition_fail"
+    if (message) {
+      if (message.includes('1110') || message.toLowerCase().includes('no speech detected')) {
+        return true;
+      }
+    }
+
+    // Try to parse error code as number
     const code = typeof errorCode === 'string' ? parseInt(errorCode, 10) : errorCode;
+
+    // If parsing failed (NaN), it's likely a string code like "recognition_fail"
+    if (typeof code === 'number' && isNaN(code)) {
+      // Treat unknown string codes as recoverable by default
+      return true;
+    }
+
     return [
       SpeechErrorCode.CLIENT,
       SpeechErrorCode.NO_MATCH,
       SpeechErrorCode.SPEECH_TIMEOUT,
       SpeechErrorCode.RECOGNIZER_BUSY,
       11,
+      1110, // iOS "No speech detected" - normal when silent
     ].includes(code);
   }
 

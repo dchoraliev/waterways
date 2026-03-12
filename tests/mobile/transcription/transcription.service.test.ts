@@ -169,4 +169,142 @@ describe('TranscriptionService.transcribeTripAudio', () => {
     expect(mockedInvoke).not.toHaveBeenCalled();
     expect(mockedUpdateObservationById).not.toHaveBeenCalled();
   });
+
+  // ═══════════════════════════════════════════
+  // WHISPER HALLUCINATION FILTERING
+  // ═══════════════════════════════════════════
+
+  describe('Whisper Hallucination Filtering', () => {
+    it('should filter out "Thanks for watching!" hallucination', async () => {
+      const tripId = 'trip-hallucination';
+      const observationId = 'obs-hallucination';
+      const localPath = '/path/to/silence.m4a';
+
+      const mockRows: UntranscribedAudioRow[] = [
+        { observation_id: observationId, local_file_path: localPath },
+      ];
+
+      mockedGetDatabase.mockResolvedValue(makeFakeDb(mockRows));
+      mockedReadAsStringAsync.mockResolvedValue('BASE64_SILENCE');
+
+      // Whisper returns common hallucination
+      mockedInvoke.mockResolvedValue({
+        data: { text: 'Thanks for watching!' },
+        error: null,
+      });
+
+      await transcribeTripAudio(tripId);
+
+      // Should mark as transcribed but with "No speech detected" instead of hallucination
+      expect(mockedUpdateObservationById).toHaveBeenCalledWith(observationId, {
+        observation: 'No speech detected',
+        audio_transcribed: true,
+      });
+    });
+
+    it('should filter out "Thank you for watching!" variant', async () => {
+      const tripId = 'trip-variant';
+      const observationId = 'obs-variant';
+      const localPath = '/path/to/empty.m4a';
+
+      const mockRows: UntranscribedAudioRow[] = [
+        { observation_id: observationId, local_file_path: localPath },
+      ];
+
+      mockedGetDatabase.mockResolvedValue(makeFakeDb(mockRows));
+      mockedReadAsStringAsync.mockResolvedValue('BASE64_EMPTY');
+
+      // Whisper returns variant hallucination
+      mockedInvoke.mockResolvedValue({
+        data: { text: 'Thank you for watching!' },
+        error: null,
+      });
+
+      await transcribeTripAudio(tripId);
+
+      expect(mockedUpdateObservationById).toHaveBeenCalledWith(observationId, {
+        observation: 'No speech detected',
+        audio_transcribed: true,
+      });
+    });
+
+    it('should NOT filter out valid transcription that contains "thanks"', async () => {
+      const tripId = 'trip-valid';
+      const observationId = 'obs-valid';
+      const localPath = '/path/to/speech.m4a';
+
+      const mockRows: UntranscribedAudioRow[] = [
+        { observation_id: observationId, local_file_path: localPath },
+      ];
+
+      mockedGetDatabase.mockResolvedValue(makeFakeDb(mockRows));
+      mockedReadAsStringAsync.mockResolvedValue('BASE64_SPEECH');
+
+      // Valid transcription that happens to contain "thanks"
+      mockedInvoke.mockResolvedValue({
+        data: { text: 'I saw a bridge, thanks to the new infrastructure project' },
+        error: null,
+      });
+
+      await transcribeTripAudio(tripId);
+
+      // Should keep the valid transcription
+      expect(mockedUpdateObservationById).toHaveBeenCalledWith(observationId, {
+        observation: 'I saw a bridge, thanks to the new infrastructure project',
+        audio_transcribed: true,
+      });
+    });
+
+    it('should filter out empty/whitespace-only transcriptions', async () => {
+      const tripId = 'trip-empty';
+      const observationId = 'obs-empty';
+      const localPath = '/path/to/blank.m4a';
+
+      const mockRows: UntranscribedAudioRow[] = [
+        { observation_id: observationId, local_file_path: localPath },
+      ];
+
+      mockedGetDatabase.mockResolvedValue(makeFakeDb(mockRows));
+      mockedReadAsStringAsync.mockResolvedValue('BASE64_BLANK');
+
+      // Whisper returns empty string
+      mockedInvoke.mockResolvedValue({
+        data: { text: '   ' },
+        error: null,
+      });
+
+      await transcribeTripAudio(tripId);
+
+      expect(mockedUpdateObservationById).toHaveBeenCalledWith(observationId, {
+        observation: 'No speech detected',
+        audio_transcribed: true,
+      });
+    });
+
+    it('should handle case-insensitive hallucination detection', async () => {
+      const tripId = 'trip-case';
+      const observationId = 'obs-case';
+      const localPath = '/path/to/noise.m4a';
+
+      const mockRows: UntranscribedAudioRow[] = [
+        { observation_id: observationId, local_file_path: localPath },
+      ];
+
+      mockedGetDatabase.mockResolvedValue(makeFakeDb(mockRows));
+      mockedReadAsStringAsync.mockResolvedValue('BASE64_NOISE');
+
+      // Whisper returns mixed case hallucination
+      mockedInvoke.mockResolvedValue({
+        data: { text: 'THANKS FOR WATCHING!' },
+        error: null,
+      });
+
+      await transcribeTripAudio(tripId);
+
+      expect(mockedUpdateObservationById).toHaveBeenCalledWith(observationId, {
+        observation: 'No speech detected',
+        audio_transcribed: true,
+      });
+    });
+  });
 });

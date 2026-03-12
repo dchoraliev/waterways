@@ -25,6 +25,8 @@ export interface IncompleteTrip {
  * Check if there's an incomplete trip (active journey with no end_time)
  * This runs on app launch to detect force stops
  * Trip stays in recovery state until user takes action
+ *
+ * IMPORTANT: Returns null if trip has 0 observations (empty journey)
  */
 export async function checkForIncompleteTrip(): Promise<IncompleteTrip | null> {
   try {
@@ -89,12 +91,28 @@ export async function checkForIncompleteTrip(): Promise<IncompleteTrip | null> {
     console.log('[TripRecovery]   Last app state:', lastAppState);
     console.log(
       '[TripRecovery]   Last auto-save:',
-      lastSave ? new Date(parseInt(lastSave)).toLocaleString() : 'never'
+      lastSave ? new Date(Number.parseInt(lastSave)).toLocaleString() : 'never'
     );
 
     // Get observation count
     const observations = await getObservationsByTripId(trip.id);
     const observationCount = observations?.length || 0;
+
+    // CRITICAL CHECK: Don't recover empty journeys (0 observations)
+    if (observationCount === 0) {
+      console.log('[TripRecovery] ❌ Trip has 0 observations - discarding empty journey');
+
+      // Delete the empty trip
+      await db.runAsync('DELETE FROM trips WHERE id = ?', [trip.id]);
+
+      // Clear storage
+      await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+      await AsyncStorage.removeItem(LAST_SAVE_KEY);
+      await AsyncStorage.removeItem(APP_STATE_KEY);
+
+      console.log('[TripRecovery] Empty journey cleaned up');
+      return null;
+    }
 
     // Get media count - ONLY COUNT PHOTOS/VIDEOS (not audio)
     const mediaResult = await db.getAllAsync<{
@@ -170,7 +188,7 @@ export async function checkForIncompleteTrip(): Promise<IncompleteTrip | null> {
       start_time: trip.start_time,
       observationCount,
       mediaCount: finalMediaCount, // Only photos/videos, not audio
-      lastSaved: lastSave ? parseInt(lastSave) : trip.start_time,
+      lastSaved: lastSave ? Number.parseInt(lastSave) : trip.start_time,
       isReviewing: false,
     };
   } catch (error) {

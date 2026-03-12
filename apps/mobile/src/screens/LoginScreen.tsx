@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, KeyboardAvoidingView, TouchableOpacity, Alert, Image } from 'react-native';
+import {
+  View,
+  Text,
+  KeyboardAvoidingView,
+  TouchableOpacity,
+  Alert,
+  Image,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signIn } from '@waterways/shared/src/supabase/auth';
 import { createLoginScreenStyles } from '../styles/LoginScreen.styles';
@@ -26,6 +35,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
   const handleSignIn = async () => {
@@ -40,13 +50,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
       } else if (data.session) {
         console.log('Login successful! User ID:', data.user?.id);
         onLoginSuccess();
-        // Update the offline data to current user account after successful login
         await updateAndSyncOfflineDataToCurrentUser();
-        // Also trigger a one-time sync after login to sync any pending data immediately
         performAutoSyncTaskOnce();
       }
     } catch (_error) {
-      // FIX: Renamed 'error' to '_error'
       console.error('Login error:', _error);
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
@@ -55,14 +62,31 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   const handleSkipOffline = () => {
-    // For offline mode we go to home without auth
     onLoginSuccess();
   };
 
   return (
     <SafeAreaView style={styles.root}>
-      <KeyboardAvoidingView style={styles.root}>
-        <View style={styles.centerWrapper}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        // use height behavior on Android so the content is padded rather than
+        // resized; avoiding a layout jump when the keyboard appears
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            // drop the centered justification. we add some top padding so the
+            // titles appear roughly centered initially, but they won't move
+            // around when the keyboard opens (that caused the weird jump).
+            paddingTop: 80,
+            paddingHorizontal: 20,
+            paddingBottom: 40,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Logo */}
           <View style={styles.logoWrapper}>
             <Image source={waterwaysLogo} style={styles.logoImage} />
@@ -129,7 +153,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

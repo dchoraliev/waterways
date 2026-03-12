@@ -104,6 +104,11 @@ const ReviewListScreen = () => {
             acc[row.id] = row.name;
             return acc;
           }, {});
+
+          console.log('[ReviewListScreen] Found projects:', projectNames);
+          console.log('[ReviewListScreen] Project IDs in trips:', projectIds);
+        } else {
+          console.log('[ReviewListScreen] No project IDs found in trips');
         }
 
         const mapped = trips.map((row) => {
@@ -116,15 +121,19 @@ const ReviewListScreen = () => {
             [row.start_location, row.end_location].filter(Boolean).join(' → ').trim() ||
             'Unknown location';
 
+          // Better project name handling
+          let projectName = 'No Project';
+          if (row.project_id) {
+            projectName = projectNames[row.project_id] ?? 'Unknown Project';
+          }
+
           return {
             id: row.id,
             location,
             duration,
             observationCount: observationCounts[row.id] ?? 0,
             submittedDate: new Date(row.created_at).toLocaleDateString(),
-            projectName: row.project_id
-              ? (projectNames[row.project_id] ?? 'Unknown project')
-              : 'Unknown project',
+            projectName,
           };
         });
 
@@ -140,8 +149,15 @@ const ReviewListScreen = () => {
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
   };
 
   return (
