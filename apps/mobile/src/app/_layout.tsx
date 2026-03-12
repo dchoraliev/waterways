@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -146,7 +146,9 @@ function ThemedAppShell() {
               onResume={handleResumeTrip}
               onDiscard={handleDiscardTrip}
             />
-            <Slot />
+            <Stack
+              screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 150 }}
+            />
           </PermissionsGate>
         </PermissionsProvider>
       </DraftJourneysProvider>
