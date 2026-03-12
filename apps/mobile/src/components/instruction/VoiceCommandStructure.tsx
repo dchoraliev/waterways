@@ -8,7 +8,7 @@ const VoiceCommandStructure = () => {
     () =>
       StyleSheet.create({
         container: {
-          paddingHorizontal: 5,
+          paddingHorizontal: 15,
           paddingVertical: 5,
         },
         subtitle: {
@@ -32,12 +32,12 @@ const VoiceCommandStructure = () => {
           paddingVertical: 4,
           borderRadius: 5,
           fontWeight: '600',
-          fontSize: 14,
+          fontSize: 13,
         },
         plus: {
           color: colors.textMuted,
-          marginHorizontal: 10,
-          fontSize: 18,
+          marginHorizontal: 7,
+          fontSize: 16,
         },
         stepContainer: {
           marginBottom: 15,

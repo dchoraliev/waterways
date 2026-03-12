@@ -557,7 +557,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
       await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
 
-      showToast('Journey saved as draft. Review and submit when ready!');
+      showToast('Journey saved. Review and submit when ready!');
       router.push(`/review/${tripId}`);
     } catch (error) {
       console.error('[JourneyScreen] Failed to end journey:', error);

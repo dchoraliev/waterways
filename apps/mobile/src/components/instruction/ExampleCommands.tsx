@@ -32,7 +32,8 @@ const ExampleCommands = () => {
     () =>
       StyleSheet.create({
         container: {
-          padding: 5,
+          paddingHorizontal: 15,
+          paddingVertical: 5,
         },
         subtitle: {
           color: colors.textMuted,
@@ -63,56 +64,56 @@ const ExampleCommands = () => {
       <ExampleItem
         tagLabel="Bridge"
         tagColor="#bbf7d0"
-        command="Hey WaDE start recording. Bridge. I see the Interstate 80 bridge."
+        command="Hey WaDE, start recording. Bridge. I see the Interstate 80 bridge."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Dam"
         tagColor="#bbf7d0"
-        command="Hey WaDE start recording. Dam. Small hydroelectric dam at 2 o&rsquo;clock."
+        command="Hey WaDE, start recording. Dam. Small hydroelectric dam at 2 o&rsquo;clock."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Bird"
         tagColor="#e9d5ff"
-        command="Hey WaDE start recording. Bird. Great blue heron spotted on the left bank."
+        command="Hey WaDE, start recording. Bird. Great blue heron spotted on the left bank."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Mammal"
         tagColor="#e9d5ff"
-        command="Hey WaDE start recording. Mammal. River otter swimming at 10 o&rsquo;clock."
+        command="Hey WaDE, start recording. Mammal. River otter swimming at 10 o&rsquo;clock."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Erosion"
         tagColor="#a5f3fc"
-        command="Hey WaDE start recording. Erosion. Significant bank erosion on right side."
+        command="Hey WaDE, start recording. Erosion. Significant bank erosion on right side."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Water Quality"
         tagColor="#a5f3fc"
-        command="Hey WaDE start recording. Water Quality. Water appears murky and brown."
+        command="Hey WaDE, start recording. Water Quality. Water appears murky and brown."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Obstruction"
         tagColor="#fed7aa"
-        command="Hey WaDE start recording. Obstruction. Fallen tree blocking right channel."
+        command="Hey WaDE, start recording. Obstruction. Fallen tree blocking right channel."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />
       <ExampleItem
         tagLabel="Comment"
         tagColor="#bfdbfe"
-        command="Hey WaDE start. Comment. Beautiful day for paddling, calm waters."
+        command="Hey WaDE, start recording. Comment. Beautiful day for paddling, calm waters."
         itemContainerStyle={exampleStyles.itemContainer}
         commandTextStyle={exampleStyles.commandText}
       />

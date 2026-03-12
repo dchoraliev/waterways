@@ -4,7 +4,7 @@ import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { createInstructionsScreenStyles } from '../styles/InstructionsScreen.styles';
 import Accordion from '../components/instruction/Accodian';
-import InstructionRow from '../components/instruction/InstuctionRow';
+import InstructionRow from '../components/instruction/InstructionRow';
 import VoiceCommandStructure from '../components/instruction/VoiceCommandStructure';
 import ObservationClassifiers from '../components/instruction/ObservationClassifiers';
 import ExampleCommands from '../components/instruction/ExampleCommands';
@@ -45,26 +45,6 @@ const InstructionsScreen = () => {
           <TipsForBestResults />
         </Accordion>
 
-        {/* 5. Recording Control (General Commands) - ACCORDION */}
-        <Accordion title="Recording Control">
-          <InstructionRow
-            command="Start journey"
-            description="Begins a new recording session and tracking."
-          />
-          <InstructionRow
-            command="Pause recording"
-            description="Temporarily stops tracking and time measurement."
-          />
-          <InstructionRow
-            command="Resume tracking"
-            description="Continues the paused recording session."
-          />
-          <InstructionRow
-            command="End journey"
-            description="Stops and saves the current trip recording. It may take a few seconds to process your observations."
-          />
-        </Accordion>
-
         {/* 6. Review & Navigation (General Commands) - ACCORDION */}
         <Accordion title="Navigation">
           <InstructionRow
@@ -83,7 +63,7 @@ const InstructionsScreen = () => {
           <InstructionRow command="Settings" description="Opens the app settings menu." />
           <InstructionRow
             command="My Projects"
-            description="Provides access to all projects you are apart of."
+            description="Provides access to all projects you are a part of."
           />
         </Accordion>
       </View>
