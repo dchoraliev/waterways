@@ -71,12 +71,12 @@ function buildLeafletHTML(
     }))
   );
 
-  const bgColor = isDark ? '#0a0a0a' : '#f5f5f5';
-  const cardBg = isDark ? '#141414' : '#ffffff';
+  const bgColor = '#f5f5f5';
+  const cardBg = isDark ? '#1a1a1a' : '#ffffff';
   const textColor = isDark ? '#f5f5f5' : '#111111';
-  const mutedColor = isDark ? '#737373' : '#666666';
-  const borderColor = isDark ? '#222222' : '#e0e0e0';
-  const closeBg = isDark ? '#1a1a1a' : '#f0f0f0';
+  const mutedColor = isDark ? '#a1a1aa' : '#666666';
+  const borderColor = isDark ? '#2e2e2e' : '#e0e0e0';
+  const closeBg = isDark ? '#2a2a2a' : '#f0f0f0';
 
   return `<!DOCTYPE html>
 <html>
@@ -196,6 +196,7 @@ function buildLeafletHTML(
 
   <script>
     var observations = ${obsJson};
+    var useDarkBaseMap = false;
     var currentTileLayer;
 
     var map = L.map('map', {
@@ -210,6 +211,15 @@ function buildLeafletHTML(
         currentTileLayer = L.tileLayer(
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           { attribution: '© Esri', maxZoom: 19 }
+        ).addTo(map);
+      } else if (useDarkBaseMap) {
+        currentTileLayer = L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+          {
+            attribution: '© OpenStreetMap contributors © CARTO',
+            maxZoom: 19,
+            subdomains: 'abcd',
+          }
         ).addTo(map);
       } else {
         currentTileLayer = L.tileLayer(
@@ -335,10 +345,10 @@ const MapScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSatellite, setIsSatellite] = useState(false);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const tokens = useMemo(() => createMapTokens(colors), [colors]);
   const styles = useMemo(() => createMapScreenStyles(tokens), [tokens]);
-  const isDark = colors.background === '#0a0a0a';
+  const isDark = mode === 'dark';
 
   // ── Fetch observations ──
   useEffect(() => {

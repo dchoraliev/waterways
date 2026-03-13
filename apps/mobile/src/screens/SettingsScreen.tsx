@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { createSettingsStyles, createSettingsTokens } from '../styles/SettingsScreen.styles';
 import { signIn, signOut, resetPassword, deleteAccount } from '@waterways/shared/src/supabase/auth';
 import { supabase } from '@waterways/shared/src/supabase/client';
@@ -20,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Switch } from 'react-native';
 import { getLocalSettings, updateLocalSettings } from '../database/db';
 import { useTheme } from '../contexts/ThemeContext';
+import { ROUTES } from '../constants/routes';
 
 interface UserProfile {
   name: string;
@@ -35,6 +37,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onNavigateToProjects,
   onSignOutSuccess,
 }) => {
+  const router = useRouter();
   const MIN_PASSWORD_LENGTH = 8;
   const PASSWORD_SPECIAL_CHAR_REGEX = /[^A-Za-z0-9]/;
   const { mode, setMode, colors } = useTheme();
@@ -415,8 +418,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           {
             text: 'OK',
             onPress: async () => {
-              await signOut();
-              onSignOutSuccess();
+              const { error: signOutError } = await signOut();
+              if (signOutError) {
+                console.warn('Sign out after account deletion failed:', signOutError);
+              }
+              router.replace(ROUTES.login);
             },
           },
         ],
