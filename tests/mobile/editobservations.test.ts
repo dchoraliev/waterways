@@ -1,5 +1,6 @@
 import type { JourneyDraft } from 'apps/mobile/src/hooks/useDraftJourneys';
 import type { Observation } from 'apps/mobile/src/components/ObservationCard';
+import { SyncStatus } from 'apps/mobile/src/database/SyncStatus';
 
 // ─────────────────────────────────────────────
 // Sample Data
@@ -13,7 +14,7 @@ const makeObservation = (overrides: Partial<Observation> = {}): Observation => (
   tags: [],
   hasAudio: false,
   hasMedia: false,
-  status: 'Offline',
+  status: SyncStatus.DRAFTED,
   category: null,
   keyword: null,
   manuallyEdited: false,
@@ -23,7 +24,7 @@ const makeObservation = (overrides: Partial<Observation> = {}): Observation => (
 const makeDraft = (overrides: Partial<JourneyDraft> = {}): JourneyDraft => ({
   id: 'trip-1',
   createdAt: Date.now(),
-  status: 'draft',
+  status: SyncStatus.DRAFTED,
   projectId: null,
   observations: [makeObservation()],
   ...overrides,
@@ -226,7 +227,7 @@ describe('ObservationCard - hasMedia flag', () => {
     const obs = makeObservation({ hasMedia: true });
     expect(obs.description).toBe('Saw a bird near the river');
     expect(obs.manuallyEdited).toBe(false);
-    expect(obs.status).toBe('Offline');
+    expect(obs.status).toBe('drafted');
   });
 });
 
@@ -404,7 +405,7 @@ describe('Edit Observation - saveDraft preserves draft metadata', () => {
   // 27. status is preserved after saving an observation
   // ------------------------------------------------------
   test('Saving an observation preserves the draft status', () => {
-    const draft = makeDraft({ status: 'draft' });
+    const draft = makeDraft({ status: SyncStatus.DRAFTED });
     const index = 0;
 
     const updated = [...draft.observations];
@@ -412,7 +413,7 @@ describe('Edit Observation - saveDraft preserves draft metadata', () => {
 
     const savedDraft: JourneyDraft = { ...draft, observations: updated };
 
-    expect(savedDraft.status).toBe('draft');
+    expect(savedDraft.status).toBe(SyncStatus.DRAFTED);
   });
 
   // ------------------------------------------------------
