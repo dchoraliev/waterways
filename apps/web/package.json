@@ -7,10 +7,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "vite",
+    "web": "vite"
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.0",

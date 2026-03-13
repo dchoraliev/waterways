@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { classifyObservation } from '../services/ObservationClassifier';
-import styles from '../styles/ReviewScreen.styles';
+import { createReviewScreenStyles } from '../styles/ReviewScreen.styles';
 import ObservationCard, { Observation } from '../components/ObservationCard';
 import PrimaryButton from '../components/form/PrimaryButton';
 import { JourneyDraft, useDraftJourneys } from '../hooks/useDraftJourneys';
@@ -24,6 +24,7 @@ import { getTripById } from '../database/TripManager';
 import { Observation as DBObservation } from '@waterways/shared/src/models/local-db-rows';
 import { showToast } from '../utils/toast';
 import { updateTripById } from '../database/TripManager';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -84,6 +85,8 @@ function dbObservationToUIObservation(dbObs: DBObservation): Observation {
 
 const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createReviewScreenStyles(colors), [colors]);
   const params = useLocalSearchParams<{ id?: string; tripId?: string }>();
   const { getDraftByTripId, saveDraft } = useDraftJourneys();
 
@@ -317,7 +320,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   if (authLoading) {
     return (
       <SafeAreaView style={styles.root}>
-        <Text style={{ color: '#F9FAFB', textAlign: 'center', marginTop: 50 }}>
+        <Text style={{ color: colors.textPrimary, textAlign: 'center', marginTop: 50 }}>
           Loading user data...
         </Text>
       </SafeAreaView>
@@ -329,8 +332,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
     return (
       <SafeAreaView style={styles.root}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#3B82F6" />
-          <Text style={{ color: '#F9FAFB', marginTop: 16 }}>Loading observations...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.textMuted, marginTop: 16 }}>Loading observations...</Text>
         </View>
       </SafeAreaView>
     );
@@ -370,7 +373,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
         {/* Observations list */}
         {observations.length === 0 ? (
           <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: '#9CA3AF', fontSize: 16 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 16 }}>
               No observations recorded for this journey.
             </Text>
           </View>

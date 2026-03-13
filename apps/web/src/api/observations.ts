@@ -75,10 +75,21 @@ type ObservationRow = {
   project_description: string | null;
   observer_first_name: string | null;
   observer_last_name: string | null;
+  observer_is_deleted?: boolean | null;
+  viewer_is_admin?: boolean | null;
   latitude: number | null;
   longitude: number | null;
   deleted?: boolean | null;
   total_count?: number | string | null;
+};
+
+type UserObserverProfileRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  share_name_on_map: boolean;
+  status: string | null;
 };
 
 type DailyObservationRow = {
@@ -110,7 +121,85 @@ export interface FetchObservationsResult {
   pageSize: number;
 }
 
-function mapRowToObservation(row: ObservationRow): Observation {
+function isDeletedUserProfile(profile: UserObserverProfileRow | undefined): boolean {
+  if (!profile) {
+    return false;
+  }
+
+  const email = profile.email?.trim().toLowerCase() ?? '';
+  return email.startsWith('deleted-') && email.endsWith('@deleted.local');
+}
+
+function getProfileFullName(profile: UserObserverProfileRow | undefined): string {
+  if (!profile) {
+    return '';
+  }
+
+  return `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+}
+
+async function getObserverContext(rows: ObservationRow[]): Promise<{
+  isAdminViewer: boolean;
+  profilesById: Map<string, UserObserverProfileRow>;
+}> {
+  const profilesById = new Map<string, UserObserverProfileRow>();
+  let isAdminViewer = false;
+  const canQueryUsers = typeof supabase.from === 'function';
+
+  const userIds = Array.from(
+    new Set(rows.map((row) => row.user_id).filter((value): value is string => Boolean(value)))
+  );
+
+  if (canQueryUsers && supabase.auth && typeof supabase.auth.getUser === 'function') {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: actorRoleRow, error: actorRoleError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!actorRoleError && actorRoleRow?.role === 'admin') {
+        isAdminViewer = true;
+      }
+    }
+  }
+
+  if (!canQueryUsers) {
+    return { isAdminViewer, profilesById };
+  }
+
+  if (userIds.length === 0) {
+    return { isAdminViewer, profilesById };
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('users')
+    .select('id, first_name, last_name, email, share_name_on_map, status')
+    .in('id', userIds);
+
+  if (profilesError) {
+    console.warn('Failed to fetch observer profiles:', profilesError.message);
+    return { isAdminViewer, profilesById };
+  }
+
+  for (const profile of (profiles ?? []) as UserObserverProfileRow[]) {
+    profilesById.set(profile.id, profile);
+  }
+
+  return { isAdminViewer, profilesById };
+}
+
+function mapRowToObservation(
+  row: ObservationRow,
+  options?: {
+    isAdminViewer?: boolean;
+    profilesById?: Map<string, UserObserverProfileRow>;
+  }
+): Observation {
   let lat = row.latitude ?? 0;
   let lng = row.longitude ?? 0;
 
@@ -122,12 +211,34 @@ function mapRowToObservation(row: ObservationRow): Observation {
 
   const projectName = row.project_name ?? 'Untitled Project';
 
+  const observerProfile = row.user_id ? options?.profilesById?.get(row.user_id) : undefined;
+  const isAdminViewer = options?.isAdminViewer === true;
+  const observerFullName = getProfileFullName(observerProfile);
+  const observerIsDeleted =
+    row.observer_is_deleted === true ||
+    observerProfile?.status === 'banned' ||
+    isDeletedUserProfile(observerProfile);
+
   let observerName = 'Anonymous';
-  if (row.observer_first_name || row.observer_last_name) {
+  if (isAdminViewer) {
+    if (!row.user_id || observerIsDeleted) {
+      if (row.user_id) {
+        observerName = `Deleted_User#${row.user_id}`;
+      } else {
+        observerName = 'Deleted_User';
+      }
+    } else if (!observerFullName) {
+      observerName = `Anonymous#${row.user_id}`;
+    } else {
+      observerName = observerFullName;
+    }
+  } else if (!row.user_id || observerIsDeleted) {
+    observerName = 'Deleted_User';
+  } else if (row.observer_first_name || row.observer_last_name) {
     observerName = `${row.observer_first_name ?? ''} ${row.observer_last_name ?? ''}`.trim();
     if (!observerName) observerName = 'Anonymous';
-  } else if (!row.user_id) {
-    observerName = 'Deleted User';
+  } else {
+    observerName = 'Anonymous';
   }
 
   const createdRaw = row.created_at ?? '';
@@ -210,10 +321,11 @@ export async function fetchObservations(
     };
   }
 
-  const rows = data ?? [];
+  const rows = (data ?? []) as ObservationRow[];
+  const { isAdminViewer, profilesById } = await getObserverContext(rows);
   const observations = rows
-    .filter((row) => (row as ObservationRow).deleted !== true)
-    .map(mapRowToObservation);
+    .filter((row) => row.deleted !== true)
+    .map((row) => mapRowToObservation(row, { isAdminViewer, profilesById }));
   const totalCountRaw = rows[0]?.total_count;
   const parsedTotalFromString =
     typeof totalCountRaw === 'string' ? Number.parseInt(totalCountRaw, 10) : Number.NaN;

@@ -63,38 +63,6 @@ serve(async (req: Request): Promise<Response> => {
       },
     });
 
-    const { error: anonymizeObservationsError } = await adminClient
-      .from('observations')
-      .update({ user_id: null })
-      .eq('user_id', user.id);
-
-    if (anonymizeObservationsError) {
-      return new Response(
-        JSON.stringify({
-          error: `Failed to anonymize user observations: ${anonymizeObservationsError.message}`,
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-
-    const { error: anonymizeTripsError } = await adminClient
-      .from('trips')
-      .update({ user_id: null })
-      .eq('user_id', user.id);
-
-    if (anonymizeTripsError) {
-      return new Response(
-        JSON.stringify({ error: `Failed to anonymize user trips: ${anonymizeTripsError.message}` }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-
     const { error: deleteMembershipError } = await adminClient
       .from('project_membership')
       .delete()
@@ -112,7 +80,65 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
+    const deletedAt = new Date().toISOString();
+    const sanitizedEmail = `deleted-${user.id}@deleted.local`;
+
+    const anonymizedUserPayload = {
+      first_name: null,
+      last_name: null,
+      email: sanitizedEmail,
+      verified: false,
+      status: 'banned',
+      role: 'regular',
+      share_name_on_map: false,
+      banned_at: deletedAt,
+    };
+
+    let { error: anonymizeUserProfileError } = await adminClient
+      .from('users')
+      .update(anonymizedUserPayload)
+      .eq('id', user.id);
+
+    if (
+      anonymizeUserProfileError &&
+      typeof anonymizeUserProfileError.message === 'string' &&
+      anonymizeUserProfileError.message.toLowerCase().includes('banned_at')
+    ) {
+      ({ error: anonymizeUserProfileError } = await adminClient
+        .from('users')
+        .update({
+          first_name: null,
+          last_name: null,
+          email: sanitizedEmail,
+          verified: false,
+          status: 'banned',
+          role: 'regular',
+          share_name_on_map: false,
+        })
+        .eq('id', user.id));
+    }
+
+    if (anonymizeUserProfileError) {
+      return new Response(
+        JSON.stringify({
+          error: `Failed to anonymize user profile: ${anonymizeUserProfileError.message}`,
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    const randomPassword = `${crypto.randomUUID().replace(/-/g, '')}Aa1!`;
+
+    const { error: deleteError } = await adminClient.auth.admin.updateUserById(user.id, {
+      email: sanitizedEmail,
+      password: randomPassword,
+      user_metadata: {
+        deleted_at: deletedAt,
+      },
+    });
 
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {

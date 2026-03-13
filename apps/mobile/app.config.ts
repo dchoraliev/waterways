@@ -83,8 +83,9 @@ export default {
     // Load the Supabase env vars for mobile app
     extra: {
       APP_VARIANT: appVariant,
-      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY,
       eas: {
         projectId: '5e066005-7d80-4ab3-a8c0-19a219f2b0a6',
       },

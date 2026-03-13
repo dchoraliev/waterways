@@ -6,7 +6,18 @@ export const signIn = async (email: string, password: string) => {
 };
 
 export const signOut = async () => {
-  return await supabase.auth.signOut();
+  const result = await supabase.auth.signOut();
+
+  if (!result.error) {
+    return result;
+  }
+
+  const localFallback = await supabase.auth.signOut({ scope: 'local' });
+  if (!localFallback.error) {
+    return localFallback;
+  }
+
+  return result;
 };
 
 export const signUp = async (
