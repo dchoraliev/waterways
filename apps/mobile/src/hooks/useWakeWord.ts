@@ -115,7 +115,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     onStateChange,
     onRecordingComplete,
     recordingDelayMs = 1000,
-    recordingDurationMs = 10000,
+    recordingDurationMs = 20000,
   } = config;
 
   const EXTERNAL_RECORDING_COOLDOWN_MS = 1200;

@@ -16,7 +16,7 @@ const TopAppBar: React.FC = () => {
       </View>
       <View style={styles.textBlock}>
         <Text style={styles.title}>WaDE</Text>
-        <Text style={styles.subtitle}>Waterway Delta Explorer</Text>
+        <Text style={styles.subtitle}>Watershed Data Escalator</Text>
       </View>
     </View>
   );

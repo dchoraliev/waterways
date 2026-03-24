@@ -21,6 +21,7 @@ config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
   '@waterways/shared': path.resolve(monorepoRoot, 'packages/shared'),
   '@shared': path.resolve(monorepoRoot, 'packages/shared/src'),
+  assert: require.resolve('assert'),
 };
 
 // 4. Resolve shared aliases to concrete files inside packages/shared/src.
