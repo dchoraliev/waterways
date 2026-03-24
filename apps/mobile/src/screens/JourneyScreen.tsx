@@ -283,7 +283,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     }, [wakeWord.isAvailable])
   );
 
-  // Start observation recording with 15-second countdown.
+  // Start observation recording with 20-second countdown.
   // Stops the wake word listener first so expo-audio can safely claim
   // the iOS audio session.
   const startObservationRecording = useCallback(async () => {
@@ -322,9 +322,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       await recorder.prepareToRecordAsync();
       await recorder.record();
 
-      // Start 15-second countdown
-      setRecordingCountdown(15);
-      recordingCountdownRef.current = 15;
+      // Start 20-second countdown
+      setRecordingCountdown(20);
+      recordingCountdownRef.current = 20;
       recordingCountdownTimerRef.current = globalThis.setInterval(() => {
         setRecordingCountdown((prev) => {
           const next = prev <= 1 ? 0 : prev - 1;

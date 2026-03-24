@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   Share,
   TextInput,
@@ -23,15 +22,14 @@ import ProjectManagementModal from '../components/ProjectManagementModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
 
-const MyProjectsScreen: React.FC = () => {
+const MyProjectsScreen = () => {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createMyProjectScreenStyles(colors), [colors]);
-  const { userId, loading: authLoading } = useAuth();
+  const { userId } = useAuth();
   const {
     projects,
-    loading: projectsLoading,
-    refreshing,
+    loading: refreshing,
     loadProjects,
     handleRefresh: handleProjectsRefresh,
   } = useUserProjects();

@@ -1,5 +1,3 @@
-// apps/mobile/src/screens/MapScreen.tsx
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +19,9 @@ export interface Observation {
   longitude: number;
   observation: string | null;
   projectName: string | null;
+  observerName: string;
+  keywords: string[];
+  photos: string[];
 }
 
 interface FilteredObservationRow {
@@ -31,6 +32,9 @@ interface FilteredObservationRow {
   longitude: number | null;
   observation: string | null;
   project_name: string | null;
+  observer_name: string | null;
+  keywords: string[] | null;
+  observation_media: string[] | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,23 +64,19 @@ function buildLeafletHTML(
 ): string {
   const obsJson = JSON.stringify(
     observations.map((o) => ({
-      id: o.id,
+      ...o,
       lat: o.latitude,
       lng: o.longitude,
-      type: o.type,
-      date: o.date,
-      observation: o.observation,
-      projectName: o.projectName,
       color: categoryColors[o.type?.toUpperCase()] ?? '#38BDF8',
     }))
   );
 
-  const bgColor = '#f5f5f5';
-  const cardBg = isDark ? '#1a1a1a' : '#ffffff';
-  const textColor = isDark ? '#f5f5f5' : '#111111';
-  const mutedColor = isDark ? '#a1a1aa' : '#666666';
-  const borderColor = isDark ? '#2e2e2e' : '#e0e0e0';
-  const closeBg = isDark ? '#2a2a2a' : '#f0f0f0';
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#09090b';
+  const mutedColor = isDark ? '#a1a1aa' : '#71717a';
+  const borderColor = isDark ? '#27272a' : '#e4e4e7';
+  const secondaryBg = isDark ? '#27272a' : '#f4f4f5';
+  const mapEmptyBg = isDark ? '#141414' : '#e5e7eb';
 
   return `<!DOCTYPE html>
 <html>
@@ -90,97 +90,66 @@ function buildLeafletHTML(
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: ${bgColor}; }
-    #map { width: 100%; height: 100%; }
+    html, body { width: 100%; height: 100%; background: ${mapEmptyBg}; font-family: -apple-system, sans-serif; }
+    #map { width: 100%; height: 100%; background: ${mapEmptyBg}; }
 
     .custom-cluster {
-      background: #ef4444;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-weight: 700;
-      font-size: 13px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      background: #ef4444; border-radius: 50%; border: 2px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
-    .custom-cluster-large { background: #dc2626; }
 
     #sheet {
-      display: none;
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: ${cardBg};
-      border-top-left-radius: 16px;
-      border-top-right-radius: 16px;
-      border: 1px solid ${borderColor};
-      max-height: 480px;
-      z-index: 9999;
-      flex-direction: column;
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      background: ${cardBg}; border-top: 1px solid ${borderColor};
+      max-height: 85%; z-index: 9999; flex-direction: column;
+      border-radius: 20px 20px 0 0; box-shadow: 0 -10px 25px rgba(0,0,0,0.1);
     }
     #sheet.visible { display: flex; }
     #sheet-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
+      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid ${borderColor};
-      flex-shrink: 0;
     }
-    #sheet-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: ${textColor};
-      font-family: -apple-system, sans-serif;
+    #sheet-title { font-size: 18px; font-weight: 600; color: ${textColor}; }
+    #sheet-close { background: ${secondaryBg}; border: none; padding: 8px; border-radius: 50%; color: ${textColor}; cursor: pointer; }
+
+    #sheet-body { overflow-y: auto; flex: 1; padding: 0; }
+    
+    .obs-content { padding: 24px 20px; border-bottom: 8px solid ${secondaryBg}; }
+    .badge-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .badge { 
+      background: ${secondaryBg}; color: ${textColor}; padding: 4px 12px; 
+      border-radius: 99px; font-size: 12px; font-weight: 500; border: 1px solid ${borderColor};
     }
-    #sheet-close {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      background: ${closeBg};
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-      color: ${textColor};
-    }
-    #sheet-body {
-      overflow-y: auto;
-      padding: 0 16px 24px;
-      flex: 1;
-    }
-    .obs-row {
-      display: flex;
-      align-items: flex-start;
-      padding: 12px 0;
-      border-bottom: 1px solid ${borderColor};
-      gap: 12px;
-    }
-    .obs-pin { color: #3b82f6; font-size: 18px; flex-shrink: 0; margin-top: 2px; }
-    .obs-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: ${textColor};
-      font-family: -apple-system, sans-serif;
-      margin-bottom: 2px;
-    }
-    .obs-sub {
-      font-size: 12px;
-      color: ${mutedColor};
-      font-family: -apple-system, sans-serif;
-      margin-top: 2px;
-    }
-    #backdrop {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 9998;
-    }
+    
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .meta-block h3 { font-size: 13px; font-weight: 500; color: ${mutedColor}; margin-bottom: 4px; }
+    .meta-block p { font-size: 14px; color: ${textColor}; }
+
+    .section-title { font-size: 14px; font-weight: 600; color: ${textColor}; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .description-text { font-size: 14px; color: ${textColor}; line-height: 1.6; margin-bottom: 24px; }
+    
+    .media-container { display: flex; flex-direction: column; gap: 12px; }
+    .obs-img { width: 100%; height: auto; border-radius: 12px; object-fit: cover; background: ${secondaryBg}; }
+
+    #backdrop { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 9998; }
     #backdrop.visible { display: block; }
 
-    /* Override leaflet cluster styles */
-    .marker-cluster { background: transparent !important; box-shadow: none !important; }
-    .marker-cluster div { background: transparent !important; }
+    #legend-toggle {
+      position: fixed; bottom: 24px; left: 16px; z-index: 9000;
+      background: ${cardBg}; border: 1px solid ${borderColor}; border-radius: 8px;
+      padding: 8px 12px; display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-size: 13px; color: ${textColor};
+    }
+    #legend-panel {
+      display: none; position: fixed; bottom: 68px; left: 16px; z-index: 9000;
+      background: ${cardBg}; border: 1px solid ${borderColor}; border-radius: 10px;
+      padding: 12px 14px; min-width: 180px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    }
+    #legend-panel.visible { display: block; }
+    .legend-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .legend-label { font-size: 13px; color: ${textColor}; }
   </style>
 </head>
 <body>
@@ -188,141 +157,88 @@ function buildLeafletHTML(
   <div id="backdrop" onclick="closeSheet()"></div>
   <div id="sheet">
     <div id="sheet-header">
-      <span id="sheet-title"></span>
+      <span id="sheet-title">Observation</span>
       <button id="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <div id="sheet-body"></div>
   </div>
 
-  <script>
-    var observations = ${obsJson};
-    var useDarkBaseMap = false;
-    var currentTileLayer;
+  <div id="legend-panel"><div id="legend-items"></div></div>
+  <button id="legend-toggle" onclick="toggleLegend()">ℹ︎ Legend</button>
 
-    var map = L.map('map', {
-      center: [39.5, -98.35],
-      zoom: 4,
+  <script>
+    var map = L.map('map', { 
+      center: [39.5, -98.35], 
+      zoom: 4, 
       zoomControl: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true
     });
+
+    var currentTileLayer;
 
     function addTileLayer(satellite) {
       if (currentTileLayer) map.removeLayer(currentTileLayer);
-      if (satellite) {
-        currentTileLayer = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          { attribution: '© Esri', maxZoom: 19 }
-        ).addTo(map);
-      } else if (useDarkBaseMap) {
-        currentTileLayer = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          {
-            attribution: '© OpenStreetMap contributors © CARTO',
-            maxZoom: 19,
-            subdomains: 'abcd',
-          }
-        ).addTo(map);
-      } else {
-        currentTileLayer = L.tileLayer(
-          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          { attribution: '© OpenStreetMap contributors', maxZoom: 19, subdomains: ['a','b','c'] }
-        ).addTo(map);
-      }
+      var url = satellite 
+        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      
+      currentTileLayer = L.tileLayer(url, { 
+        maxZoom: 19,
+        updateWhenIdle: false, // Fetch tiles while panning
+        keepBuffer: 4         // Pre-load a 4-tile margin around the screen
+      }).addTo(map);
     }
-
     addTileLayer(false);
 
-    function createClusterIcon(cluster) {
-      var count = cluster.getChildCount();
-      var size = count >= 10 ? 52 : 44;
-      var cls = count >= 10 ? 'custom-cluster custom-cluster-large' : 'custom-cluster';
-      return L.divIcon({
-        html: '<div class="' + cls + '" style="width:' + size + 'px;height:' + size + 'px;">' + count + '</div>',
-        className: '',
-        iconSize: [size, size],
-        iconAnchor: [size/2, size/2],
-      });
-    }
+    var legendItems = document.getElementById('legend-items');
+    ${JSON.stringify(Object.entries(categoryColors))}.forEach(([type, color]) => {
+      legendItems.innerHTML += '<div class="legend-row"><div class="legend-dot" style="background:'+color+'"></div><span class="legend-label">'+type+'</span></div>';
+    });
+
+    function toggleLegend() { document.getElementById('legend-panel').classList.toggle('visible'); }
 
     var markerGroup = L.markerClusterGroup({
-      iconCreateFunction: createClusterIcon,
-      maxClusterRadius: 80,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
+      iconCreateFunction: function(c) {
+        return L.divIcon({
+          html: '<div class="custom-cluster" style="width:44px;height:44px;">' + c.getChildCount() + '</div>',
+          className: '', iconSize: [44, 44]
+        });
+      },
       disableClusteringAtZoom: 15,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true
     });
 
-    // Store obs by marker so we can show in sheet
-    var markerObsMap = [];
+    function escapeHtml(str) { return str ? str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
-    observations.forEach(function(obs) {
-      var icon = L.divIcon({
-        html: '<div style="width:22px;height:22px;border-radius:50%;background:' + obs.color + ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.35);font-size:10px;color:#fff;">●</div>',
-        className: '',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11],
-      });
-
-      var marker = L.marker([obs.lat, obs.lng], { icon: icon });
-      marker._obsData = obs;
-      marker.on('click', function() {
-        showSheet([this._obsData]);
-      });
-      markerGroup.addLayer(marker);
-    });
-
-    // Show sheet when a cluster is clicked (if zoomed in enough)
-    markerGroup.on('clusterclick', function(e) {
-      var zoom = map.getZoom();
-      if (zoom >= 14) {
-        var markers = e.layer.getAllChildMarkers();
-        var obsData = markers.map(function(m) { return m._obsData; });
-        showSheet(obsData);
-      }
-      // otherwise default zoom-in behavior handles it
-    });
-
-    map.addLayer(markerGroup);
-
-    // Listen for satellite toggle from React Native
-    window.addEventListener('message', function(e) {
-      try {
-        var msg = JSON.parse(e.data);
-        if (msg.type === 'SET_SATELLITE') {
-          addTileLayer(msg.value);
-        }
-      } catch(err) {}
-    });
-
-    // Also handle Android
-    document.addEventListener('message', function(e) {
-      try {
-        var msg = JSON.parse(e.data);
-        if (msg.type === 'SET_SATELLITE') {
-          addTileLayer(msg.value);
-        }
-      } catch(err) {}
-    });
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    function showSheet(obs) {
-      var title = obs.length > 1 ? obs.length + ' Observations' : 'Observation #' + obs[0].id;
-      document.getElementById('sheet-title').textContent = title;
+    function showSheet(obsList) {
+      document.getElementById('legend-panel').classList.remove('visible');
+      document.getElementById('sheet-title').textContent = obsList.length > 1 ? obsList.length + ' Observations' : 'Observation Detail';
+      
       var body = document.getElementById('sheet-body');
-      body.innerHTML = obs.map(function(o) {
-        return '<div class="obs-row">' +
-          '<span class="obs-pin">📍</span>' +
-          '<div>' +
-            '<div class="obs-label">' + escapeHtml(o.observation || 'Observation #' + o.id) + '</div>' +
-            '<div class="obs-sub">' + escapeHtml(o.type) + ' · ' + escapeHtml(o.date) + '</div>' +
-            (o.projectName ? '<div class="obs-sub">Project: ' + escapeHtml(o.projectName) + '</div>' : '') +
-          '</div>' +
-        '</div>';
+      body.innerHTML = obsList.map(function(o) {
+        var badges = [o.type, ...(o.keywords || [])].map(k => '<span class="badge">'+escapeHtml(k)+'</span>').join('');
+        var photos = (o.photos || []).map(p => '<img src="'+p+'" class="obs-img" />').join('');
+
+        return \`
+          <div class="obs-content">
+            <div class="badge-container">\${badges}</div>
+            
+            <div class="meta-grid">
+              <div class="meta-block"><h3>Date</h3><p>\${o.date}</p></div>
+              <div class="meta-block"><h3>Observer</h3><p>\${escapeHtml(o.observerName)}</p></div>
+              \${o.projectName ? \`<div class="meta-block"><h3>Project</h3><p>\${escapeHtml(o.projectName)}</p></div>\` : ''}
+            </div>
+
+            <div class="section-title">Description</div>
+            <p class="description-text">\${escapeHtml(o.observation || 'No description provided.')}</p>
+
+            \${photos ? '<div class="section-title">Media</div><div class="media-container">' + photos + '</div>' : ''}
+          </div>
+        \`;
       }).join('');
+      
       document.getElementById('sheet').classList.add('visible');
       document.getElementById('backdrop').classList.add('visible');
     }
@@ -331,14 +247,36 @@ function buildLeafletHTML(
       document.getElementById('sheet').classList.remove('visible');
       document.getElementById('backdrop').classList.remove('visible');
     }
+
+    var observations = ${obsJson};
+    observations.forEach(function(o) {
+      var icon = L.divIcon({
+        html: '<div style="width:22px;height:22px;border-radius:50%;background:'+o.color+';border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
+        className: '', iconSize: [22, 22]
+      });
+      var marker = L.marker([o.lat, o.lng], { icon: icon });
+      marker._obsData = o;
+      marker.on('click', function() { showSheet([this._obsData]); });
+      markerGroup.addLayer(marker);
+    });
+
+    markerGroup.on('clusterclick', function(e) {
+      if (map.getZoom() >= 14) {
+        showSheet(e.layer.getAllChildMarkers().map(m => m._obsData));
+      }
+    });
+
+    map.addLayer(markerGroup);
+
+    window.addEventListener('message', function(e) {
+      var msg = JSON.parse(e.data);
+      if (msg.type === 'SET_SATELLITE') addTileLayer(msg.value);
+    });
   </script>
 </body>
 </html>`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
 const MapScreen: React.FC = () => {
   const webViewRef = useRef<WebView>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -350,43 +288,30 @@ const MapScreen: React.FC = () => {
   const styles = useMemo(() => createMapScreenStyles(tokens), [tokens]);
   const isDark = mode === 'dark';
 
-  // ── Fetch observations ──
   useEffect(() => {
-    async function fetchObservations() {
+    async function fetchData() {
       try {
         const args = buildObservationRpcArgs({ limit: 500, offset: 0 });
         const { data, error } = await supabase.rpc('get_filtered_observations', {
           ...args,
-          p_categories: args.p_categories ?? undefined,
-          p_keywords: args.p_keywords ?? undefined,
-          p_project_id: args.p_project_id ?? undefined,
-          p_since: args.p_since ?? undefined,
-          p_until: args.p_until ?? undefined,
-          p_min_lat: args.p_min_lat ?? undefined,
-          p_min_lng: args.p_min_lng ?? undefined,
-          p_max_lat: args.p_max_lat ?? undefined,
-          p_max_lng: args.p_max_lng ?? undefined,
-          p_year: args.p_year ?? undefined,
-          p_month: args.p_month ?? undefined,
-          p_limit: args.p_limit ?? undefined,
-          p_offset: args.p_offset ?? undefined,
+          p_limit: 500,
         });
 
         if (error) throw error;
 
-        const formatted: Observation[] = ((data ?? []) as FilteredObservationRow[])
+        const formatted: Observation[] = ((data ?? []) as unknown as FilteredObservationRow[])
           .filter((o) => o.latitude != null && o.longitude != null)
           .map((o) => ({
             id: String(o.id),
-            type:
-              Array.isArray(o.categories) && o.categories.length > 0
-                ? o.categories[0]
-                : 'Observation',
+            type: o.categories?.[0] ?? 'Observation',
             date: o.created_at ? new Date(o.created_at).toLocaleDateString() : '',
             latitude: Number(o.latitude),
             longitude: Number(o.longitude),
-            observation: o.observation ?? null,
-            projectName: o.project_name ?? null,
+            observation: o.observation,
+            projectName: o.project_name,
+            observerName: o.observer_name ?? 'Anonymous',
+            keywords: o.keywords ?? [],
+            photos: o.observation_media ?? [],
           }));
 
         setObservations(formatted);
@@ -397,29 +322,24 @@ const MapScreen: React.FC = () => {
       }
     }
 
-    fetchObservations();
-  }, []);
-
-  // ── Fetch category colors ──
-  useEffect(() => {
     async function fetchCategories() {
       const { data } = await supabase
         .from('observation_categories')
         .select('type, color')
         .eq('is_active', true);
-
       if (data) {
         const map: Record<string, string> = {};
-        data.forEach((row: { type: string; color: string | null }) => {
+        data.forEach((row) => {
           if (row.color) map[row.type.toUpperCase()] = row.color;
         });
         setCategoryColors(map);
       }
     }
+
+    fetchData();
     fetchCategories();
   }, []);
 
-  // ── Toggle satellite via WebView postMessage ──
   const handleSatelliteToggle = () => {
     const next = !isSatellite;
     setIsSatellite(next);
@@ -433,15 +353,11 @@ const MapScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.root} edges={['left', 'right', 'top']}>
-      {/* Top bar */}
       <View style={styles.topBar}>
         <Text style={styles.cardTitle}>
-          {loading
-            ? 'Loading...'
-            : `${observations.length} Observation${observations.length !== 1 ? 's' : ''}`}
+          {loading ? 'Loading...' : `${observations.length} Observations`}
         </Text>
         <TouchableOpacity
-          activeOpacity={0.85}
           style={[styles.button, styles.buttonOutline, styles.buttonSm]}
           onPress={handleSatelliteToggle}
         >
@@ -456,7 +372,6 @@ const MapScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Map */}
       <View style={styles.mapFull}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -468,11 +383,8 @@ const MapScreen: React.FC = () => {
             ref={webViewRef}
             source={{ html }}
             style={styles.webView}
-            originWhitelist={['*']}
             javaScriptEnabled
             domStorageEnabled
-            startInLoadingState={false}
-            scrollEnabled={false}
             allowsInlineMediaPlayback
           />
         )}
@@ -481,9 +393,6 @@ const MapScreen: React.FC = () => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
 function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: TOKENS.bg },
