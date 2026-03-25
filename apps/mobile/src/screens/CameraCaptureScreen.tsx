@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View, Animated } from 'react-native';
+import { Pressable, Text, View, Animated, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -49,6 +49,8 @@ export default function CameraCaptureScreen() {
   const [_busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [zoom, setZoom] = useState(0);
+  const [switching, setSwitching] = useState(false);
 
   // Animation for capture button press
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -56,7 +58,17 @@ export default function CameraCaptureScreen() {
   // Animation for recording pulse
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Animation for camera fade during mode switching
+  const cameraOpacity = useRef(new Animated.Value(1)).current;
+
   const cameraRef = useRef<CameraView>(null);
+
+  // Pinch-to-zoom tracking
+  const initialDistance = useRef<number>(0);
+  const initialZoom = useRef<number>(0);
+
+  // Track if recording was cancelled (X button) vs completed normally (stop button)
+  const recordingCancelled = useRef<boolean>(false);
 
   const canUseCamera = useMemo(() => cameraPermission?.granted === true, [cameraPermission]);
 
@@ -182,13 +194,21 @@ export default function CameraCaptureScreen() {
       setRecording(true);
       setBusy(true);
       startPulseAnimation();
+      recordingCancelled.current = false; // Reset cancel flag
 
       // Start recording (this will wait until stopRecording is called)
       const vid = await cameraRef.current?.recordAsync();
 
-      // Recording has stopped, now process the video
+      // Recording has stopped, now check if it was cancelled
       stopPulseAnimation();
       setRecording(false);
+
+      // If recording was cancelled (close button pressed), don't process the video
+      if (recordingCancelled.current) {
+        console.log('[Camera] Recording cancelled, not saving video');
+        return;
+      }
+
       setProcessing(true);
 
       if (!vid?.uri) {
@@ -220,6 +240,7 @@ export default function CameraCaptureScreen() {
       setRecording(false);
       setBusy(false);
       setProcessing(false);
+      recordingCancelled.current = false; // Reset flag
     }
   }
 
@@ -233,17 +254,91 @@ export default function CameraCaptureScreen() {
     }
   }
 
+  function cancelVideo() {
+    try {
+      console.log('[Camera] Cancelling video recording...');
+      recordingCancelled.current = true; // Mark as cancelled
+      cameraRef.current?.stopRecording();
+      // Note: startVideo will check recordingCancelled and skip processing
+    } catch (e) {
+      console.warn('Cancel recording error:', e);
+    }
+  }
+
+  // Pinch-to-zoom helpers
+  function getDistance(touches: { pageX: number; pageY: number }[]) {
+    if (touches.length < 2) return 0;
+    const [touch1, touch2] = touches;
+    const dx = touch1.pageX - touch2.pageX;
+    const dy = touch1.pageY - touch2.pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function handlePinchStart(event: GestureResponderEvent) {
+    if (event.nativeEvent.touches.length === 2) {
+      const distance = getDistance(event.nativeEvent.touches);
+      initialDistance.current = distance;
+      initialZoom.current = zoom;
+    }
+  }
+
+  function handlePinchMove(event: GestureResponderEvent) {
+    if (event.nativeEvent.touches.length === 2 && initialDistance.current > 0) {
+      const currentDistance = getDistance(event.nativeEvent.touches);
+      const scale = currentDistance / initialDistance.current;
+      const sensitivity = 0.5;
+      let newZoom = initialZoom.current + (scale - 1) * sensitivity;
+      newZoom = Math.max(0, Math.min(1, newZoom));
+      setZoom(newZoom);
+    }
+  }
+
+  function handlePinchEnd() {
+    initialDistance.current = 0;
+  }
+
+  function handleModeSwitch(newMode: Mode) {
+    if (newMode === mode) return; // Already in this mode
+    setSwitching(true);
+
+    // Fade out camera
+    Animated.timing(cameraOpacity, {
+      toValue: 0.4,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      // Switch mode while faded
+      setMode(newMode);
+
+      // Fade back in
+      Animated.timing(cameraOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setSwitching(false);
+      });
+    });
+  }
+
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={() => {
-            // If recording, stop it first
-            if (recording) {
-              stopVideo();
+            // Don't allow closing while processing (video is being saved)
+            if (processing) {
+              showToast('Saving media...');
+              return;
             }
-            // Go back to previous screen (journey screen)
+            // If recording, cancel it and stay on camera screen
+            if (recording) {
+              cancelVideo();
+              showToast('Recording cancelled');
+              return; // Stay on camera screen
+            }
+            // Not recording - close camera screen
             router.back();
           }}
           style={styles.closeBtn}
@@ -263,26 +358,47 @@ export default function CameraCaptureScreen() {
         </View>
       ) : (
         <View style={styles.cameraWrap}>
-          {/* Camera View */}
-          <CameraView ref={cameraRef} style={styles.camera} facing="back" mode={mode} />
+          {/* Camera View with pinch-to-zoom and fade effect */}
+          <Animated.View
+            style={[{ flex: 1, marginHorizontal: 12 }, { opacity: cameraOpacity }]}
+            onTouchStart={handlePinchStart}
+            onTouchMove={handlePinchMove}
+            onTouchEnd={handlePinchEnd}
+          >
+            <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" mode={mode} zoom={zoom} />
+
+            {/* Blur overlay during mode switching */}
+            {switching && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                }}
+              />
+            )}
+          </Animated.View>
 
           {/* Bottom Controls */}
           <View style={styles.controls}>
             {/* Mode Labels */}
             <View style={styles.modeLabelRow}>
               <Pressable
-                onPress={() => setMode('picture')}
-                disabled={recording || processing}
-                style={styles.modeLabelBtn}
+                onPress={() => handleModeSwitch('picture')}
+                disabled={recording || processing || switching}
+                style={[styles.modeLabelBtn, switching && { opacity: 0.5 }]}
               >
                 <Text style={[styles.modeLabelText, mode === 'picture' && styles.modeLabelActive]}>
                   PHOTO
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => setMode('video')}
-                disabled={recording || processing}
-                style={styles.modeLabelBtn}
+                onPress={() => handleModeSwitch('video')}
+                disabled={recording || processing || switching}
+                style={[styles.modeLabelBtn, switching && { opacity: 0.5 }]}
               >
                 <Text style={[styles.modeLabelText, mode === 'video' && styles.modeLabelActive]}>
                   VIDEO
@@ -292,12 +408,18 @@ export default function CameraCaptureScreen() {
 
             {/* Capture Buttons */}
             <View style={styles.captureRow}>
-              {/* Left spacer */}
-              <View style={styles.sideSpace} />
+              {/* Left spacer with zoom indicator */}
+              <View style={styles.sideSpace}>
+                {zoom > 0 && (
+                  <View style={styles.zoomIndicator}>
+                    <Text style={styles.zoomText}>{(zoom * 10).toFixed(1)}x</Text>
+                  </View>
+                )}
+              </View>
 
               {/* Main Capture Button */}
               <Pressable
-                disabled={processing}
+                disabled={processing || switching}
                 onPress={mode === 'picture' ? takePhoto : recording ? stopVideo : startVideo}
                 style={styles.captureButtonContainer}
               >

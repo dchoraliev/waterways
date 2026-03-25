@@ -114,6 +114,17 @@ export const createCameraCaptureScreenStyles = (themeColors: AppColors) =>
       fontWeight: '700',
       fontSize: 11,
     },
+    zoomIndicator: {
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    zoomText: {
+      color: '#ffffff',
+      fontWeight: '700',
+      fontSize: 12,
+    },
     processingText: {
       color: themeColors.textMuted,
       fontSize: 11,
