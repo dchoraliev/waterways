@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { Share } from 'react-native';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
 import { AppColors } from '../styles/colors';
@@ -15,11 +16,12 @@ export interface Observation {
   id: string;
   type: string;
   date: string;
+  time: string;
   latitude: number;
   longitude: number;
   observation: string | null;
   projectName: string | null;
-  observerName: string;
+  observerName: string | null; // null means hidden (share_name_on_map = false)
   keywords: string[];
   photos: string[];
 }
@@ -32,7 +34,9 @@ interface FilteredObservationRow {
   longitude: number | null;
   observation: string | null;
   project_name: string | null;
-  observer_name: string | null;
+  observer_first_name: string | null;
+  observer_last_name: string | null;
+  user_id: string | null;
   keywords: string[] | null;
   observation_media: string[] | null;
 }
@@ -114,23 +118,34 @@ function buildLeafletHTML(
     #sheet-close { background: ${secondaryBg}; border: none; padding: 8px; border-radius: 50%; color: ${textColor}; cursor: pointer; }
 
     #sheet-body { overflow-y: auto; flex: 1; padding: 0; }
-    
+
     .obs-content { padding: 24px 20px; border-bottom: 8px solid ${secondaryBg}; }
     .badge-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-    .badge { 
-      background: ${secondaryBg}; color: ${textColor}; padding: 4px 12px; 
+    .badge {
+      background: ${secondaryBg}; color: ${textColor}; padding: 4px 12px;
       border-radius: 99px; font-size: 12px; font-weight: 500; border: 1px solid ${borderColor};
     }
-    
+
     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .meta-full { grid-column: 1 / -1; }
     .meta-block h3 { font-size: 13px; font-weight: 500; color: ${mutedColor}; margin-bottom: 4px; }
     .meta-block p { font-size: 14px; color: ${textColor}; }
 
     .section-title { font-size: 14px; font-weight: 600; color: ${textColor}; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
     .description-text { font-size: 14px; color: ${textColor}; line-height: 1.6; margin-bottom: 24px; }
-    
-    .media-container { display: flex; flex-direction: column; gap: 12px; }
-    .obs-img { width: 100%; height: auto; border-radius: 12px; object-fit: cover; background: ${secondaryBg}; }
+
+    .media-container { display: flex; flex-direction: column; gap: 16px; }
+    .media-item { display: flex; flex-direction: column; gap: 8px; }
+    .obs-img { width: 100%; height: auto; border-radius: 12px; object-fit: cover; background: ${secondaryBg}; display: block; }
+    .download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 10px 0;
+      background: ${secondaryBg}; border: 1px solid ${borderColor};
+      border-radius: 10px; color: ${textColor};
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; font-family: -apple-system, sans-serif;
+    }
+    .download-btn:active { opacity: 0.7; }
 
     #backdrop { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 9998; }
     #backdrop.visible { display: block; }
@@ -167,9 +182,9 @@ function buildLeafletHTML(
   <button id="legend-toggle" onclick="toggleLegend()">ℹ︎ Legend</button>
 
   <script>
-    var map = L.map('map', { 
-      center: [39.5, -98.35], 
-      zoom: 4, 
+    var map = L.map('map', {
+      center: [39.5, -98.35],
+      zoom: 4,
       zoomControl: true,
       fadeAnimation: true,
       markerZoomAnimation: true
@@ -179,24 +194,43 @@ function buildLeafletHTML(
 
     function addTileLayer(satellite) {
       if (currentTileLayer) map.removeLayer(currentTileLayer);
-      var url = satellite 
+      var url = satellite
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-      
-      currentTileLayer = L.tileLayer(url, { 
+      currentTileLayer = L.tileLayer(url, {
         maxZoom: 19,
-        updateWhenIdle: false, // Fetch tiles while panning
-        keepBuffer: 4         // Pre-load a 4-tile margin around the screen
+        updateWhenIdle: false,
+        keepBuffer: 4
       }).addTo(map);
     }
     addTileLayer(false);
 
     var legendItems = document.getElementById('legend-items');
-    ${JSON.stringify(Object.entries(categoryColors))}.forEach(([type, color]) => {
+    ${JSON.stringify(Object.entries(categoryColors))}.forEach(function(entry) {
+      var type = entry[0], color = entry[1];
       legendItems.innerHTML += '<div class="legend-row"><div class="legend-dot" style="background:'+color+'"></div><span class="legend-label">'+type+'</span></div>';
     });
 
     function toggleLegend() { document.getElementById('legend-panel').classList.toggle('visible'); }
+
+    function formatLocalDateTime(isoString) {
+      if (!isoString) return 'Unknown';
+      try {
+        var d = new Date(isoString);
+        var datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        var timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return datePart + ' at ' + timePart;
+      } catch(e) { return isoString; }
+    }
+
+    function escapeHtml(str) {
+      return str ? str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;') : '';
+    }
+
+    // Posts a message to React Native to trigger a native file download
+    function downloadMedia(url) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DOWNLOAD_MEDIA', url: url }));
+    }
 
     var markerGroup = L.markerClusterGroup({
       iconCreateFunction: function(c) {
@@ -210,35 +244,45 @@ function buildLeafletHTML(
       zoomToBoundsOnClick: true
     });
 
-    function escapeHtml(str) { return str ? str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-
     function showSheet(obsList) {
       document.getElementById('legend-panel').classList.remove('visible');
       document.getElementById('sheet-title').textContent = obsList.length > 1 ? obsList.length + ' Observations' : 'Observation Detail';
-      
+
       var body = document.getElementById('sheet-body');
       body.innerHTML = obsList.map(function(o) {
-        var badges = [o.type, ...(o.keywords || [])].map(k => '<span class="badge">'+escapeHtml(k)+'</span>').join('');
-        var photos = (o.photos || []).map(p => '<img src="'+p+'" class="obs-img" />').join('');
+        var badges = [o.type, ...(o.keywords || [])].map(function(k) {
+          return '<span class="badge">'+escapeHtml(k)+'</span>';
+        }).join('');
+
+        var photos = (o.photos || []).map(function(p) {
+          return \`<div class="media-item">
+            <img src="\${escapeHtml(p)}" class="obs-img" />
+            <button class="download-btn" onclick="downloadMedia('\${escapeHtml(p)}')">⬇ Save to Photos</button>
+          </div>\`;
+        }).join('');
+
+        var observerBlock = o.observerName
+          ? \`<div class="meta-block"><h3>Observer</h3><p>\${escapeHtml(o.observerName)}</p></div>\`
+          : '';
 
         return \`
           <div class="obs-content">
             <div class="badge-container">\${badges}</div>
-            
             <div class="meta-grid">
-              <div class="meta-block"><h3>Date</h3><p>\${o.date}</p></div>
-              <div class="meta-block"><h3>Observer</h3><p>\${escapeHtml(o.observerName)}</p></div>
+              <div class="meta-block meta-full">
+                <h3>Date &amp; Time</h3>
+                <p>\${formatLocalDateTime(o.time)}</p>
+              </div>
+              \${observerBlock}
               \${o.projectName ? \`<div class="meta-block"><h3>Project</h3><p>\${escapeHtml(o.projectName)}</p></div>\` : ''}
             </div>
-
             <div class="section-title">Description</div>
             <p class="description-text">\${escapeHtml(o.observation || 'No description provided.')}</p>
-
             \${photos ? '<div class="section-title">Media</div><div class="media-container">' + photos + '</div>' : ''}
           </div>
         \`;
       }).join('');
-      
+
       document.getElementById('sheet').classList.add('visible');
       document.getElementById('backdrop').classList.add('visible');
     }
@@ -262,7 +306,7 @@ function buildLeafletHTML(
 
     markerGroup.on('clusterclick', function(e) {
       if (map.getZoom() >= 14) {
-        showSheet(e.layer.getAllChildMarkers().map(m => m._obsData));
+        showSheet(e.layer.getAllChildMarkers().map(function(m) { return m._obsData; }));
       }
     });
 
@@ -277,6 +321,9 @@ function buildLeafletHTML(
 </html>`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
 const MapScreen: React.FC = () => {
   const webViewRef = useRef<WebView>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -296,23 +343,49 @@ const MapScreen: React.FC = () => {
           ...args,
           p_limit: 500,
         });
-
         if (error) throw error;
 
-        const formatted: Observation[] = ((data ?? []) as unknown as FilteredObservationRow[])
+        const rows = (data ?? []) as unknown as FilteredObservationRow[];
+
+        // Fetch share_name_on_map for all unique user_ids in one query
+        const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id, share_name_on_map')
+          .in('id', userIds);
+
+        const shareMap: Record<string, boolean> = {};
+        (userData ?? []).forEach((u: { id: string; share_name_on_map: boolean }) => {
+          shareMap[u.id] = u.share_name_on_map;
+        });
+
+        const formatted: Observation[] = rows
           .filter((o) => o.latitude != null && o.longitude != null)
-          .map((o) => ({
-            id: String(o.id),
-            type: o.categories?.[0] ?? 'Observation',
-            date: o.created_at ? new Date(o.created_at).toLocaleDateString() : '',
-            latitude: Number(o.latitude),
-            longitude: Number(o.longitude),
-            observation: o.observation,
-            projectName: o.project_name,
-            observerName: o.observer_name ?? 'Anonymous',
-            keywords: o.keywords ?? [],
-            photos: o.observation_media ?? [],
-          }));
+          .map((o) => {
+            const sharesName = o.user_id ? shareMap[o.user_id] === true : false;
+            const fullName =
+              [o.observer_first_name, o.observer_last_name].filter(Boolean).join(' ') || null;
+
+            return {
+              id: String(o.id),
+              type: o.categories?.[0] ?? 'Observation',
+              date: o.created_at
+                ? new Date(o.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })
+                : '',
+              time: o.created_at ?? '',
+              latitude: Number(o.latitude),
+              longitude: Number(o.longitude),
+              observation: o.observation,
+              projectName: o.project_name,
+              observerName: sharesName ? fullName : null,
+              keywords: o.keywords ?? [],
+              photos: o.observation_media ?? [],
+            };
+          });
 
         setObservations(formatted);
       } catch (err) {
@@ -329,7 +402,7 @@ const MapScreen: React.FC = () => {
         .eq('is_active', true);
       if (data) {
         const map: Record<string, string> = {};
-        data.forEach((row) => {
+        data.forEach((row: { type: string; color: string | null }) => {
           if (row.color) map[row.type.toUpperCase()] = row.color;
         });
         setCategoryColors(map);
@@ -339,6 +412,18 @@ const MapScreen: React.FC = () => {
     fetchData();
     fetchCategories();
   }, []);
+
+  // Receive messages from the WebView and handle natively
+  const handleWebViewMessage = async (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'DOWNLOAD_MEDIA') {
+        await Share.share({ url: msg.url });
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+    }
+  };
 
   const handleSatelliteToggle = () => {
     const next = !isSatellite;
@@ -386,6 +471,7 @@ const MapScreen: React.FC = () => {
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
+            onMessage={handleWebViewMessage}
           />
         )}
       </View>

@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 // Load your .env from the root (you uploaded it at repo root)
 dotenv.config({
   path: path.resolve(__dirname, '../../.env'),
-  quiet: true,
 });
 
 const appVariant = process.env.APP_VARIANT ?? 'shared';
