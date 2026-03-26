@@ -583,17 +583,24 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   const obsCount = observations.length;
   const shouldRenderWakeWordStatus = true;
-  const wakeWordStatusText = isExpoGo()
-    ? 'Wake word disabled in Expo Go'
-    : recordingCountdown > 0
-      ? 'Recording observation...'
-      : !wakeWord.isAvailable
-        ? 'Wake word unavailable in this build/device'
-        : wakeWordEnabled
-          ? '💡 Say "Hey Wade, Start Recording"'
-          : wakeWord.lastError
-            ? `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`
-            : 'Wake word is starting…';
+  const wakeWordStatusText = (() => {
+    if (isExpoGo()) {
+      return 'Wake word disabled in Expo Go';
+    }
+    if (recordingCountdown > 0) {
+      return 'Recording observation...';
+    }
+    if (wakeWord.isAvailable) {
+      if (wakeWordEnabled) {
+        return '💡 Say "Hey Wade, Start Recording"';
+      }
+      if (wakeWord.lastError) {
+        return `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`;
+      }
+      return 'Wake word is starting…';
+    }
+    return 'Wake word unavailable in this build/device';
+  })();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -670,7 +677,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
             <Text style={styles.cameraText}>📸 Add Photo/Video</Text>
             <Text style={styles.cameraSubtext}>
               Available for {cameraWindowSecondsLeft} more second
-              {cameraWindowSecondsLeft !== 1 ? 's' : ''}
+              {cameraWindowSecondsLeft === 1 ? '' : 's'}
             </Text>
           </Pressable>
         )}
