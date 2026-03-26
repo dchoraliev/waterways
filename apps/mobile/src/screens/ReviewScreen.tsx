@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -19,11 +20,10 @@ import ProjectSelector from '../components/ProjectSelector';
 import { ROUTES } from '../constants/routes';
 import { useAuth } from '../hooks/useAuth';
 import { SyncStatus, syncTrip } from '../database/SyncManager';
-import { getObservationsByTripId } from '../database/ObservationManager';
-import { getTripById } from '../database/TripManager';
+import { getObservationsByTripId, removeObservationById } from '../database/ObservationManager';
+import { getTripById, updateTripById, removeTripById } from '../database/TripManager';
 import { Observation as DBObservation } from '@waterways/shared/src/models/local-db-rows';
 import { showToast } from '../utils/toast';
-import { updateTripById } from '../database/TripManager';
 import { useTheme } from '../contexts/ThemeContext';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
@@ -256,6 +256,67 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
     }
   }, [tripId, router]);
 
+  // Handle delete observation
+  const handleDeleteObservation = useCallback(
+    async (observationId: string) => {
+      try {
+        console.log('[ReviewScreen] Deleting observation:', observationId);
+
+        // Remove from database
+        await removeObservationById(observationId);
+
+        // Update local state
+        setDbObservations((prev) => prev.filter((obs) => obs.id !== observationId));
+
+        // Update the journey draft
+        if (existingJourney) {
+          const updatedObservations = existingJourney.observations.filter(
+            (obs) => obs.id !== observationId
+          );
+
+          // Check if this was the last observation
+          if (updatedObservations.length === 0) {
+            console.log('[ReviewScreen] Last observation deleted, discarding journey');
+
+            // Clear the active trip from storage
+            await AsyncStorage.removeItem(ACTIVE_TRIP_KEY);
+
+            // Delete the empty trip from database
+            await removeTripById(tripId);
+
+            // Alert user that trip wasn't saved
+            Alert.alert(
+              'Journey Not Saved',
+              'Your journey was not saved because it contains no observations.',
+              [{ text: 'OK', onPress: () => router.replace(ROUTES.home) }]
+            );
+
+            return; // Exit early - don't update draft state
+          }
+
+          // If there are still observations, update the draft normally
+          await saveDraft({
+            ...existingJourney,
+            observations: updatedObservations,
+          });
+
+          // Update local journey state
+          setExistingJourney({
+            ...existingJourney,
+            observations: updatedObservations,
+          });
+        }
+
+        showToast('Observation deleted');
+        console.log('[ReviewScreen] Observation deleted successfully');
+      } catch (error) {
+        console.error('[ReviewScreen] Failed to delete observation:', error);
+        showToast('Failed to delete observation');
+      }
+    },
+    [existingJourney, saveDraft, tripId, router]
+  );
+
   // Handle save draft button
   const handleSaveDraft = useCallback(async () => {
     await saveDraft({
@@ -392,6 +453,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
                   },
                 })
               }
+              onDelete={() => handleDeleteObservation(obs.id)}
             />
           ))
         )}

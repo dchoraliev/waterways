@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Modal,
   Pressable,
-  SafeAreaView,
   Linking,
   Alert,
   Share,
@@ -25,7 +24,7 @@ import { CATEGORIES } from '../services/ObservationClassifier';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
 import videoIcon from '../assets/icons/video_attached.png';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 export type ObservationStatus = SyncStatus;
 
 export interface Observation {
@@ -48,6 +47,7 @@ export interface Observation {
 interface ObservationCardProps {
   observation: Observation;
   onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 function ensureUri(path: string): string {
@@ -87,8 +87,6 @@ const ZoomableImageIOS: React.FC<{
   uri: string;
   sharedStyles: ReturnType<typeof createSharedStyles>;
 }> = ({ uri, sharedStyles }) => {
-  //const { width, height } = Dimensions.get('window');
-
   // iOS-only native zoom support
   if (Platform.OS !== 'ios') {
     return (
@@ -120,7 +118,7 @@ const ZoomableImageIOS: React.FC<{
   );
 };
 
-const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }) => {
+const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, onDelete }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createObservationCardStyles(colors), [colors]);
   const sharedStyles = useMemo(() => createSharedStyles(colors), [colors]);
@@ -214,9 +212,10 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
         </View>
       )}
 
-      {/* View Media Button */}
-      {hasValidMedia && (
-        <View style={styles.mediaSection}>
+      {/* Bottom Action Buttons Row */}
+      <View style={styles.actionsRow}>
+        {/* View Media Button */}
+        {hasValidMedia && (
           <TouchableOpacity
             style={styles.viewMediaButton}
             onPress={() => {
@@ -243,8 +242,31 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit }
               {isPhoto ? 'View Photo' : isVideo ? 'View Video' : 'View Media'}
             </Text>
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+
+        {/* Delete Button */}
+        {onDelete && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => {
+              Alert.alert(
+                'Delete Observation',
+                'Are you sure you want to delete this observation? This action cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: onDelete,
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.deleteText}>Delete</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* In-app photo viewer modal */}
       {isPhoto && mediaUri && (
@@ -401,9 +423,12 @@ function createObservationCardStyles(themeColors: AppColors) {
       fontWeight: '600',
       color: themeColors.textPrimary,
     },
-    mediaSection: {
+    actionsRow: {
       marginTop: 12,
-      alignItems: 'flex-end',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: 8,
     },
     viewMediaButton: {
       backgroundColor: themeColors.primary,
@@ -415,6 +440,19 @@ function createObservationCardStyles(themeColors: AppColors) {
       fontSize: 13,
       fontWeight: '600',
       color: themeColors.textPrimary,
+    },
+    deleteButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: themeColors.danger,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    },
+    deleteText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: themeColors.danger,
     },
   });
 }
