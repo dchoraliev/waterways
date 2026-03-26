@@ -1,0 +1,13 @@
+{
+  "name": "expo-wake-word",
+  "version": "0.1.0",
+  "description": "Waterways iOS wake-word native module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

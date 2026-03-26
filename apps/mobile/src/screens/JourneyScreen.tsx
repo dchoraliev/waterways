@@ -62,7 +62,7 @@ function formatDuration(secondsTotal: number) {
 }
 
 interface JourneyScreenProps {
-  tripId: string;
+  readonly tripId: string;
 }
 
 export default function JourneyScreen({ tripId }: JourneyScreenProps) {
@@ -111,6 +111,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   // --- End journey state ---
   const [endingJourney, setEndingJourney] = useState(false);
+  const [tripIsActive, setTripIsActive] = useState(true);
 
   // --- Camera window state (10 seconds after observation) ---
   const [cameraWindowActive, setCameraWindowActive] = useState(false);
@@ -127,6 +128,14 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
       try {
         const trip = await getTripById(tripId);
+        const active = !trip?.end_time;
+        setTripIsActive(active);
+
+        if (!active) {
+          setWakeWordEnabled(false);
+          return;
+        }
+
         const startTime = trip?.start_time ?? Date.now();
         journeyStartRef.current = startTime;
 
@@ -135,6 +144,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         }
       } catch (error) {
         console.warn('[JourneyScreen] Failed to restore journey start time:', error);
+        setTripIsActive(false);
       }
     };
 
@@ -254,10 +264,11 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   useFocusEffect(
     useCallback(() => {
-      const shouldEnableWakeWord = !isExpoGo() && wakeWord.isAvailable;
+      const shouldEnableWakeWord = tripIsActive && !isExpoGo() && wakeWord.isAvailable;
 
       if (!shouldEnableWakeWord) {
         setWakeWordEnabled(false);
+        void wakeWordStopRef.current();
         return;
       }
 
@@ -280,7 +291,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         setWakeWordEnabled(false);
         void wakeWordStopRef.current();
       };
-    }, [wakeWord.isAvailable])
+    }, [tripIsActive, wakeWord.isAvailable])
   );
 
   // Start observation recording with 20-second countdown.
@@ -513,6 +524,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
     try {
       setEndingJourney(true);
+      setWakeWordEnabled(false);
+      setTripIsActive(false);
+      await wakeWordStopRef.current();
 
       // Check if trip has any observations
       const observationCount = observations.length;
