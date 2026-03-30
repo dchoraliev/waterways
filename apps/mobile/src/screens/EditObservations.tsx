@@ -295,7 +295,7 @@ export default function EditObservationScreen() {
                 style={editStyles.discardButton}
                 onPress={() => router.back()}
               >
-                <Text style={editStyles.discardText}>Discard</Text>
+                <Text style={editStyles.discardText}>Discard Changes</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

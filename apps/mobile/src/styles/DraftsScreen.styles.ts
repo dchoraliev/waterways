@@ -91,6 +91,25 @@ export const createDraftsScreenStyles = (themeColors: AppColors) =>
     cardMeta: {
       fontSize: 12,
       color: themeColors.textMuted,
+      marginBottom: 8,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: 8,
+    },
+    removeButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: themeColors.danger,
+    },
+    removeButtonText: {
+      color: themeColors.danger,
+      fontSize: 12,
+      fontWeight: '500',
     },
   });
 
