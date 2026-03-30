@@ -12,10 +12,8 @@ import {
   Share,
   Platform,
   ScrollView,
-  //Dimensions,
   ShareContent,
 } from 'react-native';
-import TagPill from './TagPill';
 import locationIcon from '../assets/icons/location-pin.png';
 import editIcon from '../assets/icons/edit.png';
 import mediaIcon from '../assets/icons/media_attached_icon.png';
@@ -25,6 +23,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
 import videoIcon from '../assets/icons/video_attached.png';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 export type ObservationStatus = SyncStatus;
 
 export interface Observation {
@@ -37,7 +36,7 @@ export interface Observation {
   hasMedia?: boolean;
   mediaType?: 'photo' | 'video' | null;
   mediaTimestamp?: number | null;
-  mediaFilePath?: string | null; // Local file path or URL
+  mediaFilePath?: string | null;
   status?: ObservationStatus;
   category?: string | null;
   keyword?: string | null;
@@ -122,7 +121,7 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
   const { colors } = useTheme();
   const styles = useMemo(() => createObservationCardStyles(colors), [colors]);
   const sharedStyles = useMemo(() => createSharedStyles(colors), [colors]);
-  const { time, location, description, tags, status } = observation;
+  const { time, location, description, status } = observation;
 
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
 
@@ -136,7 +135,7 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
     const category = Object.entries(CATEGORIES).find(
       ([key]) => key.toLowerCase() === cat.toLowerCase()
     );
-    return category ? category[1].color : '#6B7280'; // default to gray if not found
+    return category ? category[1].color : '#6B7280';
   }
 
   return (
@@ -180,14 +179,6 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
       </View>
 
       <Text style={styles.description}>{description}</Text>
-
-      {tags.length > 0 && (
-        <View style={styles.tagsRow}>
-          {tags.map((tag) => (
-            <TagPill key={tag} label={tag} />
-          ))}
-        </View>
-      )}
 
       {(observation.category || observation.keyword) && (
         <View style={styles.classificationRow}>
@@ -281,8 +272,9 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
               <Pressable
                 onPress={() => setPhotoModalVisible(false)}
                 style={sharedStyles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={sharedStyles.closeButtonText}>Close</Text>
+                <Text style={sharedStyles.closeButtonText}>✕ Close</Text>
               </Pressable>
             </View>
 
@@ -464,14 +456,15 @@ function createSharedStyles(themeColors: AppColors) {
       backgroundColor: themeColors.primaryDark,
     },
     modalHeader: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 16,
+      paddingTop: 60, // Large top padding to clear status bar area
+      paddingBottom: 12,
       flexDirection: 'row',
       justifyContent: 'flex-end',
     },
     closeButton: {
-      paddingVertical: 8,
-      paddingHorizontal: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
       borderRadius: 10,
       backgroundColor: themeColors.surface,
       borderWidth: 1,
@@ -480,6 +473,7 @@ function createSharedStyles(themeColors: AppColors) {
     closeButtonText: {
       color: themeColors.textPrimary,
       fontWeight: '700',
+      fontSize: 16,
     },
     modalBody: {
       flex: 1,

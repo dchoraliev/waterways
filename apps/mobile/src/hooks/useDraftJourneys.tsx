@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import type { Observation } from '../components/ObservationCard';
 import { getObservationsByTripId } from '../database/ObservationManager';
+import { getMediaById } from '../database/MediaManager';
 import { cancelDraftReminder, scheduleDraftReminder } from '../services/DraftReminderService';
 import { SyncStatus } from '../database/SyncStatus';
 import { getTripsBySyncStatus, getTripById, updateTripById } from '../database/TripManager';
@@ -35,7 +36,7 @@ interface DraftJourneysContextValue {
 }
 
 async function mapTripDataToJourneyDraftInterface(tripId: string): Promise<JourneyDraft> {
-  // FIXED: Fetch trip to get project_id and created_at
+  // Fetch trip to get project_id and created_at
   const trip = await getTripById(tripId);
 
   console.log('[DraftJourneys] Loading draft:', tripId, 'with project_id:', trip?.project_id);
@@ -43,23 +44,46 @@ async function mapTripDataToJourneyDraftInterface(tripId: string): Promise<Journ
   // Fetch observations for the trip
   const observationRows = await getObservationsByTripId(tripId);
 
-  const draftObservations: Observation[] = observationRows.map((row) => ({
-    id: row.id,
-    time: new Date(row.created_at).toLocaleString(),
-    location: `${row.latitude}, ${row.longitude}`,
-    description: row.observation || 'Description not available',
-    tags: row.category_id ? [row.category_id] : [],
-    hasAudio: !!row.audio_media_id,
-    hasMedia: !!row.local_media_id,
-    status: row.sync_status as SyncStatus,
-  }));
+  const draftObservations: Observation[] = await Promise.all(
+    observationRows.map(async (row) => {
+      // Fetch media details if observation has media
+      let mediaType: 'photo' | 'video' | null = null;
+      let mediaFilePath: string | null = null;
+
+      if (row.local_media_id) {
+        const media = await getMediaById(row.local_media_id);
+        if (media) {
+          mediaFilePath = media.local_file_path;
+          // Determine media type from media_type field
+          if (media.media_type === 'video') {
+            mediaType = 'video';
+          } else if (media.media_type === 'image' || media.media_type === 'photo') {
+            mediaType = 'photo';
+          }
+        }
+      }
+
+      return {
+        id: row.id,
+        time: new Date(row.created_at).toLocaleString(),
+        location: `${row.latitude}, ${row.longitude}`,
+        description: row.observation || 'Description not available',
+        tags: row.category_id ? [row.category_id] : [],
+        hasAudio: !!row.audio_media_id,
+        hasMedia: !!row.local_media_id,
+        mediaType,
+        mediaFilePath,
+        status: row.sync_status as SyncStatus,
+      };
+    })
+  );
 
   return {
     id: tripId,
     createdAt: trip?.created_at ?? Date.now(),
     status: SyncStatus.DRAFTED,
     observations: draftObservations,
-    projectId: trip?.project_id ?? null, // FIXED: Load project_id from database
+    projectId: trip?.project_id ?? null,
   };
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { Share } from 'react-native';
 import { supabase } from '@waterways/shared/src/supabase/client';
@@ -414,7 +414,7 @@ const MapScreen: React.FC = () => {
   }, []);
 
   // Receive messages from the WebView and handle natively
-  const handleWebViewMessage = async (event: any) => {
+  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'DOWNLOAD_MEDIA') {
