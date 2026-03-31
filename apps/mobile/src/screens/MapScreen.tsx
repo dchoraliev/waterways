@@ -12,7 +12,7 @@ import {
   Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
@@ -36,6 +36,8 @@ export interface Observation {
   observerName: string | null;
   keywords: string[];
   photos: string[];
+  obsNumber: number;
+  journeyNumber: number | null;
 }
 
 interface FilteredObservationRow {
@@ -246,7 +248,17 @@ function buildLeafletHTML(
     });
     function showSheet(obsList) {
       document.getElementById('legend-panel').classList.remove('visible');
-      document.getElementById('sheet-title').textContent = obsList.length > 1 ? obsList.length + ' Observations' : 'Observation Detail';
+      var title;
+      if (obsList.length > 1) {
+        title = obsList.length + ' Observations';
+      } else {
+        var o = obsList[0];
+        var parts = [];
+        if (o.journeyNumber != null) parts.push('Journey ' + o.journeyNumber);
+        parts.push('Observation ' + o.obsNumber);
+        title = parts.join(' \u00b7 ');
+      }
+      document.getElementById('sheet-title').textContent = title;
       var body = document.getElementById('sheet-body');
       body.innerHTML = obsList.map(function(o) {
         var badges = [o.type, ...(o.keywords || [])].map(function(k) { return '<span class="badge">'+escapeHtml(k)+'</span>'; }).join('');
@@ -357,7 +369,7 @@ const MapScreen: React.FC = () => {
           shareMap[u.id] = u.share_name_on_map;
         });
 
-        const formatted: Observation[] = rows
+        const formatted: Omit<Observation, 'obsNumber' | 'journeyNumber'>[] = rows
           .filter((o) => o.latitude != null && o.longitude != null)
           .map((o) => {
             const sharesName = o.user_id ? shareMap[o.user_id] === true : false;
@@ -386,7 +398,42 @@ const MapScreen: React.FC = () => {
             };
           });
 
-        setObservations(formatted);
+        // Sort by time ascending so oldest = #1
+        const sorted = [...formatted].sort(
+          (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+        );
+
+        // Assign journey numbers ordered by each trip's first appearance
+        const tripFirstSeen = new Map<string, number>();
+        sorted.forEach((o) => {
+          if (o.tripId && !tripFirstSeen.has(o.tripId)) {
+            tripFirstSeen.set(o.tripId, tripFirstSeen.size + 1);
+          }
+        });
+
+        // Track per-trip observation counters so obsNumber resets each journey
+        const tripObsCounter = new Map<string, number>();
+
+        const numbered: Observation[] = sorted.map((o) => {
+          let obsNumber: number;
+          if (o.tripId) {
+            const next = (tripObsCounter.get(o.tripId) ?? 0) + 1;
+            tripObsCounter.set(o.tripId, next);
+            obsNumber = next;
+          } else {
+            // No trip — use a shared counter for tripless observations
+            const next = (tripObsCounter.get('__none__') ?? 0) + 1;
+            tripObsCounter.set('__none__', next);
+            obsNumber = next;
+          }
+          return {
+            ...o,
+            obsNumber,
+            journeyNumber: o.tripId ? (tripFirstSeen.get(o.tripId) ?? null) : null,
+          };
+        });
+
+        setObservations(numbered);
       } catch (err) {
         console.error('Failed to fetch observations:', err);
       } finally {
