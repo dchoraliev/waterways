@@ -82,6 +82,19 @@ async function openVideoExternally(path: string) {
   }
 }
 
+async function downloadPhotoExternally(path: string) {
+  const uri = encodeURI(ensureUri(path));
+
+  try {
+    // Use Share API to save to Photos/Files
+    const content: ShareContent = Platform.OS === 'ios' ? { url: uri } : { message: uri };
+    await Share.share(content);
+  } catch (e) {
+    console.warn('[ObservationCard] Failed to share photo', e);
+    Alert.alert('Unable to save photo', 'Could not save photo to your device.');
+  }
+}
+
 const ZoomableImageIOS: React.FC<{
   uri: string;
   sharedStyles: ReturnType<typeof createSharedStyles>;
@@ -211,16 +224,33 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
             style={styles.viewMediaButton}
             onPress={() => {
               if (isPhoto) {
-                setPhotoModalVisible(true);
+                // Show photo options: View in app or Save
+                Alert.alert('Photo Options', 'Choose how to view this photo', [
+                  {
+                    text: 'View in App',
+                    onPress: () => setPhotoModalVisible(true),
+                  },
+                  {
+                    text: 'Save to Photos',
+                    onPress: () => downloadPhotoExternally(observation.mediaFilePath as string),
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                ]);
               } else if (isVideo) {
                 Alert.alert(
-                  'Video preview not available',
-                  'This build does not include an in-app video player. You can open the video in your device player instead.',
+                  'Video Options',
+                  'You cannot view the video in the app, but you can choose a different way to view it if you would like.',
                   [
-                    { text: 'Cancel', style: 'cancel' },
                     {
-                      text: 'Open Video',
+                      text: 'Choose Option',
                       onPress: () => openVideoExternally(observation.mediaFilePath as string),
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
                     },
                   ]
                 );
@@ -230,7 +260,7 @@ const ObservationCard: React.FC<ObservationCardProps> = ({ observation, onEdit, 
             }}
           >
             <Text style={styles.viewMediaText}>
-              {isPhoto ? 'View Photo' : isVideo ? 'View Video' : 'View Media'}
+              {isPhoto ? 'Photo Options' : isVideo ? 'Video Options' : 'View Media'}
             </Text>
           </TouchableOpacity>
         )}
