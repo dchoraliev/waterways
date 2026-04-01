@@ -37,7 +37,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({ command, description })
 
   return (
     <View style={rowStyles.container}>
-      <Text style={rowStyles.commandText}>&quot;{command}&quot;</Text>
+      <Text style={rowStyles.commandText}>{command}</Text>
       <Text style={rowStyles.descriptionText}>{description}</Text>
     </View>
   );

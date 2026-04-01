@@ -52,14 +52,14 @@ export default function CameraCaptureScreen() {
   const [zoom, setZoom] = useState(0);
   const [switching, setSwitching] = useState(false);
 
-  // Animation for capture button press
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  // Animation for capture button press - using useMemo instead of useRef().current
+  const scaleAnim = useMemo(() => new Animated.Value(1), []);
 
   // Animation for recording pulse
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useMemo(() => new Animated.Value(1), []);
 
   // Animation for camera fade during mode switching
-  const cameraOpacity = useRef(new Animated.Value(1)).current;
+  const cameraOpacity = useMemo(() => new Animated.Value(1), []);
 
   const cameraRef = useRef<CameraView>(null);
 
@@ -144,6 +144,8 @@ export default function CameraCaptureScreen() {
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
       if (!photo?.uri) {
         showToast('Failed to take photo.');
+        setBusy(false);
+        setProcessing(false);
         return;
       }
 
@@ -162,11 +164,15 @@ export default function CameraCaptureScreen() {
       markObservationHasMedia(observationId, secondsElapsed, 'photo');
 
       showToast('Photo attached');
+
+      // Clean up state BEFORE navigating back
+      setBusy(false);
+      setProcessing(false);
+
       router.back();
     } catch (e) {
       console.warn(e);
       showToast('Photo failed');
-    } finally {
       setBusy(false);
       setProcessing(false);
     }
@@ -194,18 +200,16 @@ export default function CameraCaptureScreen() {
       setRecording(true);
       setBusy(true);
       startPulseAnimation();
-      recordingCancelled.current = false; // Reset cancel flag
+      recordingCancelled.current = false;
 
-      // Start recording (this will wait until stopRecording is called)
       const vid = await cameraRef.current?.recordAsync();
 
-      // Recording has stopped, now check if it was cancelled
       stopPulseAnimation();
       setRecording(false);
 
-      // If recording was cancelled (close button pressed), don't process the video
       if (recordingCancelled.current) {
         console.log('[Camera] Recording cancelled, not saving video');
+        setBusy(false);
         return;
       }
 
@@ -213,6 +217,8 @@ export default function CameraCaptureScreen() {
 
       if (!vid?.uri) {
         showToast('No video recorded.');
+        setBusy(false);
+        setProcessing(false);
         return;
       }
 
@@ -231,16 +237,22 @@ export default function CameraCaptureScreen() {
       markObservationHasMedia(observationId, secondsElapsed, 'video');
 
       showToast('Video attached');
+
+      // Clean up state BEFORE navigating back
+      setRecording(false);
+      setBusy(false);
+      setProcessing(false);
+      recordingCancelled.current = false;
+
       router.back();
     } catch (e) {
       console.warn(e);
       showToast('Video failed');
       stopPulseAnimation();
-    } finally {
       setRecording(false);
       setBusy(false);
       setProcessing(false);
-      recordingCancelled.current = false; // Reset flag
+      recordingCancelled.current = false;
     }
   }
 
@@ -248,7 +260,7 @@ export default function CameraCaptureScreen() {
     try {
       console.log('[Camera] Stopping video recording...');
       cameraRef.current?.stopRecording();
-      // Note: cleanup happens in startVideo's finally block after recordAsync resolves
+      // Note: cleanup happens in startVideo after recordAsync resolves
     } catch (e) {
       console.warn('Stop recording error:', e);
     }
@@ -309,6 +321,7 @@ export default function CameraCaptureScreen() {
     }).start(() => {
       // Switch mode while faded
       setMode(newMode);
+      setZoom(0); // ✅ Reset zoom when switching modes
 
       // Fade back in
       Animated.timing(cameraOpacity, {
