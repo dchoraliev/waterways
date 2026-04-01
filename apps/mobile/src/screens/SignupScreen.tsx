@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
 import { signUp } from '@waterways/shared/src/supabase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import TextInputField from '../components/form/TextInputField';
 import PrimaryButton from '../components/form/PrimaryButton';
 import waterwaysLogo from '../../assets/logo/waterways-logo.png';
 import { useTheme } from '../contexts/ThemeContext';
+import { LEGAL_DOCUMENTS_URL } from '../constants/legal';
 
 export interface SignupScreenProps {
   onSignupSuccess: () => void;
@@ -43,12 +45,14 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const canSubmit =
     name.trim().length > 0 &&
     email.trim().length > 0 &&
     password.trim().length >= 4 &&
-    password === confirm;
+    password === confirm &&
+    acceptedTerms;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -124,6 +128,25 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               value={confirm}
               onChangeText={setConfirm}
             />
+
+            <View style={styles.termsRow}>
+              <TouchableOpacity
+                onPress={() => setAcceptedTerms((current) => !current)}
+                style={styles.checkboxButton}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: acceptedTerms }}
+              >
+                <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+                  {acceptedTerms ? <Text style={styles.checkboxCheckmark}>✓</Text> : null}
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.termsText}>
+                I agree to the{' '}
+                <Text style={styles.termsLink} onPress={() => Linking.openURL(LEGAL_DOCUMENTS_URL)}>
+                  Legal Terms
+                </Text>
+              </Text>
+            </View>
 
             <PrimaryButton
               label="Create account"

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ import { Switch } from 'react-native';
 import { getLocalSettings, updateLocalSettings } from '../database/db';
 import { useTheme } from '../contexts/ThemeContext';
 import { ROUTES } from '../constants/routes';
+import { LEGAL_DOCUMENTS_URL } from '../constants/legal';
 
 interface UserProfile {
   name: string;
@@ -676,14 +678,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={styles.cardTitle}>Legal</Text>
             <View style={styles.cardBody}>
               <Pressable
-                onPress={() =>
-                  Alert.alert('Terms', 'Terms & Conditions screen not wired in this file.')
-                }
+                onPress={() => Linking.openURL(LEGAL_DOCUMENTS_URL)}
                 style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
               >
                 <View style={styles.navLeft}>
                   <Ionicons name="document-text-outline" size={20} color={tokens.mutedText} />
-                  <Text style={styles.navLabel}>Terms and Conditions</Text>
+                  <Text style={styles.navLabel}>Legal Documents</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
               </Pressable>
