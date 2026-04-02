@@ -7,6 +7,7 @@ import {
   type ObservationQueryParams,
   type ObservationBounds,
 } from '@waterways/shared';
+import TZLookup from 'tz-lookup';
 
 export type { ObservationQueryParams, ObservationBounds };
 
@@ -247,15 +248,51 @@ function mapRowToObservation(
   let timestamp = '';
   if (createdRaw) {
     const created = new Date(createdRaw);
-    date = [
-      created.getFullYear(),
-      String(created.getMonth() + 1).padStart(2, '0'),
-      String(created.getDate()).padStart(2, '0'),
-    ].join('-');
-    timestamp = created.toLocaleTimeString('en-GB', {
+
+    // Determine the timezone for this observation
+    let timezone = 'UTC';
+    if (lat !== 0 && lng !== 0) {
+      try {
+        timezone = TZLookup(lat, lng);
+      } catch {
+        // If lookup fails, fall back to UTC
+        timezone = 'UTC';
+      }
+    }
+
+    // Format date using the observation's timezone
+    const dateFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    // Format time in 12-hour format with AM/PM
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true,
     });
+
+    // Get timezone abbreviation
+    const tzFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'short',
+    });
+    const tzParts = tzFormatter.formatToParts(created);
+    const tzAbbr = tzParts.find((p) => p.type === 'timeZoneName')?.value || timezone;
+
+    // Get date parts
+    const dateParts = dateFormatter.formatToParts(created);
+    const datePartsMap = new Map(dateParts.map((p) => [p.type, p.value]));
+
+    date = `${datePartsMap.get('year')}-${datePartsMap.get('month')}-${datePartsMap.get('day')}`;
+
+    // Get formatted time string and append timezone
+    const timeString = timeFormatter.format(created);
+    timestamp = `${timeString} ${tzAbbr}`;
   }
 
   const categories = Array.isArray(row.categories) ? row.categories : [];
