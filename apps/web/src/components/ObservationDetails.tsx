@@ -144,10 +144,7 @@ export function ObservationDetails({
                 <p className="text-sm text-muted-foreground">Date</p>
                 <p className="text-sm">
                   {(() => {
-                    const dateObj = new Date(observation.createdAt);
-                    const month = dateObj.getUTCMonth() + 1;
-                    const day = dateObj.getUTCDate();
-                    const year = dateObj.getUTCFullYear();
+                    const [year, month, day] = observation.date.split('-');
                     return `${month}/${day}/${year}`;
                   })()}
                 </p>
@@ -158,14 +155,7 @@ export function ObservationDetails({
               <Clock className="size-4 mt-0.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">Time</p>
-                <p className="text-sm">
-                  {(() => {
-                    const dateObj = new Date(observation.createdAt);
-                    const hours = String(dateObj.getUTCHours()).padStart(2, '0');
-                    const minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
-                    return `${hours}:${minutes} UTC`;
-                  })()}
-                </p>
+                <p className="text-sm">{observation.timestamp}</p>
               </div>
             </div>
 
