@@ -18,7 +18,7 @@
     "mobile:expo-config": "cd apps/mobile && node ../../node_modules/expo/bin/cli config --type public",
     "mobile:eas:build:ios:development": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 eas build -p ios --profile development",
     "mobile:eas:build:ios:dev-device": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 eas build --non-interactive -p ios --profile development",
-    "mobile:eas:build:ios:sandbox": "cd apps/mobile && cross-env APP_VARIANT=sandbox APP_DISPLAY_NAME=\"Waterways Sandbox\" IOS_BUNDLE_ID=com.waterways.mobile.sandbox EXPO_SCHEME=waterways-sandbox EAS_SKIP_AUTO_FINGERPRINT=1 eas build --non-interactive -p ios --profile development_sandbox",
+    "mobile:eas:build:ios:sandbox": "cd apps/mobile && cross-env APP_VARIANT=sandbox APP_DISPLAY_NAME=\"Waterways Sandbox\" IOS_BUNDLE_ID=com.waterways.mobile EXPO_SCHEME=waterways-sandbox EAS_SKIP_AUTO_FINGERPRINT=1 eas build -p ios --profile development_sandbox",
     "mobile:eas:build:ios": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 eas build --non-interactive -p ios --profile production",
     "mobile:eas:build:ios:ci": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 eas build --non-interactive -p ios --profile production",
     "web": "cross-env VITE_CJS_IGNORE_WARNING=true yarn workspace @waterways/web dev",
