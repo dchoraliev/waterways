@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { useAuth } from '../hooks/useAuth';
 import { createReviewListScreenStyles } from '../styles/ReviewListScreen.styles';
@@ -45,106 +45,108 @@ const ReviewListScreen = () => {
   const [submittedJourneys, setSubmittedJourneys] = useState<SubmittedJourney[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchTrips = async () => {
-      setLoading(true);
+  const fetchTrips = useCallback(async () => {
+    setLoading(true);
 
-      if (authLoading) {
-        return;
-      }
+    if (authLoading) {
+      return;
+    }
 
-      if (!userId) {
-        setSubmittedJourneys([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('trips')
-        .select(
-          'id, user_id, project_id, start_time, end_time, start_location, end_location, created_at, unique_userID_localID_pair'
-        )
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        const trips = data as TripRow[];
-        const tripIds = trips.map((row) => row.id);
-        const projectIds = Array.from(
-          new Set(trips.map((row) => row.project_id).filter(Boolean))
-        ) as string[];
-        let observationCounts: Record<string, number> = {};
-        let projectNames: Record<string, string> = {};
-
-        if (tripIds.length > 0) {
-          const { data: observationRows } = await supabase
-            .from('observations')
-            .select('trip_id')
-            .in('trip_id', tripIds)
-            .eq('user_id', userId);
-
-          const typedObservationRows = (observationRows ?? []) as ObservationTripRow[];
-          observationCounts = typedObservationRows.reduce<Record<string, number>>((acc, row) => {
-            const tripId = row.trip_id;
-            if (tripId) {
-              acc[tripId] = (acc[tripId] ?? 0) + 1;
-            }
-            return acc;
-          }, {});
-        }
-
-        if (projectIds.length > 0) {
-          const { data: projectRows } = await supabase
-            .from('projects')
-            .select('id, name')
-            .in('id', projectIds);
-
-          const typedProjectRows = (projectRows ?? []) as ProjectNameRow[];
-          projectNames = typedProjectRows.reduce<Record<string, string>>((acc, row) => {
-            acc[row.id] = row.name;
-            return acc;
-          }, {});
-
-          console.log('[ReviewListScreen] Found projects:', projectNames);
-          console.log('[ReviewListScreen] Project IDs in trips:', projectIds);
-        } else {
-          console.log('[ReviewListScreen] No project IDs found in trips');
-        }
-
-        const mapped = trips.map((row) => {
-          const start = row.start_time ? new Date(row.start_time) : null;
-          const end = row.end_time ? new Date(row.end_time) : null;
-          const duration =
-            start && end ? Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000)) : 0;
-
-          const location =
-            [row.start_location, row.end_location].filter(Boolean).join(' → ').trim() ||
-            'Unknown location';
-
-          // Better project name handling
-          let projectName = 'No Project';
-          if (row.project_id) {
-            projectName = projectNames[row.project_id] ?? 'Unknown Project';
-          }
-
-          return {
-            id: row.id,
-            location,
-            duration,
-            observationCount: observationCounts[row.id] ?? 0,
-            submittedDate: new Date(row.created_at).toLocaleDateString(),
-            projectName,
-          };
-        });
-
-        setSubmittedJourneys(mapped);
-      }
-
+    if (!userId) {
+      setSubmittedJourneys([]);
       setLoading(false);
-    };
+      return;
+    }
 
-    fetchTrips();
+    const { data, error } = await supabase
+      .from('trips')
+      .select(
+        'id, user_id, project_id, start_time, end_time, start_location, end_location, created_at, unique_userID_localID_pair'
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      const trips = data as TripRow[];
+      const tripIds = trips.map((row) => row.id);
+      const projectIds = Array.from(
+        new Set(trips.map((row) => row.project_id).filter(Boolean))
+      ) as string[];
+      let observationCounts: Record<string, number> = {};
+      let projectNames: Record<string, string> = {};
+
+      if (tripIds.length > 0) {
+        const { data: observationRows } = await supabase
+          .from('observations')
+          .select('trip_id')
+          .in('trip_id', tripIds)
+          .eq('user_id', userId);
+
+        const typedObservationRows = (observationRows ?? []) as ObservationTripRow[];
+        observationCounts = typedObservationRows.reduce<Record<string, number>>((acc, row) => {
+          const tripId = row.trip_id;
+          if (tripId) {
+            acc[tripId] = (acc[tripId] ?? 0) + 1;
+          }
+          return acc;
+        }, {});
+      }
+
+      if (projectIds.length > 0) {
+        const { data: projectRows } = await supabase
+          .from('projects')
+          .select('id, name')
+          .in('id', projectIds);
+
+        const typedProjectRows = (projectRows ?? []) as ProjectNameRow[];
+        projectNames = typedProjectRows.reduce<Record<string, string>>((acc, row) => {
+          acc[row.id] = row.name;
+          return acc;
+        }, {});
+
+        console.log('[ReviewListScreen] Found projects:', projectNames);
+        console.log('[ReviewListScreen] Project IDs in trips:', projectIds);
+      } else {
+        console.log('[ReviewListScreen] No project IDs found in trips');
+      }
+
+      const mapped = trips.map((row) => {
+        const start = row.start_time ? new Date(row.start_time) : null;
+        const end = row.end_time ? new Date(row.end_time) : null;
+        const duration =
+          start && end ? Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000)) : 0;
+
+        const location =
+          [row.start_location, row.end_location].filter(Boolean).join(' → ').trim() ||
+          'Unknown location';
+
+        // Better project name handling
+        let projectName = 'No Project';
+        if (row.project_id) {
+          projectName = projectNames[row.project_id] ?? 'Unknown Project';
+        }
+
+        return {
+          id: row.id,
+          location,
+          duration,
+          observationCount: observationCounts[row.id] ?? 0,
+          submittedDate: new Date(row.created_at).toLocaleDateString(),
+          projectName,
+        };
+      });
+
+      setSubmittedJourneys(mapped);
+    }
+
+    setLoading(false);
   }, [authLoading, userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchTrips();
+    }, [fetchTrips])
+  );
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

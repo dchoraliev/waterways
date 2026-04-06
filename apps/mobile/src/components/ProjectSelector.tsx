@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { getUserProjects, createProject, joinProjectWithCode } from '../services/projectService';
+import { supabase } from '@waterways/shared/src/supabase/client';
 import type { Project } from '../types/project.types';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppColors } from '../styles/colors';
@@ -29,6 +30,8 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [selectedProjectName, setSelectedProjectName] = useState('Select a project');
+
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -44,23 +47,95 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
     setLoading(false);
   }, [userId]);
 
-  useEffect(() => {
-    if (modalVisible) {
-      (async () => {
-        await loadProjects();
-      })();
+  const loadSelectedProjectName = useCallback(async () => {
+    if (!selectedProjectId) {
+      setSelectedProjectName('No Project');
+      return;
     }
-  }, [modalVisible, loadProjects]);
 
-  const selectedProject = useMemo<Project | null>(() => {
-    if (selectedProjectId && projects.length > 0) {
-      return projects.find((p) => p.id === selectedProjectId) || null;
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', selectedProjectId)
+      .maybeSingle();
+
+    if (error || !data) {
+      setSelectedProjectName('Select a project');
+      return;
     }
-    return null;
-  }, [selectedProjectId, projects]);
+
+    setSelectedProjectName(data.name);
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const run = async () => {
+      if (!selectedProjectId) {
+        if (isActive) {
+          setSelectedProjectName('No Project');
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('id', selectedProjectId)
+        .maybeSingle();
+
+      if (!isActive) return;
+
+      if (error || !data) {
+        setSelectedProjectName('Select a project');
+        return;
+      }
+
+      setSelectedProjectName(data.name);
+    };
+
+    void run();
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!modalVisible) return;
+
+    let isActive = true;
+
+    const run = async () => {
+      setLoading(true);
+      const { data } = await getUserProjects(userId);
+
+      if (!isActive) return;
+
+      setProjects(data || []);
+      setLoading(false);
+    };
+
+    void run();
+
+    return () => {
+      isActive = false;
+    };
+  }, [modalVisible, userId]);
+
+  const handleOpenSelector = async () => {
+    setModalVisible(true);
+  };
 
   const handleSelectProject = (project: Project) => {
+    setSelectedProjectName(project.name);
     onSelectProject(project.id);
+    setModalVisible(false);
+  };
+
+  const handleClearProject = () => {
+    setSelectedProjectName('No Project');
+    onSelectProject(null);
     setModalVisible(false);
   };
 
@@ -76,12 +151,16 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
 
     if (error) {
       Alert.alert('Error', 'Failed to create project');
-    } else if (data) {
+      return;
+    }
+
+    if (data) {
       Alert.alert('Success', `Project created!\nJoin Code: ${data.join_code}`);
       setNewProjectName('');
       setCreateModalVisible(false);
-      loadProjects();
-      handleSelectProject(data);
+      setSelectedProjectName(data.name);
+      onSelectProject(data.id);
+      await loadProjects();
     }
   };
 
@@ -97,21 +176,23 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
 
     if (!success) {
       Alert.alert('Error', error || 'Failed to join project');
-    } else {
-      Alert.alert('Success', 'Joined project successfully!');
-      setJoinCode('');
-      setJoinModalVisible(false);
-      loadProjects();
+      return;
     }
+
+    Alert.alert('Success', 'Joined project successfully!');
+    setJoinCode('');
+    setJoinModalVisible(false);
+    await loadProjects();
+
+    // optional: leave current selection unchanged until user picks from list
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Project (Optional)</Text>
-      <TouchableOpacity style={styles.selector} onPress={() => setModalVisible(true)}>
-        <Text style={styles.selectorText}>
-          {selectedProject ? selectedProject.name : 'Select a project'}
-        </Text>
+
+      <TouchableOpacity style={styles.selector} onPress={handleOpenSelector}>
+        <Text style={styles.selectorText}>{selectedProjectName}</Text>
         <Text style={styles.arrow}>▼</Text>
       </TouchableOpacity>
 
@@ -140,6 +221,7 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
               >
                 <Text style={styles.actionButtonText}>+ Create New</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.actionButton, styles.joinButton]}
                 onPress={() => {
@@ -157,6 +239,7 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
               <FlatList
                 data={projects}
                 keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.projectListContent}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[
@@ -165,7 +248,14 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
                     ]}
                     onPress={() => handleSelectProject(item)}
                   >
-                    <Text style={styles.projectName}>{item.name}</Text>
+                    <Text
+                      style={[
+                        styles.projectName,
+                        selectedProjectId === item.id && styles.selectedProjectNameText,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={
@@ -176,13 +266,7 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
               />
             )}
 
-            <TouchableOpacity
-              style={styles.noneButton}
-              onPress={() => {
-                onSelectProject(null);
-                setModalVisible(false);
-              }}
-            >
+            <TouchableOpacity style={styles.noneButton} onPress={handleClearProject}>
               <Text style={styles.noneButtonText}>No Project</Text>
             </TouchableOpacity>
           </View>
@@ -216,9 +300,12 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.button, styles.createButton]}
-                onPress={handleCreateProject}
+                onPress={() => {
+                  void handleCreateProject();
+                }}
                 disabled={creating}
               >
                 <Text style={styles.createButtonText}>{creating ? 'Creating...' : 'Create'}</Text>
@@ -256,9 +343,12 @@ const ProjectSelector: React.FC<Props> = ({ selectedProjectId, onSelectProject, 
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.button, styles.createButton]}
-                onPress={handleJoinWithCode}
+                onPress={() => {
+                  void handleJoinWithCode();
+                }}
                 disabled={joining}
               >
                 <Text style={styles.createButtonText}>{joining ? 'Joining...' : 'Join'}</Text>
@@ -331,24 +421,56 @@ const createStyles = (colors: AppColors) =>
     actionButtonText: { color: colors.background, fontWeight: '600', fontSize: 13 },
     joinButtonText: { color: colors.primary },
     loader: { marginVertical: 32 },
-    projectItem: {
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.primary,
+    projectListContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 0,
     },
-    selectedProjectItem: { backgroundColor: colors.primarySoft },
-    projectName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    projectItem: {
+      minHeight: 56,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      marginBottom: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    selectedProjectItem: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    projectName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    selectedProjectNameText: {
+      color: colors.background,
+    },
     emptyText: { textAlign: 'center', color: colors.textMuted, padding: 32, fontSize: 13 },
     noneButton: {
-      margin: 16,
-      padding: 12,
-      borderRadius: 8,
+      minHeight: 56,
+      marginHorizontal: 16,
+      marginTop: 0,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
+      justifyContent: 'center',
       alignItems: 'center',
     },
-    noneButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+    noneButtonText: {
+      fontSize: 15,
+      color: colors.textMuted,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
     input: {
       borderWidth: 1,
       borderColor: colors.primary,
