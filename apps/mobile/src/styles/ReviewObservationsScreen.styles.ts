@@ -138,6 +138,115 @@ export const createReviewObservationsScreenStyles = (themeColors: AppColors) =>
       fontSize: 12,
       lineHeight: 14,
     },
+    projectInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    projectInfoBox: {
+      flex: 1,
+      backgroundColor: themeColors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginRight: 10,
+    },
+    projectInfoLabel: {
+      color: themeColors.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    projectInfoValue: {
+      color: themeColors.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    projectInfoSubtext: {
+      color: themeColors.textMuted,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    changeProjectButton: {
+      backgroundColor: themeColors.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    changeProjectButtonDisabled: {
+      opacity: 0.7,
+    },
+    changeProjectButtonText: {
+      color: themeColors.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    projectModalContent: {
+      width: '100%',
+      maxHeight: '70%',
+      backgroundColor: themeColors.surface,
+      borderRadius: 18,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    modalTitle: {
+      color: themeColors.textPrimary,
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 6,
+    },
+    modalSubtitle: {
+      color: themeColors.textMuted,
+      fontSize: 13,
+      marginBottom: 16,
+    },
+    projectListContent: {
+      paddingBottom: 8,
+    },
+    projectOptionCard: {
+      backgroundColor: themeColors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      padding: 14,
+      marginBottom: 10,
+    },
+    projectOptionCardSelected: {
+      borderColor: themeColors.primary,
+      backgroundColor: themeColors.primarySoft,
+    },
+    projectOptionTitle: {
+      color: themeColors.textPrimary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    projectOptionSubtitle: {
+      color: themeColors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    projectModalCloseButton: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginTop: 8,
+    },
+    projectModalCloseButtonText: {
+      color: themeColors.textMuted,
+      fontWeight: '600',
+    },
   });
 
 const styles = createReviewObservationsScreenStyles(colors);

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@waterways/shared/src/supabase/client';
@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { createReviewObservationsScreenStyles } from '../styles/ReviewObservationsScreen.styles';
 import { classifierTagCategoryMap, classifierTagPalette } from '../styles/colors';
 import { useTheme } from '../contexts/ThemeContext';
+import ProjectSelector from '../components/ProjectSelector';
 
 type ObservationRow = {
   id: string;
@@ -44,6 +45,7 @@ const ReviewObservationsScreen = () => {
   const [trip, setTrip] = useState<TripRow | null>(null);
   const [projectName, setProjectName] = useState<string>('No Project');
   const [loading, setLoading] = useState(true);
+  const [updatingProject, setUpdatingProject] = useState(false);
 
   useEffect(() => {
     const fetchTripAndObservations = async () => {
@@ -56,18 +58,19 @@ const ReviewObservationsScreen = () => {
       if (!userId || !id) {
         setObservations([]);
         setTrip(null);
+        setProjectName('No Project');
         setLoading(false);
         return;
       }
 
-      const { data: tripData } = await supabase
+      const { data: tripData, error: tripError } = await supabase
         .from('trips')
         .select('id, project_id, start_time, end_time, created_at, user_id')
         .eq('id', id)
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (!tripData) {
+      if (tripError || !tripData) {
         setTrip(null);
         setObservations([]);
         setProjectName('No Project');
@@ -77,20 +80,15 @@ const ReviewObservationsScreen = () => {
 
       setTrip(tripData);
 
-      // Better project name handling
       if (tripData.project_id) {
-        console.log('[ReviewObservationsScreen] Trip has project_id:', tripData.project_id);
-
         const { data: projectData } = await supabase
           .from('projects')
           .select('id, name')
           .eq('id', tripData.project_id)
           .maybeSingle();
 
-        console.log('[ReviewObservationsScreen] Project lookup result:', projectData);
         setProjectName(projectData?.name ?? 'Unknown Project');
       } else {
-        console.log('[ReviewObservationsScreen] Trip has no project_id');
         setProjectName('No Project');
       }
 
@@ -113,13 +111,51 @@ const ReviewObservationsScreen = () => {
         });
 
         setObservations(mapped);
+      } else {
+        setObservations([]);
       }
 
       setLoading(false);
     };
 
-    fetchTripAndObservations();
+    void fetchTripAndObservations();
   }, [authLoading, userId, id]);
+
+  const handleProjectSelect = async (selectedProjectId: string | null) => {
+    if (!trip?.id || !userId) return;
+
+    setUpdatingProject(true);
+
+    const { error } = await supabase
+      .from('trips')
+      .update({ project_id: selectedProjectId })
+      .eq('id', trip.id)
+      .eq('user_id', userId);
+
+    if (error) {
+      setUpdatingProject(false);
+      Alert.alert('Error', 'Failed to update project');
+      return;
+    }
+
+    let updatedProjectName = 'No Project';
+
+    if (selectedProjectId) {
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('id', selectedProjectId)
+        .maybeSingle();
+
+      updatedProjectName = projectData?.name ?? 'Unknown Project';
+    }
+
+    setTrip((prev) => (prev ? { ...prev, project_id: selectedProjectId } : prev));
+    setProjectName(updatedProjectName);
+    setUpdatingProject(false);
+
+    Alert.alert('Success', 'Project updated successfully');
+  };
 
   const observationCount = observations.length;
 
@@ -137,11 +173,13 @@ const ReviewObservationsScreen = () => {
 
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
     }
+
+    if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    }
+
+    return `${secs}s`;
   };
 
   const getTagStyle = (tag: string) => {
@@ -152,7 +190,6 @@ const ReviewObservationsScreen = () => {
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Pressable
@@ -165,11 +202,10 @@ const ReviewObservationsScreen = () => {
           </Pressable>
 
           <Text style={styles.headerTitle}>
-            Journey Details <Text style={styles.headerTitleMuted}>· {projectName}</Text>
+            Journey Details <Text style={styles.headerTitleMuted}></Text>
           </Text>
         </View>
 
-        {/* Summary */}
         <View style={styles.summaryRow}>
           <Text style={styles.summaryItem}>
             📅 {trip?.created_at ? new Date(trip.created_at).toLocaleDateString() : '—'}
@@ -179,9 +215,18 @@ const ReviewObservationsScreen = () => {
             <Text style={styles.summaryTagText}>{observationCount} observations</Text>
           </View>
         </View>
+
+        {userId ? (
+          <ProjectSelector
+            selectedProjectId={trip?.project_id ?? null}
+            onSelectProject={(projectId) => {
+              void handleProjectSelect(projectId);
+            }}
+            userId={userId}
+          />
+        ) : null}
       </View>
 
-      {/* Content */}
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Observations</Text>
 
@@ -195,7 +240,6 @@ const ReviewObservationsScreen = () => {
           <View>
             {observations.map((obs) => (
               <View key={obs.id} style={styles.card}>
-                {/* Time + Tags */}
                 <View style={styles.cardMetaRow}>
                   <Text style={styles.cardMetaText}>🕒 {obs.time}</Text>
                   {obs.tags.map((tag, index) => {
@@ -211,7 +255,6 @@ const ReviewObservationsScreen = () => {
                   })}
                 </View>
 
-                {/* Description */}
                 <Text style={styles.description}>{obs.description}</Text>
               </View>
             ))}
