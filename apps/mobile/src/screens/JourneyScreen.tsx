@@ -72,7 +72,7 @@ function formatDuration(secondsTotal: number) {
 }
 
 interface JourneyScreenProps {
-  tripId: string;
+  readonly tripId: string;
 }
 
 export default function JourneyScreen({ tripId }: JourneyScreenProps) {
@@ -129,6 +129,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   // --- End journey state ---
   const [endingJourney, setEndingJourney] = useState(false);
+  const [tripIsActive, setTripIsActive] = useState(true);
 
   // --- Camera window state (10 seconds after observation) ---
   const [cameraWindowActive, setCameraWindowActive] = useState(false);
@@ -182,6 +183,14 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
       try {
         const trip = await getTripById(tripId);
+        const active = !trip?.end_time;
+        setTripIsActive(active);
+
+        if (!active) {
+          setWakeWordEnabled(false);
+          return;
+        }
+
         const startTime = trip?.start_time ?? Date.now();
         journeyStartRef.current = startTime;
 
@@ -190,6 +199,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         }
       } catch (error) {
         console.warn('[JourneyScreen] Failed to restore journey start time:', error);
+        setTripIsActive(false);
       }
     };
 
@@ -309,10 +319,11 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   useFocusEffect(
     useCallback(() => {
-      const shouldEnableWakeWord = !isExpoGo() && wakeWord.isAvailable;
+      const shouldEnableWakeWord = tripIsActive && !isExpoGo() && wakeWord.isAvailable;
 
       if (!shouldEnableWakeWord) {
         setWakeWordEnabled(false);
+        void wakeWordStopRef.current();
         return;
       }
 
@@ -335,7 +346,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
         setWakeWordEnabled(false);
         void wakeWordStopRef.current();
       };
-    }, [wakeWord.isAvailable])
+    }, [tripIsActive, wakeWord.isAvailable])
   );
 
   // Start observation recording with 20-second countdown.
@@ -568,6 +579,9 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
     try {
       setEndingJourney(true);
+      setWakeWordEnabled(false);
+      setTripIsActive(false);
+      await wakeWordStopRef.current();
 
       // Check if trip has any observations
       const observationCount = observations.length;
@@ -624,17 +638,24 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
   const obsCount = observations.length;
   const shouldRenderWakeWordStatus = true;
-  const wakeWordStatusText = isExpoGo()
-    ? 'Wake word disabled in Expo Go'
-    : recordingCountdown > 0
-      ? 'Recording observation...'
-      : !wakeWord.isAvailable
-        ? 'Wake word unavailable in this build/device'
-        : wakeWordEnabled
-          ? '💡 Say "Hey Wade, Start Recording"'
-          : wakeWord.lastError
-            ? `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`
-            : 'Wake word is starting…';
+  const wakeWordStatusText = (() => {
+    if (isExpoGo()) {
+      return 'Wake word disabled in Expo Go';
+    }
+    if (recordingCountdown > 0) {
+      return 'Recording observation...';
+    }
+    if (wakeWord.isAvailable) {
+      if (wakeWordEnabled) {
+        return '💡 Say "Hey Wade, Start Recording"';
+      }
+      if (wakeWord.lastError) {
+        return `Wake word failed: ${wakeWord.lastError.message ?? 'Unknown error'}`;
+      }
+      return 'Wake word is starting…';
+    }
+    return 'Wake word unavailable in this build/device';
+  })();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -747,7 +768,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
             <Text style={styles.cameraText}>📸 Add Photo/Video</Text>
             <Text style={styles.cameraSubtext}>
               Available for {cameraWindowSecondsLeft} more second
-              {cameraWindowSecondsLeft !== 1 ? 's' : ''}
+              {cameraWindowSecondsLeft === 1 ? '' : 's'}
             </Text>
           </Pressable>
         )}

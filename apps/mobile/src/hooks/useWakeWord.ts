@@ -28,11 +28,13 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { Platform } from 'react-native';
 import VoiceRecognitionService, {
   RecognitionResult,
   RecognitionError,
   RecognitionState,
 } from '../services/VoiceRecognitionService';
+import NativeWakeWordService from '../services/NativeWakeWordService';
 import AudioRecordingService, {
   RecordingResult,
   RecordingStopReason,
@@ -52,6 +54,8 @@ export type WakeWordState =
 export interface WakeWordConfig {
   wakeWord: string;
   threshold?: number;
+  nativeWakeWordLabel?: string;
+  preferNativeEngine?: boolean;
   locale?: string;
   continuous?: boolean;
   maxAlternatives?: number;
@@ -106,6 +110,8 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   const {
     wakeWord,
     threshold = 0.85,
+    nativeWakeWordLabel = 'hey_wade',
+    preferNativeEngine = true,
     locale = 'en-US',
     continuous = true,
     maxAlternatives = 5,
@@ -146,6 +152,8 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
 
   // Refs for stable references
   const voiceService = useRef(VoiceRecognitionService.getInstance());
+  const nativeWakeWordService = useRef(NativeWakeWordService.getInstance());
+  const useNativeEngineRef = useRef(false);
   const audioService = useRef(AudioRecordingService.getInstance());
   const isRecordingMode = useRef(false);
   const transitionTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
@@ -388,6 +396,31 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     [onError, updateState]
   );
 
+  const handleNativeWakeWordError = useCallback(
+    (event: { code: string; message: string }) => {
+      const error: RecognitionError = {
+        code: event.code,
+        message: event.message,
+        isRecoverable: true,
+        timestamp: Date.now(),
+      };
+      handleError(error);
+    },
+    [handleError]
+  );
+
+  const handleNativeWakeWordStatus = useCallback(
+    (event: { status: string }) => {
+      if (event.status === 'listening') {
+        updateState('listening');
+      }
+      if (event.status === 'idle' && state !== 'idle') {
+        updateState('idle');
+      }
+    },
+    [state, updateState]
+  );
+
   // Handle state changes from service
   const handleServiceStateChange = useCallback(
     (serviceState: RecognitionState) => {
@@ -418,6 +451,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   // Initialize service
   useEffect(() => {
     const recognitionService = voiceService.current;
+    const nativeService = nativeWakeWordService.current;
     const recordingService = audioService.current;
 
     const init = async () => {
@@ -427,14 +461,24 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
         return;
       }
 
-      const success = await recognitionService.initialize({
-        locale,
-        continuous: true,
-        maxAlternatives,
-        returnPartialResults: true,
-        wakeWord,
-        wakeWordThreshold: threshold,
-      });
+      const canUseNativeEngine =
+        preferNativeEngine &&
+        Platform.OS === 'ios' &&
+        nativeService.initialize() &&
+        recordingDurationMs <= 0;
+
+      useNativeEngineRef.current = canUseNativeEngine;
+
+      const success = canUseNativeEngine
+        ? true
+        : await recognitionService.initialize({
+            locale,
+            continuous: true,
+            maxAlternatives,
+            returnPartialResults: true,
+            wakeWord,
+            wakeWordThreshold: threshold,
+          });
 
       setIsAvailable(success);
 
@@ -446,7 +490,11 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     void init();
 
     return () => {
-      if (recognitionService.isListening()) {
+      if (useNativeEngineRef.current) {
+        nativeService.stop().catch(() => {
+          /* noop */
+        });
+      } else if (recognitionService.isListening()) {
         recognitionService.stop();
       }
       if (transitionTimeout.current) {
@@ -459,7 +507,16 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
         });
       }
     };
-  }, [locale, maxAlternatives, wakeWord, threshold, clearRecordingTimers, updateState]);
+  }, [
+    locale,
+    maxAlternatives,
+    wakeWord,
+    threshold,
+    preferNativeEngine,
+    recordingDurationMs,
+    clearRecordingTimers,
+    updateState,
+  ]);
 
   // Start listening for wake word
   const startListening = useCallback(async (): Promise<boolean> => {
@@ -489,13 +546,31 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
 
     updateState('initializing');
 
-    const success = await voiceService.current.start({
-      onResults: handleResults,
-      onPartialResults: handlePartialResults,
-      onError: handleError,
-      onStateChange: handleServiceStateChange,
-      onWakeWordDetected: handleWakeWordDetected,
-    });
+    const success = useNativeEngineRef.current
+      ? await nativeWakeWordService.current.start(
+          {
+            onWakeWordDetected: () => {
+              handleWakeWordDetected();
+            },
+            onError: handleNativeWakeWordError,
+            onStatus: handleNativeWakeWordStatus,
+          },
+          {
+            wakeWordLabel: nativeWakeWordLabel,
+            threshold,
+            sampleRate: 16000,
+            windowSize: 16000,
+            hopSize: 3200,
+            cooldownMs: 1500,
+          }
+        )
+      : await voiceService.current.start({
+          onResults: handleResults,
+          onPartialResults: handlePartialResults,
+          onError: handleError,
+          onStateChange: handleServiceStateChange,
+          onWakeWordDetected: handleWakeWordDetected,
+        });
 
     if (success) {
       updateState('listening');
@@ -511,6 +586,10 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     handleError,
     handleServiceStateChange,
     handleWakeWordDetected,
+    handleNativeWakeWordError,
+    handleNativeWakeWordStatus,
+    nativeWakeWordLabel,
+    threshold,
     updateState,
     clearRecordingTimers,
   ]);
@@ -527,7 +606,11 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       await stopAudioRecording('manual');
     }
     isRecordingMode.current = false;
-    await voiceService.current.stop();
+    if (useNativeEngineRef.current) {
+      await nativeWakeWordService.current.stop();
+    } else {
+      await voiceService.current.stop();
+    }
     updateState('idle');
   }, [clearRecordingTimers, stopAudioRecording, updateState]);
 
