@@ -36,6 +36,9 @@ interface DraftJourneysContextValue {
 }
 
 async function mapTripDataToJourneyDraftInterface(tripId: string): Promise<JourneyDraft> {
+  // Import classifier
+  const { classifyObservation } = await import('../services/ObservationClassifier');
+
   // Fetch trip to get project_id and created_at
   const trip = await getTripById(tripId);
 
@@ -63,6 +66,20 @@ async function mapTripDataToJourneyDraftInterface(tripId: string): Promise<Journ
         }
       }
 
+      // Classify the observation if it doesn't have a category yet
+      let category = row.category_id || null;
+      let keyword: string | null = null;
+
+      if (row.observation && !category) {
+        const result = classifyObservation(row.observation);
+        category = result.category === 'Unclassified' ? null : result.category;
+        keyword = result.keyword || null;
+      } else if (row.observation) {
+        // Even if category exists, extract keyword
+        const result = classifyObservation(row.observation);
+        keyword = result.keyword || null;
+      }
+
       return {
         id: row.id,
         time: new Date(row.created_at).toLocaleString(),
@@ -73,6 +90,8 @@ async function mapTripDataToJourneyDraftInterface(tripId: string): Promise<Journ
         hasMedia: !!row.local_media_id,
         mediaType,
         mediaFilePath,
+        category, // Classified category
+        keyword, // Extracted keyword
         status: row.sync_status as SyncStatus,
       };
     })

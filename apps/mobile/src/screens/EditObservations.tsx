@@ -61,10 +61,20 @@ export default function EditObservationScreen() {
       if (obs) {
         setDescription(obs.description);
         setLocation(obs.location || '');
-        const fallback =
-          Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
-        setCategory(obs.category ?? fallback);
+
+        // FIXED: Load category and keyword directly from observation
+        // If observation has a category, use it. Otherwise use fallback.
+        if (obs.category) {
+          setCategory(obs.category);
+        } else {
+          const fallback =
+            Object.entries(CATEGORIES).find(([_k, d]) => !!d?.is_fallback)?.[0] ?? null;
+          setCategory(fallback);
+        }
+
+        // Load keyword from observation
         setKeyword(obs.keyword || '');
+
         setDraft(loadedDraft);
 
         // Build sibling observations for map context
