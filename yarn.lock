@@ -6298,11 +6298,6 @@ expo-dev-menu@7.0.18:
   dependencies:
     expo-dev-menu-interface "2.0.0"
 
-expo-file-system@^55.0.11:
-  version "55.0.11"
-  resolved "https://registry.yarnpkg.com/expo-file-system/-/expo-file-system-55.0.11.tgz#9be75b499363d40f1329830c685f34e55710d987"
-  integrity sha512-KMUd6OY375J9WD79ZvjvCDZMveT7YfgiGWdi58/gfuTBsr14TRuoPk8RRQHAtc4UquzWViKcHwna9aPY7/XPpw==
-
 expo-file-system@~19.0.19:
   version "19.0.19"
   resolved "https://registry.npmjs.org/expo-file-system/-/expo-file-system-19.0.19.tgz"
@@ -6363,10 +6358,10 @@ expo-manifests@~1.0.10:
     "@expo/config" "~12.0.11"
     expo-json-utils "~0.15.0"
 
-expo-media-library@^55.0.10:
-  version "55.0.10"
-  resolved "https://registry.yarnpkg.com/expo-media-library/-/expo-media-library-55.0.10.tgz#bd34f1ad498a6af8259a9df51a7b2b55cac1d965"
-  integrity sha512-xXmz8Do9BJSt1LrkC6r8l2HAXNdaAr2TdzCuiVo9u47Vuo54twlOgzLpdx4rIzODy/cclqbYb2tae4nCKHJLbw==
+expo-media-library@~18.2.1:
+  version "18.2.1"
+  resolved "https://registry.yarnpkg.com/expo-media-library/-/expo-media-library-18.2.1.tgz#22aac022cc3fabfc3e004e3f3f031c7b2cd355d8"
+  integrity sha512-dV1acx6Aseu+I5hmF61wY8UkD4vdt8d7YXHDfgNp6ZSs06qxayUxgrBsiG2eigLe54VLm3ycbFBbWi31lhfsCA==
 
 expo-modules-autolinking@3.0.22:
   version "3.0.22"

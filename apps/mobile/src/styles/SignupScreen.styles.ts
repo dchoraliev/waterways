@@ -82,6 +82,45 @@ export const createSignupScreenStyles = (themeColors: AppColors) =>
       justifyContent: 'center',
       paddingVertical: 12,
     },
+    termsRow: {
+      marginTop: 14,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    checkboxButton: {
+      marginTop: 2,
+      marginRight: 10,
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: themeColors.surface,
+    },
+    checkboxChecked: {
+      backgroundColor: '#1D4ED8',
+      borderColor: '#1D4ED8',
+    },
+    checkboxCheckmark: {
+      color: '#F9FAFB',
+      fontSize: 12,
+      fontWeight: '700',
+      lineHeight: 14,
+    },
+    termsText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 18,
+      color: themeColors.textMuted,
+    },
+    termsLink: {
+      color: '#60A5FA',
+      textDecorationLine: 'underline',
+    },
     signUpButtonDisabled: {
       opacity: 0.6,
     },

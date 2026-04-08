@@ -52,6 +52,9 @@ describe('LocationService', () => {
     jest.clearAllMocks();
     watchCallback = undefined;
 
+    // Use fake timers to control setInterval in dead reckoning
+    jest.useFakeTimers();
+
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
 
     mockRemove.mockReset();
@@ -71,6 +74,17 @@ describe('LocationService', () => {
 
   afterEach(() => {
     (Date.now as unknown as jest.Mock).mockRestore?.();
+
+    // Clean up any running location services to prevent timer leaks
+    const service = loadFreshLocationService();
+    try {
+      service.stopLocationTracking();
+    } catch {
+      // Ignore errors if service wasn't started
+    }
+
+    // Restore real timers
+    jest.useRealTimers();
   });
 
   test('validateLocationPermission throws when permission denied', async () => {
@@ -157,7 +171,12 @@ describe('LocationService', () => {
     if (watchCallback) watchCallback(update);
 
     const coords = await service.getCurrentCoordinates();
-    expect(coords).toEqual({ latitude: 55.5, longitude: -66.6 });
+    expect(coords).toEqual({
+      latitude: 55.5,
+      longitude: -66.6,
+      accuracy: 7,
+      source: 'gps',
+    });
     expect(mockGetCurrentPositionAsync).not.toHaveBeenCalled();
   });
 
@@ -187,7 +206,12 @@ describe('LocationService', () => {
       mayShowUserSettingsDialog: true,
     });
 
-    expect(coords).toEqual({ latitude: 1, longitude: 2 });
+    expect(coords).toEqual({
+      latitude: 1,
+      longitude: 2,
+      accuracy: 10,
+      source: 'gps',
+    });
   });
 
   test('getCurrentCoordinates uses High accuracy when forceHighAccuracy is true', async () => {

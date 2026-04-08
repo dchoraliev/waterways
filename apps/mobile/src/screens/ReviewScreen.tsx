@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Pressable,
   Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -113,6 +115,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   // Active trip state
   const [isActiveTrip, setIsActiveTrip] = useState(false);
 
+  // Scroll position preservation
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollPositionRef = useRef(0);
+  const shouldRestoreScrollRef = useRef(false);
+
   // STABLE function - doesn't change between renders
   const checkAndLoadData = useCallback(async () => {
     if (tripId === 'sample-trip') {
@@ -166,6 +173,35 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
       // Just reload, don't create new function
       void checkAndLoadData();
     }, [checkAndLoadData])
+  );
+
+  // Restore scroll position after data loads when returning from edit
+  useEffect(() => {
+    if (!loading && shouldRestoreScrollRef.current && scrollPositionRef.current > 0) {
+      // Use setTimeout to ensure the ScrollView has rendered with new content
+      const timer = globalThis.setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: scrollPositionRef.current,
+          animated: false,
+        });
+        shouldRestoreScrollRef.current = false;
+      }, 100);
+
+      return () => globalThis.clearTimeout(timer);
+    }
+  }, [loading]);
+
+  // Track when we're returning from another screen
+  useFocusEffect(
+    useCallback(() => {
+      // When screen gains focus, mark that we should restore scroll position
+      shouldRestoreScrollRef.current = true;
+
+      return () => {
+        // Reset when leaving screen
+        shouldRestoreScrollRef.current = false;
+      };
+    }, [])
   );
 
   // Track unsaved changes when project is selected
@@ -241,6 +277,11 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
       }
     };
   }, [hasUnsavedChanges, autoSaveDraft]);
+
+  // Track scroll position
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollPositionRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
 
   // Handle continue journey
   const handleContinueJourney = useCallback(async () => {
@@ -402,7 +443,13 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journey review</Text>

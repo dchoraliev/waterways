@@ -18,7 +18,15 @@ import { getObservationsByTripId } from '../database/ObservationManager';
 import { SyncStatus } from '../database/SyncStatus';
 
 import { getCurrentUserId } from '../services/AuthService';
-import { getCurrentCoordinates, stopLocationTracking } from '../services/LocationService';
+import {
+  getCurrentCoordinates,
+  stopLocationTracking,
+  startLocationTracking,
+  addQualityChangeListener,
+  getLocationQualityInfo,
+  GPSQuality,
+  type LocationQualityInfo,
+} from '../services/LocationService';
 import { transcribeTripAudio } from '../services/TranscriptionService';
 import { showToast } from '../utils/toast';
 import { isExpoGo } from '../utils/platformDetection';
@@ -40,6 +48,8 @@ import { useWakeWord } from '../hooks/useWakeWord';
 import type { WakeWordMatch } from '../utils/stringMatching';
 import { useTheme } from '../contexts/ThemeContext';
 import { ROUTES } from '../constants/routes';
+import { GPSQualityIndicator } from '../components/GPSQualityIndicator';
+import * as Location from 'expo-location';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -78,6 +88,14 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   // Media counts (loaded from database)
   const [photoCount, setPhotoCount] = useState(0);
   const [videoCount, setVideoCount] = useState(0);
+
+  // GPS quality state
+  const [gpsQuality, setGpsQuality] = useState<LocationQualityInfo>({
+    quality: GPSQuality.GOOD,
+    accuracy: null,
+    usingDeadReckoning: false,
+    lastGoodFix: null,
+  });
 
   // --- Audio recording state ---
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -119,6 +137,43 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
   const [lastObservationId, setLastObservationId] = useState<string | null>(null);
 
   const cameraWindowTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
+
+  // Start location tracking with dead reckoning when journey screen mounts
+  useEffect(() => {
+    let _mounted = true;
+
+    const initLocationTracking = async () => {
+      try {
+        await startLocationTracking({
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 25,
+          timeInterval: 10_000,
+          enableDeadReckoning: true, // Enable dead reckoning fallback
+        });
+      } catch (error) {
+        console.warn('[JourneyScreen] Failed to start location tracking:', error);
+      }
+    };
+
+    void initLocationTracking();
+
+    return () => {
+      _mounted = false;
+    };
+  }, []);
+
+  // Monitor GPS quality changes
+  useEffect(() => {
+    const unsubscribe = addQualityChangeListener((info) => {
+      setGpsQuality(info);
+    });
+
+    // Get initial quality
+    const initialQuality = getLocationQualityInfo();
+    setGpsQuality(initialQuality);
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -607,8 +662,44 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Current Journey</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}
+          >
+            <Text style={styles.headerTitle}>Current Journey</Text>
+
+            {/* GPS Quality Indicator - Compact mode */}
+            <GPSQualityIndicator
+              quality={gpsQuality.quality}
+              accuracy={gpsQuality.accuracy}
+              usingDeadReckoning={gpsQuality.usingDeadReckoning}
+              showDetails={false}
+            />
+          </View>
+
+          {/* Centered Timer */}
           <Text style={styles.timerText}>{formatDuration(secondsElapsed)}</Text>
+
+          {/* GPS Quality Indicator Row - Detailed mode below timer */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              marginTop: 8,
+              marginBottom: 8,
+            }}
+          >
+            <GPSQualityIndicator
+              quality={gpsQuality.quality}
+              accuracy={gpsQuality.accuracy}
+              usingDeadReckoning={gpsQuality.usingDeadReckoning}
+              showDetails={true}
+            />
+          </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>

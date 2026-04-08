@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { Share } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
 import { AppColors } from '../styles/colors';
@@ -227,7 +228,7 @@ function buildLeafletHTML(
       return str ? str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;') : '';
     }
 
-    // Posts a message to React Native to trigger a native file download
+    // Posts a message to React Native to trigger native share sheet
     function downloadMedia(url) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DOWNLOAD_MEDIA', url: url }));
     }
@@ -257,7 +258,7 @@ function buildLeafletHTML(
         var photos = (o.photos || []).map(function(p) {
           return \`<div class="media-item">
             <img src="\${escapeHtml(p)}" class="obs-img" />
-            <button class="download-btn" onclick="downloadMedia('\${escapeHtml(p)}')">⬇ Save to Photos</button>
+            <button class="download-btn" onclick="downloadMedia('\${escapeHtml(p)}')">📷 Photo Options</button>
           </div>\`;
         }).join('');
 
@@ -414,15 +415,38 @@ const MapScreen: React.FC = () => {
   }, []);
 
   // Receive messages from the WebView and handle natively
-  const handleWebViewMessage = async (event: any) => {
+  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'DOWNLOAD_MEDIA') {
-        await Share.share({ url: msg.url });
+        // For remote URLs, download first then share as local file
+        // This ensures "Save Image" option appears in share sheet
+        try {
+          const url = msg.url;
+
+          // Download the image to cache
+          const fileUri = await downloadImageToCache(url);
+
+          // Share the local file (shows "Save Image" option)
+          await Share.share({ url: fileUri });
+        } catch (downloadError) {
+          console.error('Failed to download image:', downloadError);
+          // Fallback to direct share
+          await Share.share({ url: msg.url });
+        }
       }
     } catch (err) {
       console.error('Share failed:', err);
     }
+  };
+
+  // Download remote image to local cache
+  const downloadImageToCache = async (url: string): Promise<string> => {
+    const filename = url.split('/').pop() || 'image.jpg';
+    const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+    const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+    return downloadResult.uri;
   };
 
   const handleSatelliteToggle = () => {
