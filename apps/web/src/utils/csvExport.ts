@@ -11,33 +11,42 @@ export function exportToCSV(
     'Longitude',
     'Date',
     'Time',
-    'Observation Type',
-    'Observation',
+    'Category',
+    'Description',
     'Observer Name',
     'Keywords',
-    'Number of Photos',
-    'Number of Videos',
+    'Photo URLs',
+    'Video URLs',
   ];
 
-  const rows = observations.map((obs) => [
-    obs.id,
-    obs.projectName,
-    obs.location.lat.toString(),
-    obs.location.lng.toString(),
-    obs.date,
-    obs.timestamp,
-    obs.type,
-    obs.observation,
-    obs.observerName,
-    obs.keywords.join('; '),
-    obs.photos.length.toString(),
-    obs.videos.length.toString(),
-  ]);
+  const rows = observations.map((obs) => {
+    const photoUrls = obs.photos.length > 0 ? obs.photos.join(' | ') : '';
+    const videoUrls = obs.videos.length > 0 ? obs.videos.join(' | ') : '';
 
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')),
-  ].join('\n');
+    return [
+      obs.id,
+      obs.projectName,
+      obs.location.lat.toString(),
+      obs.location.lng.toString(),
+      obs.date,
+      obs.timestamp,
+      obs.type,
+      obs.observation,
+      obs.observerName,
+      obs.keywords.join('; '),
+      photoUrls,
+      videoUrls,
+    ];
+  });
+
+  // Add BOM for UTF-8 encoding to help Excel recognize column widths
+  const bom = '\uFEFF';
+  const csvContent =
+    bom +
+    [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
 
   const blob = new globalThis.Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');

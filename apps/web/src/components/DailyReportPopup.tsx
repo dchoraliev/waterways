@@ -7,7 +7,7 @@ import {
   fetchObservationsForRangeWithRelations,
 } from '../api/observations';
 import { Observation } from '../types/observation';
-import { Clock, FileText, Loader2, MapPin, ShieldAlert, User } from 'lucide-react';
+import { Camera, Clock, FileText, Loader2, MapPin, ShieldAlert, User } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,7 +21,7 @@ interface DailyReportPopupProps {
   readonly selectedUserId?: string | null;
 }
 
-type ViewMode = 'person' | 'project' | 'all';
+type ViewMode = 'person' | 'project' | 'journey' | 'all';
 type SecondarySort = 'time' | 'count';
 type RangeMode = 'last-24h' | 'last-7d' | 'custom-range';
 
@@ -39,6 +39,16 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: 'numeric',
   minute: '2-digit',
 });
+
+const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const hasMedia = (observation: Observation): boolean => {
+  return observation.photos.length > 0 || observation.videos.length > 0;
+};
 
 function shouldKeepReportOpenForTarget(target: globalThis.EventTarget | null) {
   const element = target as globalThis.Element | null;
@@ -158,6 +168,10 @@ export function DailyReportPopup({
     );
   }, [observations, secondarySort]);
 
+  const groupedByJourney = useMemo(() => {
+    return buildJourneyGroups(observations, secondarySort);
+  }, [observations, secondarySort]);
+
   const sortedAll = useMemo(() => {
     const items = [...observations];
 
@@ -248,7 +262,12 @@ export function DailyReportPopup({
     return `${diffMins}m ago`;
   };
 
-  const activeGroups = viewMode === 'person' ? groupedByPerson : groupedByProject;
+  const activeGroups =
+    viewMode === 'person'
+      ? groupedByPerson
+      : viewMode === 'project'
+        ? groupedByProject
+        : groupedByJourney;
   const rangeLabel = getRangeLabel(rangeMode, rangeStart, rangeEnd);
 
   const handleDialogOpenChange = (isOpen: boolean) => {
@@ -372,6 +391,13 @@ export function DailyReportPopup({
                   </Button>
                   <Button
                     size="sm"
+                    variant={viewMode === 'journey' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('journey')}
+                  >
+                    Sort by Journey
+                  </Button>
+                  <Button
+                    size="sm"
                     variant={viewMode === 'all' ? 'default' : 'outline'}
                     onClick={() => setViewMode('all')}
                   >
@@ -438,9 +464,16 @@ export function DailyReportPopup({
                         <span className="text-gray-300">•</span>
                         <span>{formatTimeAgo(obs.createdAt)}</span>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {obs.type}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {hasMedia(obs) && (
+                          <span title="Has media (photos/videos)">
+                            <Camera className="size-4 text-blue-600" />
+                          </span>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {obs.type}
+                        </Badge>
+                      </div>
                     </div>
 
                     <p className="text-sm text-gray-800 mb-3 line-clamp-2">
@@ -500,36 +533,100 @@ export function DailyReportPopup({
                     </summary>
 
                     <div className="px-4 pb-4 space-y-2 border-t pt-3">
-                      {group.observations.map((obs) => (
-                        <button
-                          type="button"
-                          key={obs.id}
-                          className="bg-muted/20 border rounded-md p-3 cursor-pointer w-full text-left"
-                          onClick={() => handleObservationClick(obs)}
-                        >
-                          <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="size-3" />
-                              {DATE_TIME_FORMATTER.format(new Date(obs.createdAt))}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              {viewMode === 'person' ? (
-                                <>
-                                  <MapPin className="size-3" />
-                                  {obs.projectName}
-                                </>
-                              ) : (
-                                <>
-                                  <User className="size-3" />
-                                  {obs.observerName}
-                                </>
-                              )}
-                            </span>
-                          </div>
-                          <p className="text-sm text-foreground">
-                            {obs.observation || 'No observation text'}
-                          </p>
-                        </button>
+                      {(viewMode === 'project'
+                        ? buildJourneyGroups(group.observations, secondarySort)
+                        : [
+                            {
+                              key: group.key,
+                              label: '',
+                              count: group.count,
+                              observations: group.observations,
+                            },
+                          ]
+                      ).map((journeyGroup) => (
+                        <div key={`${group.key}-${journeyGroup.key}`} className="space-y-2">
+                          {viewMode === 'project' ? (
+                            <details className="rounded-md border bg-muted/10">
+                              <summary className="list-none cursor-pointer flex items-center justify-between px-3 py-2 gap-2">
+                                <div className="text-xs font-medium text-foreground truncate">
+                                  {journeyGroup.label}
+                                </div>
+                                <Badge variant="secondary" className="shrink-0 text-xs">
+                                  {journeyGroup.count} obs
+                                </Badge>
+                              </summary>
+
+                              <div className="space-y-2 px-2 pb-2 border-t pt-2">
+                                {journeyGroup.observations.map((obs) => (
+                                  <button
+                                    type="button"
+                                    key={obs.id}
+                                    className="bg-muted/20 border rounded-md p-3 cursor-pointer w-full text-left"
+                                    onClick={() => handleObservationClick(obs)}
+                                  >
+                                    <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="size-3" />
+                                        {DATE_TIME_FORMATTER.format(new Date(obs.createdAt))}
+                                      </span>
+                                      <span className="flex items-center gap-2">
+                                        {hasMedia(obs) && (
+                                          <span title="Has media (photos/videos)">
+                                            <Camera className="size-3 text-blue-600" />
+                                          </span>
+                                        )}
+                                        <>
+                                          <User className="size-3" />
+                                          {obs.observerName}
+                                        </>
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-foreground">
+                                      {obs.observation || 'No observation text'}
+                                    </p>
+                                  </button>
+                                ))}
+                              </div>
+                            </details>
+                          ) : (
+                            journeyGroup.observations.map((obs) => (
+                              <button
+                                type="button"
+                                key={obs.id}
+                                className="bg-muted/20 border rounded-md p-3 cursor-pointer w-full text-left"
+                                onClick={() => handleObservationClick(obs)}
+                              >
+                                <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="size-3" />
+                                    {DATE_TIME_FORMATTER.format(new Date(obs.createdAt))}
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    {hasMedia(obs) && (
+                                      <span title="Has media (photos/videos)">
+                                        <Camera className="size-3 text-blue-600" />
+                                      </span>
+                                    )}
+                                    {viewMode === 'person' ? (
+                                      <>
+                                        <MapPin className="size-3" />
+                                        {obs.projectName}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MapPin className="size-3" />
+                                        {obs.projectName}
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-foreground">
+                                  {obs.observation || 'No observation text'}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
                       ))}
                     </div>
                   </details>
@@ -662,4 +759,17 @@ function buildGroupedObservations(
 
       return new Date(b.lastObservationAt).getTime() - new Date(a.lastObservationAt).getTime();
     });
+}
+
+function buildJourneyGroups(observations: Observation[], sortMode: SecondarySort) {
+  return buildGroupedObservations(
+    observations,
+    sortMode,
+    (obs) => obs.tripId || `${obs.userId || obs.observerName}-${obs.date}`,
+    (obs) => {
+      const date = new Date(obs.createdAt);
+      const dateLabel = Number.isNaN(date.getTime()) ? obs.date : DATE_FORMATTER.format(date);
+      return `${obs.observerName || 'Unknown person'} - ${dateLabel}`;
+    }
+  );
 }

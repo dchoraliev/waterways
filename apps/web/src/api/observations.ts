@@ -97,6 +97,7 @@ type DailyObservationRow = {
   id: string;
   location: string | null;
   user_id: string | null;
+  trip_id: string | null;
   created_at: string;
   observation: string | null;
   categories: string[] | null;
@@ -443,6 +444,7 @@ export async function fetchObservationsForRangeWithRelations(
       id,
       location,
       user_id,
+      trip_id,
       created_at,
       observation,
       categories,
@@ -488,6 +490,7 @@ export async function fetchObservationsForRangeWithRelations(
 
     return {
       id: dailyRow.id,
+      tripId: dailyRow.trip_id ?? undefined,
       projectName,
       journeyStartLocation: projectName,
       location: {
