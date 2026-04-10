@@ -4,6 +4,7 @@ export interface FilterOptions {
   types: string[];
   keywords: string;
   myProjects: string;
+  hasMedia: boolean;
 }
 
 export const DEFAULT_FILTER_OPTIONS: FilterOptions = {
@@ -12,6 +13,7 @@ export const DEFAULT_FILTER_OPTIONS: FilterOptions = {
   types: [],
   keywords: '',
   myProjects: 'all',
+  hasMedia: false,
 };
 
 export function hasActiveObservationFilters(filters: FilterOptions): boolean {
@@ -20,6 +22,7 @@ export function hasActiveObservationFilters(filters: FilterOptions): boolean {
     filters.dateTo ||
     filters.types.length > 0 ||
     filters.keywords.trim() ||
-    filters.myProjects !== 'all'
+    filters.myProjects !== 'all' ||
+    filters.hasMedia
   );
 }
