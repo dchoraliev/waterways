@@ -6,6 +6,7 @@ import {
   MapPin,
   Satellite,
   Map as MapIcon,
+  Camera,
   Info,
   ChevronRight,
   ChevronDown,
@@ -353,6 +354,7 @@ export function MapView({
               const formattedDate = Number.isNaN(createdAtDate.getTime())
                 ? obs.date
                 : `${createdAtDate.getUTCMonth() + 1}/${createdAtDate.getUTCDate()}/${createdAtDate.getUTCFullYear()}`;
+              const mediaCount = obs.photos.length + obs.videos.length;
 
               let observationNumber = null;
               if (obs.projectName && obs.projectName.toLowerCase() !== 'untitled project') {
@@ -370,7 +372,6 @@ export function MapView({
                   key={obs.id}
                   onClick={() => {
                     setClickedObservationId(obs.id);
-                    setSelectedCluster(null);
                     onObservationClick(obs);
                   }}
                   className="w-full text-left p-3 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
@@ -386,13 +387,29 @@ export function MapView({
                       obs.projectName.toLowerCase() !== 'untitled project' &&
                       observationNumber ? (
                         <>
-                          <p className="text-neutral-950 font-medium mb-1">
-                            {obs.projectName} #{observationNumber}
-                          </p>
+                          <div className="flex items-center gap-2 mb-1 min-w-0">
+                            <p className="text-neutral-950 font-medium truncate">
+                              {obs.projectName} #{observationNumber}
+                            </p>
+                            {mediaCount > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 shrink-0">
+                                <Camera className="size-3 text-blue-600" />
+                                {mediaCount}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">{obs.type}</p>
                         </>
                       ) : (
-                        <p className="text-neutral-950 font-medium mb-1">{obs.type}</p>
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                          <p className="text-neutral-950 font-medium truncate">{obs.type}</p>
+                          {mediaCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 shrink-0">
+                              <Camera className="size-3 text-blue-600" />
+                              {mediaCount}
+                            </span>
+                          )}
+                        </div>
                       )}
                       <p className="text-sm text-gray-600">{formattedDate}</p>
                     </div>

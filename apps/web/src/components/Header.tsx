@@ -23,6 +23,7 @@ import {
   LogIn,
   ChevronDown,
   CalendarDays,
+  Image as ImageIcon,
   Info,
   Shield,
 } from 'lucide-react';
@@ -218,6 +219,18 @@ export function Header({
               onChange={(e) => handleFilterChange('keywords', e.target.value)}
               className="min-w-[160px] flex-1 bg-background h-8 text-sm"
             />
+
+            <Button
+              type="button"
+              variant={filters.hasMedia ? 'default' : 'outline'}
+              size="sm"
+              className="shrink-0"
+              onClick={() => handleFilterChange('hasMedia', !filters.hasMedia)}
+              title="Only show observations with media"
+            >
+              <ImageIcon className="size-4 mr-2" />
+              Media only
+            </Button>
 
             {showProjectFilter && (
               <Select

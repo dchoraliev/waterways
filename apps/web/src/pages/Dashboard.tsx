@@ -136,6 +136,7 @@ export function Dashboard() {
           types: [...activeFilters.types].sort(),
           keywords: activeFilters.keywords.trim().toLowerCase(),
           myProjects: activeFilters.myProjects,
+          hasMedia: activeFilters.hasMedia,
           userId: user?.isAdmin ? selectedAdminUserId : null,
         },
       });
@@ -404,9 +405,13 @@ export function Dashboard() {
         return false;
       }
 
+      if (filters.hasMedia && obs.photos.length + obs.videos.length === 0) {
+        return false;
+      }
+
       return true;
     });
-  }, [observations, bannedUsers]);
+  }, [observations, bannedUsers, filters.hasMedia]);
 
   const handleObservationClick = useCallback((observation: Observation) => {
     setSelectedObservation(observation);
