@@ -1,5 +1,6 @@
 export interface Observation {
   id: string;
+  tripId?: string;
   projectName: string;
   journeyStartLocation: string;
   location: {

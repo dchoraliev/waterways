@@ -3807,6 +3807,11 @@
   resolved "https://registry.npmjs.org/@types/tough-cookie/-/tough-cookie-4.0.5.tgz"
   integrity sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==
 
+"@types/tz-lookup@^6":
+  version "6.1.2"
+  resolved "https://registry.yarnpkg.com/@types/tz-lookup/-/tz-lookup-6.1.2.tgz#6b33caac5ff4525ae9c32e3787118792f30a3d4e"
+  integrity sha512-9y31Xf/8FHXrCHjvVjGZLcsayAa6ABNc8bZlk6MPOQLLlr41tICSqW3TRPRIx2nodbzdKs5N7ipHWBrUsWUiAA==
+
 "@types/ws@^8.18.1":
   version "8.18.1"
   resolved "https://registry.npmjs.org/@types/ws/-/ws-8.18.1.tgz"
@@ -11740,6 +11745,11 @@ typescript@^5.3.3, typescript@~5.9.2:
   version "5.9.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
+
+tz-lookup@^6.1.25:
+  version "6.1.25"
+  resolved "https://registry.yarnpkg.com/tz-lookup/-/tz-lookup-6.1.25.tgz#34d68a7e1ccfcb51f29a9893d2d48e4118d873cd"
+  integrity sha512-fFewT9o1uDzsW1QnUU1ValqaihFnwiUiiHr1S79/fxOzKXYYvX+EHeRnpvQJ9B3Qg67wPXT6QF2Esc4pFOrvLg==
 
 uglify-js@^3.1.4:
   version "3.19.3"
