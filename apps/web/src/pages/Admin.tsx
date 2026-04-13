@@ -1,5 +1,6 @@
-/* global HTMLTextAreaElement */
+/* global HTMLTextAreaElement, HTMLInputElement */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { FocusEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { WaveIcon } from '../components/WaveIcon';
@@ -48,6 +49,7 @@ type CategoryRow = {
   editKeywords?: string;
   editColor?: string | null;
   editActive?: boolean;
+  editType?: string;
 };
 
 type GroupedDeletedObservation = {
@@ -192,11 +194,18 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [editingRow, setEditingRow] = useState<CategoryRow | null>(null);
   const [modalFields, setModalFields] = useState<{
+    editType?: string;
     editKeywords: string;
     editColor: string;
     editActive: boolean;
     is_fallback?: boolean;
-  }>({ editKeywords: '', editColor: '#000000', editActive: true });
+  }>({ editType: '', editKeywords: '', editColor: '#000000', editActive: true });
+  const originalModal = useRef<{
+    editType: string;
+    editKeywords: string;
+    editColor: string;
+    editActive: boolean;
+  } | null>(null);
 
   const [bannedUsers, setBannedUsers] = useState<BannedUserRecord[]>([]);
   const [bannedLoading, setBannedLoading] = useState(false);
@@ -246,7 +255,8 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
 
         const rows: CategoryRow[] = data.map((c) => ({
           ...c,
-          editKeywords: (c.keywords || []).join(', '),
+          editType: c.type ? c.type.toUpperCase() : '',
+          editKeywords: (c.keywords || []).map((k) => k.toLowerCase()).join(', '),
           editColor: c.color || '#000000',
           editActive: !!c.is_active,
         }));
@@ -381,6 +391,7 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
       }
 
       const payload: Partial<{
+        type: string;
         keywords: string[] | null;
         color: string | null;
         is_active: boolean;
@@ -390,9 +401,13 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
         payload.keywords = row.editKeywords
           ? row.editKeywords
               .split(',')
-              .map((k) => k.trim())
+              .map((k) => k.trim().toLowerCase())
               .filter(Boolean)
           : null;
+      }
+
+      if (row.editType !== undefined) {
+        payload.type = row.editType ? row.editType.trim().toUpperCase() : undefined;
       }
 
       if (row.editColor !== undefined) payload.color = row.editColor;
@@ -412,7 +427,8 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
       const data = await fetchObservationCategories();
       const rows: CategoryRow[] = data.map((c) => ({
         ...c,
-        editKeywords: (c.keywords || []).join(', '),
+        editType: c.type ? c.type.toUpperCase() : '',
+        editKeywords: (c.keywords || []).map((k) => k.toLowerCase()).join(', '),
         editColor: c.color || '#000000',
         editActive: !!c.is_active,
       }));
@@ -427,8 +443,57 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
   const handleModalSave = async () => {
     if (!editingRow) return;
 
+    // Create new category
+    if (editingRow.id === -1) {
+      try {
+        const payload: {
+          type: string;
+          keywords: string[] | null;
+          color: string | null;
+          is_active: boolean;
+        } = {
+          type: modalFields.editType!.trim().toUpperCase(),
+          keywords: modalFields.editKeywords
+            ? modalFields.editKeywords
+                .split(',')
+                .map((k) => k.trim().toLowerCase())
+                .filter(Boolean)
+            : null,
+          color: modalFields.editColor ?? null,
+          is_active: !!modalFields.editActive,
+        };
+
+        const { error } = await supabase.from('observation_categories').insert(payload as any);
+
+        if (error) {
+          console.error('Failed to create category:', error);
+          globalThis.alert('Failed to create category');
+          return;
+        }
+
+        const data = await fetchObservationCategories();
+        const rows: CategoryRow[] = data.map((c) => ({
+          ...c,
+          editType: c.type ? c.type.toUpperCase() : '',
+          editKeywords: (c.keywords || []).map((k) => k.toLowerCase()).join(', '),
+          editColor: c.color || '#000000',
+          editActive: !!c.is_active,
+        }));
+        rows.sort((a, b) => (a.is_fallback ? 1 : 0) - (b.is_fallback ? 1 : 0));
+        setCategories(rows);
+      } catch (err) {
+        console.error('Error creating category:', err);
+        globalThis.alert('Error creating category');
+      } finally {
+        setEditingRow(null);
+      }
+
+      return;
+    }
+
     const updated: CategoryRow = {
       ...editingRow,
+      editType: modalFields.editType,
       editKeywords: modalFields.editKeywords,
       editColor: modalFields.editColor,
       editActive: modalFields.editActive,
@@ -521,7 +586,37 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
 
             {activeTab === 'categories' && (
               <section>
-                <h3 className="text-lg font-medium mb-4">Category Management</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">Category Management</h3>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const newRow: CategoryRow = {
+                        id: -1,
+                        type: '',
+                        color: null,
+                        keywords: null,
+                        is_fallback: false,
+                        is_active: true,
+                        editKeywords: '',
+                        editColor: '#000000',
+                        editActive: true,
+                      };
+
+                      setEditingRow(newRow);
+                      const initial = {
+                        editType: '',
+                        editKeywords: '',
+                        editColor: '#000000',
+                        editActive: true,
+                      };
+                      setModalFields({ ...initial, is_fallback: false });
+                      originalModal.current = { ...initial };
+                    }}
+                  >
+                    Add Category
+                  </Button>
+                </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full table-auto border-collapse">
@@ -545,7 +640,9 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
 
                       {categories.map((row) => (
                         <tr key={row.id} className="border-t">
-                          <td className="px-3 py-2 align-top">{capitalize(row.type)}</td>
+                          <td className="px-3 py-2 align-top">
+                            {row.type ? row.type.toUpperCase() : ''}
+                          </td>
                           <td className="px-3 py-2">
                             <div className="text-sm">{row.editKeywords}</div>
                           </td>
@@ -570,12 +667,14 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
                                   size="sm"
                                   onClick={() => {
                                     setEditingRow(row);
-                                    setModalFields({
-                                      editKeywords: row.editKeywords ?? '',
+                                    const initial = {
+                                      editType: row.type ? row.type.toUpperCase() : '',
+                                      editKeywords: (row.editKeywords ?? '').toLowerCase(),
                                       editColor: row.editColor ?? '#000000',
                                       editActive: !!row.editActive,
-                                      is_fallback: row.is_fallback,
-                                    });
+                                    };
+                                    setModalFields({ ...initial, is_fallback: row.is_fallback });
+                                    originalModal.current = { ...initial };
                                   }}
                                 >
                                   Edit
@@ -935,16 +1034,50 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
       <Dialog
         open={!!editingRow}
         onOpenChange={(open) => {
-          if (!open) setEditingRow(null);
+          if (!open) {
+            setEditingRow(null);
+            originalModal.current = null;
+          }
         }}
       >
-        <DialogContent>
+        <DialogContent hideClose>
           <DialogHeader>
             <DialogTitle>Edit Category</DialogTitle>
-            <DialogDescription>{editingRow ? capitalize(editingRow.type) : ''}</DialogDescription>
+            <DialogDescription>
+              {editingRow ? (editingRow.type ? editingRow.type.toUpperCase() : '') : ''}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-2">
+            <div>
+              <label htmlFor="category-name" className="block text-sm text-muted-foreground mb-1">
+                Category name
+              </label>
+              <Input
+                id="category-name"
+                value={modalFields.editType ?? ''}
+                onChange={(e) =>
+                  setModalFields((m) => ({ ...m, editType: e.target.value.toUpperCase() }))
+                }
+                onFocus={(e: FocusEvent<HTMLInputElement>) => {
+                  // prevent the input's contents from being selected on focus; place caret at end
+                  const el = e.currentTarget;
+                  const len = el.value ? el.value.length : 0;
+                  // small timeout to ensure browser has completed focus handling
+                  window.setTimeout(() => {
+                    try {
+                      el.setSelectionRange(len, len);
+                    } catch {
+                      /* ignore */
+                    }
+                  }, 0);
+                }}
+                disabled={!!modalFields.is_fallback}
+                placeholder="e.g. LITTER"
+                style={{ textDecoration: 'none' }}
+              />
+            </div>
+
             <div>
               <label
                 htmlFor="category-keywords"
@@ -956,11 +1089,16 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
                 id="category-keywords"
                 ref={keywordsRef}
                 value={modalFields.editKeywords}
-                onChange={(e) => setModalFields((m) => ({ ...m, editKeywords: e.target.value }))}
+                onChange={(e) =>
+                  setModalFields((m) => ({ ...m, editKeywords: e.target.value.toLowerCase() }))
+                }
                 disabled={!!modalFields.is_fallback}
                 placeholder="comma separated keywords"
                 className="w-full min-h-[48px] resize-none file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input rounded-md border px-3 py-2 bg-input-background text-sm outline-none"
               />
+              <div className="text-xs text-muted-foreground mt-1">
+                Separate keywords with commas.
+              </div>
             </div>
 
             <div>
@@ -991,10 +1129,38 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
 
           <DialogFooter>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setEditingRow(null)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingRow(null);
+                  originalModal.current = null;
+                }}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleModalSave}>Save</Button>
+              <Button
+                onClick={handleModalSave}
+                disabled={(() => {
+                  const isCreate = editingRow?.id === -1;
+                  const valid =
+                    !!modalFields.editType &&
+                    modalFields.editType.trim().length > 0 &&
+                    !!modalFields.editKeywords &&
+                    modalFields.editKeywords.trim().length > 0;
+                  if (isCreate) return !valid;
+                  const orig = originalModal.current;
+                  if (!orig) return true;
+                  const changed =
+                    (modalFields.editType ?? '').trim() !== (orig.editType ?? '').trim() ||
+                    (modalFields.editKeywords ?? '').trim() !== (orig.editKeywords ?? '').trim() ||
+                    (modalFields.editColor ?? '') !== (orig.editColor ?? '') ||
+                    !!modalFields.editActive !== !!orig.editActive;
+
+                  return !changed;
+                })()}
+              >
+                Save
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -1005,7 +1171,4 @@ export function AdminPage({ onClose }: Readonly<{ onClose: () => void }>) {
 
 export default AdminPage;
 
-function capitalize(s?: string) {
-  if (!s) return '';
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
+// `capitalize` removed — category names are displayed/handled as uppercase now.
