@@ -340,10 +340,17 @@ const MapScreen: React.FC = () => {
     async function fetchData() {
       try {
         const args = buildObservationRpcArgs({ limit: 500, offset: 0 });
-        const { data, error } = await supabase.rpc('get_filtered_observations', {
-          ...args,
-          p_limit: 500,
-        });
+        // Supabase RPC params expect undefined for absent values; convert nulls to undefined
+        const raw = { ...args, p_limit: 500 } as Record<string, unknown>;
+        const normalized = Object.fromEntries(
+          Object.entries(raw).map(([k, v]) => [k, v === null ? undefined : v])
+        ) as Record<string, unknown>;
+
+        const { data, error } = await supabase.rpc(
+          'get_filtered_observations',
+          // supabase client types expect optional fields to be undefined, so cast here
+          normalized as unknown as Record<string, unknown>
+        );
         if (error) throw error;
 
         const rows = (data ?? []) as unknown as FilteredObservationRow[];
