@@ -1,8 +1,10 @@
 // packages/shared/src/supabase/auth.ts
 import { supabase } from './client';
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 export const signIn = async (email: string, password: string) => {
-  return await supabase.auth.signInWithPassword({ email, password });
+  return await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password });
 };
 
 export const signOut = async () => {
@@ -27,7 +29,7 @@ export const signUp = async (
   lastName: string
 ) => {
   return await supabase.auth.signUp({
-    email,
+    email: normalizeEmail(email),
     password,
     options: {
       data: {
@@ -43,12 +45,12 @@ export const getSession = async () => {
 };
 
 export const sendResetPasswordEmail = async (email: string) => {
-  return await supabase.auth.resetPasswordForEmail(email);
+  return await supabase.auth.resetPasswordForEmail(normalizeEmail(email));
 };
 
 export const verifyResetPasswordOtp = async (email: string, otp: string) => {
   return await supabase.auth.verifyOtp({
-    email,
+    email: normalizeEmail(email),
     token: otp,
     type: 'recovery',
   });
@@ -58,8 +60,26 @@ export const resetPassword = async (newPassword: string) => {
   return await supabase.auth.updateUser({ password: newPassword });
 };
 
+export const requestPasswordReauthEmail = async () => {
+  return await supabase.auth.reauthenticate();
+};
+
+export const changePasswordWithReauthCode = async (newPassword: string, reauthCode: string) => {
+  return await supabase.auth.updateUser({
+    password: newPassword,
+    nonce: reauthCode.trim(),
+  });
+};
+
 export const resetEmail = async (newEmail: string) => {
-  return await supabase.auth.updateUser({ email: newEmail });
+  return await supabase.auth.updateUser({ email: normalizeEmail(newEmail) });
+};
+
+export type DeleteAccountAction = 'confirm-delete';
+
+export type DeleteAccountInput = {
+  action: DeleteAccountAction;
+  currentPassword: string;
 };
 
 type ErrorContext = {
@@ -71,9 +91,9 @@ type ErrorContext = {
   };
 };
 
-export const deleteAccount = async () => {
+export const deleteAccount = async (input: DeleteAccountInput) => {
   const result = await supabase.functions.invoke('delete-account', {
-    body: {},
+    body: input,
   });
 
   if (!result.error) {

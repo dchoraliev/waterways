@@ -40,6 +40,16 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    const requestBody = await req.json().catch(() => ({}));
+    const action =
+      requestBody && typeof requestBody === 'object' && 'action' in requestBody
+        ? String((requestBody as { action?: unknown }).action ?? '')
+        : '';
+    const currentPassword =
+      requestBody && typeof requestBody === 'object' && 'currentPassword' in requestBody
+        ? String((requestBody as { currentPassword?: unknown }).currentPassword ?? '')
+        : '';
+
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -54,6 +64,52 @@ serve(async (req: Request): Promise<Response> => {
         status: 401,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
+    }
+
+    if (!user.email) {
+      return new Response(
+        JSON.stringify({ error: 'Authenticated user does not have an email address.' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    if (action !== 'confirm-delete') {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid action. Use confirm-delete to delete an account.',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    if (!currentPassword.trim()) {
+      return new Response(JSON.stringify({ error: 'Current password is required.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    const { error: verifyPasswordError } = await userClient.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (verifyPasswordError) {
+      return new Response(
+        JSON.stringify({
+          error: `Current password is invalid: ${verifyPasswordError.message}`,
+        }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -88,7 +144,7 @@ serve(async (req: Request): Promise<Response> => {
       last_name: null,
       email: sanitizedEmail,
       verified: false,
-      status: 'banned',
+      status: 'deleted',
       role: 'regular',
       share_name_on_map: false,
       banned_at: deletedAt,
@@ -98,25 +154,6 @@ serve(async (req: Request): Promise<Response> => {
       .from('users')
       .update(anonymizedUserPayload)
       .eq('id', user.id);
-
-    if (
-      anonymizeUserProfileError &&
-      typeof anonymizeUserProfileError.message === 'string' &&
-      anonymizeUserProfileError.message.toLowerCase().includes('banned_at')
-    ) {
-      ({ error: anonymizeUserProfileError } = await adminClient
-        .from('users')
-        .update({
-          first_name: null,
-          last_name: null,
-          email: sanitizedEmail,
-          verified: false,
-          status: 'banned',
-          role: 'regular',
-          share_name_on_map: false,
-        })
-        .eq('id', user.id));
-    }
 
     if (anonymizeUserProfileError) {
       return new Response(

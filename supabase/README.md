@@ -145,6 +145,26 @@ Common use cases:
 - Integrate with external APIs
 - Complex database operations
 
+### Resend Email Function Setup
+
+The repository now includes a `send-email` edge function at `supabase/functions/send-email/`.
+
+1. Set required secrets:
+   ```bash
+   npx supabase secrets set RESEND_API_KEY=your_resend_api_key
+   npx supabase secrets set RESEND_FROM_EMAIL="Waterways <noreply@yourdomain.com>"
+   ```
+2. Optional: allow sending to recipients other than the logged-in user:
+   ```bash
+   npx supabase secrets set ALLOW_EXTERNAL_EMAIL_RECIPIENTS=true
+   ```
+3. Deploy the function:
+   ```bash
+   yarn db:function:deploy send-email
+   ```
+
+By default, the function requires a valid authenticated user and only sends to that user's email unless `ALLOW_EXTERNAL_EMAIL_RECIPIENTS=true` is set.
+
 ## 🔐 Row Level Security (RLS)
 
 All tables have Row Level Security enabled. Key policies:

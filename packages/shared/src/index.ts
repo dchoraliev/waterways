@@ -35,3 +35,6 @@ export type {
 export { DEFAULT_FILTER_OPTIONS, hasActiveObservationFilters } from './types/observation-filters';
 
 export type { FilterOptions } from './types/observation-filters';
+
+export { sendAppEmail } from './supabase/email';
+export type { EmailTemplate, SendAppEmailInput, SendAppEmailResult } from './supabase/email';
