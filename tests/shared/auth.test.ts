@@ -18,6 +18,8 @@ const {
     mockResetPasswordForEmail,
     mockVerifyOtp,
     mockUpdateUser,
+    mockReauthenticate,
+    mockFunctionsInvoke,
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
 } = require('@waterways/shared/supabase/client');
@@ -35,7 +37,7 @@ describe('Supabase Auth Wrapper (shared package)', () => {
     const mockRes = { data: { session: { id: 's1' } }, error: null };
     mockSignInWithPassword.mockResolvedValueOnce(mockRes);
 
-    const res = await auth.signIn('user@example.com', 'pass123');
+    const res = await auth.signIn('  USER@Example.com  ', 'pass123');
 
     expect(mockSignInWithPassword).toHaveBeenCalledWith({
       email: 'user@example.com',
@@ -87,7 +89,7 @@ describe('Supabase Auth Wrapper (shared package)', () => {
     const mockRes = { data: {}, error: null };
     mockResetPasswordForEmail.mockResolvedValueOnce(mockRes);
 
-    const res = await auth.sendResetPasswordEmail('reset@example.com');
+    const res = await auth.sendResetPasswordEmail('  RESET@Example.com ');
 
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith('reset@example.com');
     expect(res).toBe(mockRes);
@@ -97,7 +99,7 @@ describe('Supabase Auth Wrapper (shared package)', () => {
     const mockRes = { data: {}, error: null };
     mockVerifyOtp.mockResolvedValueOnce(mockRes);
 
-    const res = await auth.verifyResetPasswordOtp('user@example.com', '123456');
+    const res = await auth.verifyResetPasswordOtp('  USER@Example.com ', '123456');
 
     expect(mockVerifyOtp).toHaveBeenCalledWith({
       email: 'user@example.com',
@@ -114,6 +116,51 @@ describe('Supabase Auth Wrapper (shared package)', () => {
     const res = await auth.resetPassword('new-pass');
 
     expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'new-pass' });
+    expect(res).toBe(mockRes);
+  });
+
+  test('resetEmail delegates to supabase.auth.updateUser with normalized email', async () => {
+    const mockRes = { data: { user: { id: 'u3' } }, error: null };
+    mockUpdateUser.mockResolvedValueOnce(mockRes);
+
+    const res = await auth.resetEmail('  NEW@Example.com  ');
+
+    expect(mockUpdateUser).toHaveBeenCalledWith({ email: 'new@example.com' });
+    expect(res).toBe(mockRes);
+  });
+
+  test('requestPasswordReauthEmail delegates to supabase.auth.reauthenticate', async () => {
+    const mockRes = { data: {}, error: null };
+    mockReauthenticate.mockResolvedValueOnce(mockRes);
+
+    const res = await auth.requestPasswordReauthEmail();
+
+    expect(mockReauthenticate).toHaveBeenCalledTimes(1);
+    expect(res).toBe(mockRes);
+  });
+
+  test('changePasswordWithReauthCode delegates to supabase.auth.updateUser with nonce', async () => {
+    const mockRes = { data: { user: { id: 'u4' } }, error: null };
+    mockUpdateUser.mockResolvedValueOnce(mockRes);
+
+    const res = await auth.changePasswordWithReauthCode('new-pass', ' 123456 ');
+
+    expect(mockUpdateUser).toHaveBeenCalledWith({
+      password: 'new-pass',
+      nonce: '123456',
+    });
+    expect(res).toBe(mockRes);
+  });
+
+  test('deleteAccount confirm-delete passes the current password', async () => {
+    const mockRes = { data: { success: true, step: 'deleted' }, error: null };
+    mockFunctionsInvoke.mockResolvedValueOnce(mockRes);
+
+    const res = await auth.deleteAccount({ action: 'confirm-delete', currentPassword: 'pass123!' });
+
+    expect(mockFunctionsInvoke).toHaveBeenCalledWith('delete-account', {
+      body: { action: 'confirm-delete', currentPassword: 'pass123!' },
+    });
     expect(res).toBe(mockRes);
   });
 });

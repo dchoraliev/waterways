@@ -7,6 +7,8 @@ export const mockGetSession = jest.fn();
 export const mockResetPasswordForEmail = jest.fn();
 export const mockVerifyOtp = jest.fn();
 export const mockUpdateUser = jest.fn();
+export const mockReauthenticate = jest.fn();
+export const mockFunctionsInvoke = jest.fn();
 
 // Mock version of the Supabase client expected by auth.ts
 export const supabase = {
@@ -18,6 +20,10 @@ export const supabase = {
     resetPasswordForEmail: mockResetPasswordForEmail,
     verifyOtp: mockVerifyOtp,
     updateUser: mockUpdateUser,
+    reauthenticate: mockReauthenticate,
+  },
+  functions: {
+    invoke: mockFunctionsInvoke,
   },
 };
 

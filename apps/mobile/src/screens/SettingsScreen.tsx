@@ -16,7 +16,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { createSettingsStyles, createSettingsTokens } from '../styles/SettingsScreen.styles';
-import { signIn, signOut, resetPassword, deleteAccount } from '@waterways/shared/src/supabase/auth';
+import {
+  signIn,
+  signOut,
+  requestPasswordReauthEmail,
+  changePasswordWithReauthCode,
+  deleteAccount,
+} from '@waterways/shared/src/supabase/auth';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { Ionicons } from '@expo/vector-icons';
 import { Switch } from 'react-native';
@@ -66,9 +72,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordReauthCode, setPasswordReauthCode] = useState('');
+  const [hasRequestedPasswordReauth, setHasRequestedPasswordReauth] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteReauthCode, setDeleteReauthCode] = useState('');
+  const [hasRequestedDeleteReauth, setHasRequestedDeleteReauth] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
@@ -205,11 +216,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const resetDeleteDialog = () => {
     setShowDeleteDialog(false);
     setDeletePassword('');
+    setDeleteReauthCode('');
+    setHasRequestedDeleteReauth(false);
     setDeleteError('');
   };
 
   const handleDeletePasswordChange = (value: string) => {
     setDeletePassword(value);
+    if (deleteError) setDeleteError('');
+  };
+
+  const handleDeleteReauthCodeChange = (value: string) => {
+    setDeleteReauthCode(value);
     if (deleteError) setDeleteError('');
   };
 
@@ -332,6 +350,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   const handlePasswordChange = async () => {
+    if (isUpdatingPassword) return;
+
     setPasswordError('');
 
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -360,13 +380,39 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
 
     try {
+      setIsUpdatingPassword(true);
+
       const { error: signInError } = await signIn(userProfile.email, currentPassword);
       if (signInError) {
         setPasswordError(signInError.message || 'Current password is incorrect');
         return;
       }
 
-      const { error: updatePasswordError } = await resetPassword(newPassword);
+      if (!hasRequestedPasswordReauth) {
+        const { error: reauthRequestError } = await requestPasswordReauthEmail();
+        if (reauthRequestError) {
+          setPasswordError(reauthRequestError.message || 'Unable to send reauthentication email');
+          return;
+        }
+
+        setHasRequestedPasswordReauth(true);
+        setPasswordError('');
+        Alert.alert(
+          'Reauthentication email sent',
+          'Check your email for the verification code, then enter it to confirm your new password.'
+        );
+        return;
+      }
+
+      if (!passwordReauthCode.trim()) {
+        setPasswordError('Reauthentication code is required');
+        return;
+      }
+
+      const { error: updatePasswordError } = await changePasswordWithReauthCode(
+        newPassword,
+        passwordReauthCode
+      );
       if (updatePasswordError) {
         setPasswordError(updatePasswordError.message || 'Unable to update password');
         return;
@@ -376,9 +422,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordReauthCode('');
+      setHasRequestedPasswordReauth(false);
     } catch (error) {
       console.error('Password change error:', error);
       setPasswordError('An unexpected error occurred while updating your password');
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -400,13 +450,37 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
     try {
       setIsDeletingAccount(true);
 
-      const { error: signInError } = await signIn(userProfile.email, deletePassword);
-      if (signInError) {
-        setDeleteError(signInError.message || 'Incorrect password');
+      if (!hasRequestedDeleteReauth) {
+        const { error: signInError } = await signIn(userProfile.email, deletePassword);
+        if (signInError) {
+          setDeleteError(signInError.message || 'Incorrect password');
+          return;
+        }
+
+        const { error: requestReauthError } = await requestPasswordReauthEmail();
+        if (requestReauthError) {
+          setDeleteError(requestReauthError.message || 'Unable to send reauthentication email');
+          return;
+        }
+
+        setHasRequestedDeleteReauth(true);
+        setDeleteError('');
+        Alert.alert(
+          'Reauthentication email sent',
+          'Check your email for the verification code, then enter it to confirm account deletion.'
+        );
         return;
       }
 
-      const { error: deleteErrorResponse } = await deleteAccount();
+      if (!deleteReauthCode.trim()) {
+        setDeleteError('Reauthentication code is required');
+        return;
+      }
+
+      const { error: deleteErrorResponse } = await deleteAccount({
+        action: 'confirm-delete',
+        currentPassword: deletePassword,
+      });
       if (deleteErrorResponse) {
         setDeleteError(formatDeleteAccountError(deleteErrorResponse));
         return;
@@ -762,8 +836,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <SheetModal
         visible={showPasswordDialog}
         title="Change Password"
-        description="Enter your current password and choose a new one. Passwords must be at least 8 characters long and include at least one special character."
-        onClose={() => setShowPasswordDialog(false)}
+        description={
+          hasRequestedPasswordReauth
+            ? 'Enter the reauthentication code sent to your email to confirm your password change.'
+            : "Enter your current password and choose a new one. You'll receive a reauthentication code by email to confirm the change."
+        }
+        onClose={() => {
+          setShowPasswordDialog(false);
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setPasswordReauthCode('');
+          setHasRequestedPasswordReauth(false);
+          setPasswordError('');
+        }}
         styles={styles}
         useKeyboardAvoidingView
       >
@@ -797,12 +883,33 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             style={styles.input}
           />
         </Field>
+        {hasRequestedPasswordReauth && (
+          <Field label="Reauthentication code" styles={styles}>
+            <TextInput
+              value={passwordReauthCode}
+              onChangeText={setPasswordReauthCode}
+              placeholder="Enter email code"
+              placeholderTextColor={tokens.placeholder}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </Field>
+        )}
         {!!passwordError && <ErrorBox message={passwordError} styles={styles} />}
         <View style={styles.modalFooter}>
           <TouchableOpacity
             activeOpacity={0.85}
             style={[styles.button, styles.buttonOutline]}
-            onPress={() => setShowPasswordDialog(false)}
+            onPress={() => {
+              setShowPasswordDialog(false);
+              setCurrentPassword('');
+              setNewPassword('');
+              setConfirmPassword('');
+              setPasswordReauthCode('');
+              setHasRequestedPasswordReauth(false);
+              setPasswordError('');
+            }}
+            disabled={isUpdatingPassword}
           >
             <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
           </TouchableOpacity>
@@ -811,8 +918,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             activeOpacity={0.85}
             style={[styles.button, styles.buttonPrimary]}
             onPress={handlePasswordChange}
+            disabled={isUpdatingPassword}
           >
-            <Text style={[styles.buttonText, styles.buttonTextSolid]}>Update Password</Text>
+            <Text style={[styles.buttonText, styles.buttonTextSolid]}>
+              {isUpdatingPassword
+                ? hasRequestedPasswordReauth
+                  ? 'Updating...'
+                  : 'Sending code...'
+                : hasRequestedPasswordReauth
+                  ? 'Confirm Password Change'
+                  : 'Send Reauthentication Code'}
+            </Text>
           </TouchableOpacity>
         </View>
       </SheetModal>
@@ -821,9 +937,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <DeletePasswordModal
         visible={showDeleteDialog}
         password={deletePassword}
+        reauthCode={deleteReauthCode}
+        hasRequestedReauth={hasRequestedDeleteReauth}
         passwordError={deleteError}
         isSubmitting={isDeletingAccount}
         onPasswordChange={handleDeletePasswordChange}
+        onReauthCodeChange={handleDeleteReauthCodeChange}
         onCancel={resetDeleteDialog}
         onConfirm={handleDeleteAccount}
         styles={styles}
@@ -934,9 +1053,12 @@ function SheetModal({
 function DeletePasswordModal({
   visible,
   password,
+  reauthCode,
+  hasRequestedReauth,
   passwordError,
   isSubmitting,
   onPasswordChange,
+  onReauthCodeChange,
   onCancel,
   onConfirm,
   styles,
@@ -944,63 +1066,91 @@ function DeletePasswordModal({
 }: {
   visible: boolean;
   password: string;
+  reauthCode: string;
+  hasRequestedReauth: boolean;
   passwordError: string;
   isSubmitting: boolean;
   onPasswordChange: (value: string) => void;
+  onReauthCodeChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
   styles: SettingsStyles;
   tokens: SettingsTokens;
 }) {
-  return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.backdropSolid}>
-        <View style={styles.confirmBox}>
-          <Text style={styles.sheetTitle}>Delete Account</Text>
-          <View style={{ height: 8 }} />
-          <Text style={styles.sheetDesc}>
-            Enter your password to permanently delete your account and all related data.
-          </Text>
-          <View style={{ height: 12 }} />
+  const modalContent = (
+    <View style={styles.confirmBox}>
+      <Text style={styles.sheetTitle}>Delete Account</Text>
+      <View style={{ height: 8 }} />
+      <Text style={styles.sheetDesc}>
+        {hasRequestedReauth
+          ? 'Enter the reauthentication code we emailed you to permanently delete your account and all related data.'
+          : 'Enter your password to receive a reauthentication code by email before deletion.'}
+      </Text>
+      <View style={{ height: 12 }} />
+      <TextInput
+        value={password}
+        onChangeText={onPasswordChange}
+        placeholder="Enter your password"
+        placeholderTextColor={tokens.placeholder}
+        secureTextEntry
+        style={styles.input}
+        autoCapitalize="none"
+        editable={!isSubmitting && !hasRequestedReauth}
+      />
+      {hasRequestedReauth && (
+        <>
+          <View style={{ height: 10 }} />
           <TextInput
-            value={password}
-            onChangeText={onPasswordChange}
-            placeholder="Enter your password"
+            value={reauthCode}
+            onChangeText={onReauthCodeChange}
+            placeholder="Enter reauthentication code"
             placeholderTextColor={tokens.placeholder}
-            secureTextEntry
             style={styles.input}
             autoCapitalize="none"
+            keyboardType="number-pad"
             editable={!isSubmitting}
           />
-          {!!passwordError && (
-            <View style={{ marginTop: 8 }}>
-              <ErrorBox message={passwordError} styles={styles} />
-            </View>
-          )}
-          <View style={{ height: 16 }} />
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[styles.button, styles.buttonOutline]}
-              onPress={onCancel}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
-            </TouchableOpacity>
-            <View style={{ width: 12 }} />
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[styles.button, styles.buttonDestructive]}
-              onPress={onConfirm}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.buttonText, styles.buttonTextSolid]}>
-                {isSubmitting ? 'Deleting...' : 'Delete Account'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        </>
+      )}
+      {!!passwordError && (
+        <View style={{ marginTop: 8 }}>
+          <ErrorBox message={passwordError} styles={styles} />
         </View>
+      )}
+      <View style={{ height: 16 }} />
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.button, styles.buttonOutline]}
+          onPress={onCancel}
+          disabled={isSubmitting}
+        >
+          <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
+        </TouchableOpacity>
+        <View style={{ width: 12 }} />
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.button, styles.buttonDestructive]}
+          onPress={onConfirm}
+          disabled={isSubmitting}
+        >
+          <Text style={[styles.buttonText, styles.buttonTextSolid]}>
+            {isSubmitting
+              ? hasRequestedReauth
+                ? 'Deleting...'
+                : 'Sending code...'
+              : hasRequestedReauth
+                ? 'Confirm and Delete'
+                : 'Send Reauthentication Code'}
+          </Text>
+        </TouchableOpacity>
       </View>
+    </View>
+  );
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.backdropSolid}>{modalContent}</View>
     </Modal>
   );
 }
