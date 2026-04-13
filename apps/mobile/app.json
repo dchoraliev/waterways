@@ -15,6 +15,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "icon": "./assets/logo/waterways-logo.png",
       "supportsTablet": true,
       "infoPlist": {
         "NSUserNotificationUsageDescription": "We use notifications to remind you to review and submit draft journeys."
@@ -22,7 +23,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo/waterways-logo.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
