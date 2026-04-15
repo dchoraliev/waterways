@@ -1,9 +1,15 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View, Animated, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import {
+  CameraView,
+  useCameraPermissions,
+  useMicrophonePermissions,
+  type CameraMountError,
+} from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 
 import { createCameraCaptureScreenStyles } from '../styles/CameraCaptureScreen.styles';
 import { showToast } from '../utils/toast';
@@ -32,6 +38,7 @@ async function persistToDocuments(srcUri: string, fileName: string) {
 
 export default function CameraCaptureScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { colors } = useTheme();
   const styles = useMemo(() => createCameraCaptureScreenStyles(colors), [colors]);
   const params = useLocalSearchParams<{
@@ -51,6 +58,9 @@ export default function CameraCaptureScreen() {
   const [processing, setProcessing] = useState(false);
   const [zoom, setZoom] = useState(0);
   const [switching, setSwitching] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraMountError, setCameraMountError] = useState<string | null>(null);
+  const [cameraSessionKey, setCameraSessionKey] = useState(0);
 
   // Animation for capture button press - using useMemo instead of useRef().current
   const scaleAnim = useMemo(() => new Animated.Value(1), []);
@@ -61,7 +71,7 @@ export default function CameraCaptureScreen() {
   // Animation for camera fade during mode switching
   const cameraOpacity = useMemo(() => new Animated.Value(1), []);
 
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<CameraView | null>(null);
 
   // Pinch-to-zoom tracking
   const initialDistance = useRef<number>(0);
@@ -71,6 +81,29 @@ export default function CameraCaptureScreen() {
   const recordingCancelled = useRef<boolean>(false);
 
   const canUseCamera = useMemo(() => cameraPermission?.granted === true, [cameraPermission]);
+
+  const stopActiveRecording = useCallback(() => {
+    try {
+      recordingCancelled.current = true;
+      cameraRef.current?.stopRecording();
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+    } catch (error) {
+      console.warn('[Camera] Failed to stop active recording:', error);
+    }
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    if (isFocused) return;
+
+    stopActiveRecording();
+  }, [isFocused, stopActiveRecording]);
+
+  useEffect(() => {
+    return () => {
+      stopActiveRecording();
+    };
+  }, [stopActiveRecording]);
 
   // Animate button press
   const animatePress = () => {
@@ -112,6 +145,39 @@ export default function CameraCaptureScreen() {
     pulseAnim.setValue(1);
   };
 
+  function handleCameraReady() {
+    setCameraReady(true);
+    setCameraMountError(null);
+  }
+
+  function handleCameraMountError(event: CameraMountError) {
+    const message = event?.message || 'Camera failed to initialize.';
+    setCameraReady(false);
+    setCameraMountError(message);
+    console.error('[Camera] Mount error:', message);
+  }
+
+  function retryCameraMount() {
+    setCameraReady(false);
+    setCameraMountError(null);
+    setZoom(0);
+    setCameraSessionKey((prev) => prev + 1);
+  }
+
+  function ensureCameraSessionReady() {
+    if (cameraMountError) {
+      showToast('Camera failed to start. Tap Retry Camera.');
+      return false;
+    }
+
+    if (!cameraReady || !cameraRef.current) {
+      showToast('Camera is still starting. Please try again.');
+      return false;
+    }
+
+    return true;
+  }
+
   async function ensureCameraPermission() {
     if (cameraPermission?.granted) return true;
     const res = await requestCameraPermission();
@@ -133,6 +199,10 @@ export default function CameraCaptureScreen() {
     const ok = await ensureCameraPermission();
     if (!ok) {
       showToast('Camera permission denied.');
+      return;
+    }
+
+    if (!ensureCameraSessionReady()) {
       return;
     }
 
@@ -193,6 +263,10 @@ export default function CameraCaptureScreen() {
     const micOk = await ensureMicPermission();
     if (!micOk) {
       showToast('Microphone permission denied.');
+      return;
+    }
+
+    if (!ensureCameraSessionReady()) {
       return;
     }
 
@@ -369,6 +443,14 @@ export default function CameraCaptureScreen() {
             <Text style={styles.primaryBtnText}>Grant Permission</Text>
           </Pressable>
         </View>
+      ) : cameraMountError ? (
+        <View style={styles.permissionWrap}>
+          <Text style={styles.permissionText}>Camera failed to start.</Text>
+          <Text style={styles.permissionText}>{cameraMountError}</Text>
+          <Pressable onPress={retryCameraMount} style={styles.primaryBtn}>
+            <Text style={styles.primaryBtnText}>Retry Camera</Text>
+          </Pressable>
+        </View>
       ) : (
         <View style={styles.cameraWrap}>
           {/* Camera View with pinch-to-zoom and fade effect */}
@@ -378,7 +460,17 @@ export default function CameraCaptureScreen() {
             onTouchMove={handlePinchMove}
             onTouchEnd={handlePinchEnd}
           >
-            <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" mode={mode} zoom={zoom} />
+            <CameraView
+              key={cameraSessionKey}
+              ref={cameraRef}
+              style={{ flex: 1 }}
+              facing="back"
+              mode={mode}
+              zoom={zoom}
+              active={isFocused}
+              onCameraReady={handleCameraReady}
+              onMountError={handleCameraMountError}
+            />
 
             {/* Blur overlay during mode switching */}
             {switching && (
@@ -401,8 +493,8 @@ export default function CameraCaptureScreen() {
             <View style={styles.modeLabelRow}>
               <Pressable
                 onPress={() => handleModeSwitch('picture')}
-                disabled={recording || processing || switching}
-                style={[styles.modeLabelBtn, switching && { opacity: 0.5 }]}
+                disabled={recording || processing || switching || !cameraReady}
+                style={[styles.modeLabelBtn, (switching || !cameraReady) && { opacity: 0.5 }]}
               >
                 <Text style={[styles.modeLabelText, mode === 'picture' && styles.modeLabelActive]}>
                   PHOTO
@@ -410,8 +502,8 @@ export default function CameraCaptureScreen() {
               </Pressable>
               <Pressable
                 onPress={() => handleModeSwitch('video')}
-                disabled={recording || processing || switching}
-                style={[styles.modeLabelBtn, switching && { opacity: 0.5 }]}
+                disabled={recording || processing || switching || !cameraReady}
+                style={[styles.modeLabelBtn, (switching || !cameraReady) && { opacity: 0.5 }]}
               >
                 <Text style={[styles.modeLabelText, mode === 'video' && styles.modeLabelActive]}>
                   VIDEO
@@ -432,9 +524,9 @@ export default function CameraCaptureScreen() {
 
               {/* Main Capture Button */}
               <Pressable
-                disabled={processing || switching}
+                disabled={processing || switching || !cameraReady}
                 onPress={mode === 'picture' ? takePhoto : recording ? stopVideo : startVideo}
-                style={styles.captureButtonContainer}
+                style={[styles.captureButtonContainer, !cameraReady && { opacity: 0.6 }]}
               >
                 <Animated.View
                   style={[
@@ -459,6 +551,9 @@ export default function CameraCaptureScreen() {
                     <View style={styles.recordingDot} />
                     <Text style={styles.recordingText}>REC</Text>
                   </View>
+                )}
+                {!cameraReady && !processing && (
+                  <Text style={styles.processingText}>Preparing...</Text>
                 )}
                 {processing && <Text style={styles.processingText}>Saving...</Text>}
               </View>

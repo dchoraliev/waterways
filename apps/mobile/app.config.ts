@@ -23,7 +23,7 @@ export default {
     owner: 'waterwaysse4330',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: './assets/logo/waterways-logo.png',
     userInterfaceStyle: 'light',
     newArchEnabled: false,
 
@@ -35,9 +35,15 @@ export default {
 
     android: {
       package: 'com.waterways.mobile',
-      permissions: ['android.permission.RECORD_AUDIO', 'android.permission.INTERNET'],
+      permissions: [
+        'android.permission.CAMERA',
+        'android.permission.RECORD_AUDIO',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.INTERNET',
+      ],
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
+        foregroundImage: './assets/logo/waterways-logo.png',
         backgroundColor: '#ffffff',
       },
       edgeToEdgeEnabled: true,
@@ -46,6 +52,7 @@ export default {
 
     ios: {
       bundleIdentifier: iosBundleIdentifier,
+      icon: './assets/logo/waterways-logo.png',
       supportsTablet: true,
       config: {
         usesNonExemptEncryption: false,
@@ -70,6 +77,10 @@ export default {
           NSAllowsLocalNetworking: true,
         },
       },
+    },
+
+    web: {
+      favicon: './assets/favicon.png',
     },
 
     plugins: ['expo-router', 'expo-notifications', './plugins/withAndroidCompatibility.js'],

@@ -7,14 +7,14 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 const config = getDefaultConfig(projectRoot);
 
 // 1. Watch all files in the monorepo
-config.watchFolders = [monorepoRoot];
+config.watchFolders = Array.from(new Set([...(config.watchFolders ?? []), monorepoRoot]));
 
 // 2. Let Metro resolve node_modules from both the project and the monorepo root
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+config.resolver.disableHierarchicalLookup = false;
 
 // 3. Mirror tsconfig/workspace aliases so Metro can resolve shared imports at runtime.
 config.resolver.extraNodeModules = {
