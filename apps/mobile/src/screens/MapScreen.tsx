@@ -1,9 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  TextInput,
+  Pressable,
+  Share,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { Share } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import { buildObservationRpcArgs } from '@waterways/shared/src/utils/observation-query';
@@ -22,9 +32,13 @@ export interface Observation {
   longitude: number;
   observation: string | null;
   projectName: string | null;
-  observerName: string | null; // null means hidden (share_name_on_map = false)
+  projectId: string | null;
+  tripId: string | null;
+  observerName: string | null;
   keywords: string[];
   photos: string[];
+  obsNumber: number;
+  journeyNumber: number | null;
 }
 
 interface FilteredObservationRow {
@@ -35,11 +49,22 @@ interface FilteredObservationRow {
   longitude: number | null;
   observation: string | null;
   project_name: string | null;
+  project_id: string | null;
+  trip_id: string | null;
   observer_first_name: string | null;
   observer_last_name: string | null;
   user_id: string | null;
   keywords: string[] | null;
   observation_media: string[] | null;
+}
+
+interface ProjectOption {
+  id: string;
+  name: string;
+}
+interface TripOption {
+  id: string;
+  label: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +82,21 @@ function createMapTokens(themeColors: AppColors) {
     inputBg: themeColors.surface,
     overlay: themeColors.overlay,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Build a YYYY-MM-DD string from individual day/month/year parts
+function buildIso(day: string, month: string, year: string): string {
+  return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+// Split a YYYY-MM-DD string into { day, month, year }
+function splitIso(iso: string) {
+  const [year = '', month = '', day = ''] = iso.split('-');
+  return { day, month, year };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,7 +287,18 @@ function buildLeafletHTML(
 
     function showSheet(obsList) {
       document.getElementById('legend-panel').classList.remove('visible');
-      document.getElementById('sheet-title').textContent = obsList.length > 1 ? obsList.length + ' Observations' : 'Observation Detail';
+      
+      var title;
+      if (obsList.length > 1) {
+        title = obsList.length + ' Observations';
+      } else {
+        var o = obsList[0];
+        var parts = [];
+        if (o.journeyNumber != null) parts.push('Journey ' + o.journeyNumber);
+        parts.push('Observation ' + o.obsNumber);
+        title = parts.join(' · ');
+      }
+      document.getElementById('sheet-title').textContent = title;
 
       var body = document.getElementById('sheet-body');
       body.innerHTML = obsList.map(function(o) {
@@ -331,6 +382,28 @@ const MapScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSatellite, setIsSatellite] = useState(false);
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
+
+  // Applied filter state
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+  const [selectedTripIds, setSelectedTripIds] = useState<Set<string>>(new Set());
+
+  // Pending filter state (inside panel before applying)
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [pendingFromDay, setPendingFromDay] = useState('');
+  const [pendingFromMonth, setPendingFromMonth] = useState('');
+  const [pendingFromYear, setPendingFromYear] = useState('');
+  const [pendingToDay, setPendingToDay] = useState('');
+  const [pendingToMonth, setPendingToMonth] = useState('');
+  const [pendingToYear, setPendingToYear] = useState('');
+  const [pendingProjectIds, setPendingProjectIds] = useState<Set<string>>(new Set());
+  const [pendingTripIds, setPendingTripIds] = useState<Set<string>>(new Set());
+
+  // Options
+  const [userProjects, setUserProjects] = useState<ProjectOption[]>([]);
+  const [userTrips, setUserTrips] = useState<TripOption[]>([]);
+
   const { colors, mode } = useTheme();
   const tokens = useMemo(() => createMapTokens(colors), [colors]);
   const styles = useMemo(() => createMapScreenStyles(tokens), [tokens]);
@@ -340,17 +413,16 @@ const MapScreen: React.FC = () => {
     async function fetchData() {
       try {
         const args = buildObservationRpcArgs({ limit: 500, offset: 0 });
-        // Supabase RPC params expect undefined for absent values; convert nulls to undefined
-        const raw = { ...args, p_limit: 500 } as Record<string, unknown>;
-        const normalized = Object.fromEntries(
-          Object.entries(raw).map(([k, v]) => [k, v === null ? undefined : v])
+
+        // Convert null to undefined for Supabase RPC compatibility
+        const rpcArgs = Object.fromEntries(
+          Object.entries({ ...args, p_limit: 500 }).map(([key, value]) => [
+            key,
+            value === null ? undefined : value,
+          ])
         ) as Record<string, unknown>;
 
-        const { data, error } = await supabase.rpc(
-          'get_filtered_observations',
-          // supabase client types expect optional fields to be undefined, so cast here
-          normalized as unknown as Record<string, unknown>
-        );
+        const { data, error } = await supabase.rpc('get_filtered_observations', rpcArgs);
         if (error) throw error;
 
         const rows = (data ?? []) as unknown as FilteredObservationRow[];
@@ -367,7 +439,7 @@ const MapScreen: React.FC = () => {
           shareMap[u.id] = u.share_name_on_map;
         });
 
-        const formatted: Observation[] = rows
+        const formatted = rows
           .filter((o) => o.latitude != null && o.longitude != null)
           .map((o) => {
             const sharesName = o.user_id ? shareMap[o.user_id] === true : false;
@@ -389,13 +461,50 @@ const MapScreen: React.FC = () => {
               longitude: Number(o.longitude),
               observation: o.observation,
               projectName: o.project_name,
+              projectId: o.project_id,
+              tripId: o.trip_id,
               observerName: sharesName ? fullName : null,
               keywords: o.keywords ?? [],
               photos: o.observation_media ?? [],
             };
           });
 
-        setObservations(formatted);
+        // Sort by time ascending so oldest = #1
+        const sorted = [...formatted].sort(
+          (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+        );
+
+        // Assign journey numbers ordered by each trip's first appearance
+        const tripFirstSeen = new Map<string, number>();
+        sorted.forEach((o) => {
+          if (o.tripId && !tripFirstSeen.has(o.tripId)) {
+            tripFirstSeen.set(o.tripId, tripFirstSeen.size + 1);
+          }
+        });
+
+        // Track per-trip observation counters so obsNumber resets each journey
+        const tripObsCounter = new Map<string, number>();
+
+        const numbered: Observation[] = sorted.map((o) => {
+          let obsNumber: number;
+          if (o.tripId) {
+            const next = (tripObsCounter.get(o.tripId) ?? 0) + 1;
+            tripObsCounter.set(o.tripId, next);
+            obsNumber = next;
+          } else {
+            // No trip — use a shared counter for tripless observations
+            const next = (tripObsCounter.get('__none__') ?? 0) + 1;
+            tripObsCounter.set('__none__', next);
+            obsNumber = next;
+          }
+          return {
+            ...o,
+            obsNumber,
+            journeyNumber: o.tripId ? (tripFirstSeen.get(o.tripId) ?? null) : null,
+          };
+        });
+
+        setObservations(numbered);
       } catch (err) {
         console.error('Failed to fetch observations:', err);
       } finally {
@@ -417,10 +526,152 @@ const MapScreen: React.FC = () => {
       }
     }
 
+    async function fetchUserProjectsAndTrips() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: membershipData } = await supabase
+        .from('project_membership')
+        .select('project_id, projects(id, name)')
+        .eq('user_id', user.id);
+
+      const projects: ProjectOption[] = (membershipData ?? [])
+        .map(
+          (m: { project_id: string | null; projects: { id: string; name: string } | null }) =>
+            m.projects
+        )
+        .filter((p): p is { id: string; name: string } => p !== null)
+        .map((p) => ({ id: p.id, name: p.name }));
+
+      setUserProjects(projects);
+
+      const { data: tripData } = await supabase
+        .from('trips')
+        .select('id, start_time')
+        .eq('user_id', user.id)
+        .order('start_time', { ascending: false });
+
+      const trips: TripOption[] = (tripData ?? []).map(
+        (t: { id: string; start_time: string | null }) => ({
+          id: t.id,
+          label: t.start_time
+            ? new Date(t.start_time).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : 'Unknown date',
+        })
+      );
+
+      setUserTrips(trips);
+    }
+
     fetchData();
     fetchCategories();
+    fetchUserProjectsAndTrips();
   }, []);
 
+  // ── Filtered observations ──────────────────────────────────────────────────
+  const filteredObservations = useMemo(() => {
+    return observations.filter((o) => {
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        if (!isNaN(from.getTime()) && new Date(o.time) < from) return false;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo + 'T23:59:59');
+        if (!isNaN(to.getTime()) && new Date(o.time) > to) return false;
+      }
+      if (selectedProjectIds.size > 0) {
+        if (!o.projectId || !selectedProjectIds.has(o.projectId)) return false;
+      }
+      if (selectedTripIds.size > 0) {
+        if (!o.tripId || !selectedTripIds.has(o.tripId)) return false;
+      }
+      return true;
+    });
+  }, [observations, dateFrom, dateTo, selectedProjectIds, selectedTripIds]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (dateFrom) count++;
+    if (dateTo) count++;
+    if (selectedProjectIds.size > 0) count++;
+    if (selectedTripIds.size > 0) count++;
+    return count;
+  }, [dateFrom, dateTo, selectedProjectIds, selectedTripIds]);
+
+  // ── Filter panel handlers ──────────────────────────────────────────────────
+  const openFilter = () => {
+    // Populate pending fields from currently applied filters
+    const from = splitIso(dateFrom);
+    const to = splitIso(dateTo);
+    setPendingFromDay(from.day);
+    setPendingFromMonth(from.month);
+    setPendingFromYear(from.year);
+    setPendingToDay(to.day);
+    setPendingToMonth(to.month);
+    setPendingToYear(to.year);
+    setPendingProjectIds(new Set(selectedProjectIds));
+    setPendingTripIds(new Set(selectedTripIds));
+    setFilterVisible(true);
+  };
+
+  const applyFilters = () => {
+    const fromIso =
+      pendingFromDay && pendingFromMonth && pendingFromYear
+        ? buildIso(pendingFromDay, pendingFromMonth, pendingFromYear)
+        : '';
+    const toIso =
+      pendingToDay && pendingToMonth && pendingToYear
+        ? buildIso(pendingToDay, pendingToMonth, pendingToYear)
+        : '';
+    setDateFrom(fromIso);
+    setDateTo(toIso);
+    setSelectedProjectIds(new Set(pendingProjectIds));
+    setSelectedTripIds(new Set(pendingTripIds));
+    setFilterVisible(false);
+  };
+
+  const clearFilters = () => {
+    setPendingFromDay('');
+    setPendingFromMonth('');
+    setPendingFromYear('');
+    setPendingToDay('');
+    setPendingToMonth('');
+    setPendingToYear('');
+    setPendingProjectIds(new Set());
+    setPendingTripIds(new Set());
+  };
+
+  const togglePendingProject = (id: string) => {
+    setPendingProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const togglePendingTrip = (id: string) => {
+    setPendingTripIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // ── WebView handlers ───────────────────────────────────────────────────────
   // Receive messages from the WebView and handle natively
   const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
@@ -463,29 +714,48 @@ const MapScreen: React.FC = () => {
   };
 
   const html = useMemo(
-    () => buildLeafletHTML(observations, categoryColors, isDark),
-    [observations, categoryColors, isDark]
+    () => buildLeafletHTML(filteredObservations, categoryColors, isDark),
+    [filteredObservations, categoryColors, isDark]
   );
+
+  const countLabel = loading
+    ? 'Loading...'
+    : activeFilterCount > 0
+      ? `${filteredObservations.length} / ${observations.length} Observations`
+      : `${observations.length} Observations`;
 
   return (
     <SafeAreaView style={styles.root} edges={['left', 'right', 'top']}>
       <View style={styles.topBar}>
-        <Text style={styles.cardTitle}>
-          {loading ? 'Loading...' : `${observations.length} Observations`}
-        </Text>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonOutline, styles.buttonSm]}
-          onPress={handleSatelliteToggle}
-        >
-          <Ionicons
-            name={isSatellite ? 'map-outline' : 'earth-outline'}
-            size={13}
-            color={tokens.text}
-          />
-          <Text style={[styles.buttonText, styles.buttonTextOutline]}>
-            {isSatellite ? 'Map' : 'Satellite'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.cardTitle}>{countLabel}</Text>
+        <View style={styles.topBarActions}>
+          <TouchableOpacity
+            style={[styles.button, styles.buttonOutline, styles.buttonSm]}
+            onPress={openFilter}
+          >
+            <Ionicons name="options-outline" size={13} color={tokens.text} />
+            <Text style={[styles.buttonText, styles.buttonTextOutline]}>Filter</Text>
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.buttonOutline, styles.buttonSm]}
+            onPress={handleSatelliteToggle}
+          >
+            <Ionicons
+              name={isSatellite ? 'map-outline' : 'earth-outline'}
+              size={13}
+              color={tokens.text}
+            />
+            <Text style={[styles.buttonText, styles.buttonTextOutline]}>
+              {isSatellite ? 'Map' : 'Satellite'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.mapFull}>
@@ -506,6 +776,160 @@ const MapScreen: React.FC = () => {
           />
         )}
       </View>
+
+      {/* Filter panel */}
+      <Modal
+        visible={filterVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setFilterVisible(false)} />
+        <View style={styles.filterSheet}>
+          {/* Header */}
+          <View style={styles.filterHeader}>
+            <Text style={styles.filterTitle}>Filter Observations</Text>
+            <TouchableOpacity onPress={clearFilters}>
+              <Text style={styles.clearText}>Clear all</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.filterBody} showsVerticalScrollIndicator={false}>
+            {/* Date range — DD / MM / YYYY */}
+            <Text style={styles.filterSectionLabel}>DATE RANGE</Text>
+            <View style={styles.dateRow}>
+              {/* From */}
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>From</Text>
+                <View style={styles.dmdRow}>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdDay]}
+                    placeholder="DD"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingFromDay}
+                    onChangeText={setPendingFromDay}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dmdSep}>/</Text>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdMonth]}
+                    placeholder="MM"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingFromMonth}
+                    onChangeText={setPendingFromMonth}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dmdSep}>/</Text>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdYear]}
+                    placeholder="YYYY"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingFromYear}
+                    onChangeText={setPendingFromYear}
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.dateSeparator} />
+
+              {/* To */}
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>To</Text>
+                <View style={styles.dmdRow}>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdDay]}
+                    placeholder="DD"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingToDay}
+                    onChangeText={setPendingToDay}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dmdSep}>/</Text>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdMonth]}
+                    placeholder="MM"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingToMonth}
+                    onChangeText={setPendingToMonth}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text style={styles.dmdSep}>/</Text>
+                  <TextInput
+                    style={[styles.dateInput, styles.dmdYear]}
+                    placeholder="YYYY"
+                    placeholderTextColor={tokens.mutedText}
+                    value={pendingToYear}
+                    onChangeText={setPendingToYear}
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Projects */}
+            {userProjects.length > 0 && (
+              <>
+                <Text style={styles.filterSectionLabel}>MY PROJECTS</Text>
+                <View style={styles.chipRow}>
+                  {userProjects.map((p) => {
+                    const active = pendingProjectIds.has(p.id);
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => togglePendingProject(p.id)}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {p.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {/* Trips */}
+            {userTrips.length > 0 && (
+              <>
+                <Text style={styles.filterSectionLabel}>MY JOURNEYS</Text>
+                <View style={styles.chipRow}>
+                  {userTrips.map((t) => {
+                    const active = pendingTripIds.has(t.id);
+                    return (
+                      <TouchableOpacity
+                        key={t.id}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => togglePendingTrip(t.id)}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {t.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <View style={{ height: 24 }} />
+          </ScrollView>
+
+          {/* Apply */}
+          <View style={styles.filterFooter}>
+            <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -525,7 +949,8 @@ function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
     },
     mapFull: { flex: 1 },
     webView: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '600', color: TOKENS.text },
+    cardTitle: { fontSize: 15, fontWeight: '600', color: TOKENS.text, flexShrink: 1 },
+    topBarActions: { flexDirection: 'row', gap: 8 },
     loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     loadingText: { color: TOKENS.mutedText, fontSize: 14 },
     button: {
@@ -540,6 +965,100 @@ function createMapScreenStyles(TOKENS: ReturnType<typeof createMapTokens>) {
     buttonOutline: { borderWidth: 1, borderColor: TOKENS.border, backgroundColor: 'transparent' },
     buttonText: { fontSize: 13, fontWeight: '500' },
     buttonTextOutline: { color: TOKENS.text },
+
+    filterBadge: {
+      backgroundColor: TOKENS.primary,
+      borderRadius: 99,
+      minWidth: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 4,
+    },
+    filterBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+
+    filterSheet: {
+      backgroundColor: TOKENS.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      borderTopWidth: 1,
+      borderTopColor: TOKENS.border,
+      maxHeight: '80%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 20,
+    },
+    filterHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: TOKENS.border,
+    },
+    filterTitle: { fontSize: 18, fontWeight: '600', color: TOKENS.text },
+    clearText: { fontSize: 14, color: TOKENS.primary, fontWeight: '500' },
+    filterBody: { paddingHorizontal: 20, paddingTop: 20 },
+
+    filterSectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: TOKENS.mutedText,
+      letterSpacing: 0.8,
+      marginBottom: 12,
+      marginTop: 8,
+    },
+
+    // Date range
+    dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 24 },
+    dateField: { flex: 1 },
+    dateLabel: { fontSize: 13, color: TOKENS.mutedText, marginBottom: 6 },
+    dateSeparator: { width: 1, height: 38, backgroundColor: TOKENS.border, marginBottom: 2 },
+
+    // DD / MM / YYYY row
+    dmdRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    dmdSep: { fontSize: 16, color: TOKENS.mutedText },
+    dateInput: {
+      borderWidth: 1,
+      borderColor: TOKENS.border,
+      borderRadius: 8,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: TOKENS.text,
+      backgroundColor: TOKENS.inputBg,
+      textAlign: 'center',
+    },
+    dmdDay: { width: 40 },
+    dmdMonth: { width: 40 },
+    dmdYear: { width: 56 },
+
+    // Chips
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 99,
+      borderWidth: 1,
+      borderColor: TOKENS.border,
+      backgroundColor: TOKENS.inputBg,
+    },
+    chipActive: { backgroundColor: TOKENS.primary, borderColor: TOKENS.primary },
+    chipText: { fontSize: 13, color: TOKENS.text, fontWeight: '500' },
+    chipTextActive: { color: '#fff' },
+
+    filterFooter: { padding: 20, borderTopWidth: 1, borderTopColor: TOKENS.border },
+    applyButton: {
+      backgroundColor: TOKENS.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    applyButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   });
 }
 
