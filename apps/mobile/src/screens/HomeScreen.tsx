@@ -36,7 +36,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     <View style={styles.root}>
       <View style={styles.contentWrapper}>
         <Text style={styles.title}>Welcome to WaDE</Text>
-        <Text style={styles.subtitle}>Track and explore waterway deltas</Text>
 
         {/* Start Journey */}
         <TouchableOpacity
