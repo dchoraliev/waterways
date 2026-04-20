@@ -4,6 +4,7 @@ import {
   Text,
   KeyboardAvoidingView,
   TouchableOpacity,
+  Alert,
   Image,
   ScrollView,
   Platform,
@@ -46,26 +47,33 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const canSubmit =
     name.trim().length > 0 &&
     email.trim().length > 0 &&
-    password.trim().length >= 4 &&
+    password.length >= 6 &&
     password === confirm &&
     acceptedTerms;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
 
-    const { firstName, lastName } = parseFullName(name);
+    setLoading(true);
+    try {
+      const { firstName, lastName } = parseFullName(name);
+      const { error } = await signUp(email, password, firstName, lastName);
+      if (error) {
+        Alert.alert('Sign Up Failed', error.message);
+        return;
+      }
 
-    const { error } = await signUp(email, password, firstName, lastName);
-    if (error) {
-      console.log('Error singing up:', error);
-      return;
+      onSignupSuccess();
+    } catch (error) {
+      Alert.alert('Sign Up Failed', error instanceof Error ? error.message : 'Unexpected error');
+    } finally {
+      setLoading(false);
     }
-    console.log('Sign up successful:');
-    onSignupSuccess();
   };
 
   return (
@@ -117,6 +125,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               label="Password"
               placeholder="••••••••"
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="none"
+              autoComplete="off"
               value={password}
               onChangeText={setPassword}
             />
@@ -125,6 +137,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               label="Confirm password"
               placeholder="••••••••"
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="none"
+              autoComplete="off"
               value={confirm}
               onChangeText={setConfirm}
             />
@@ -149,9 +165,9 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
             </View>
 
             <PrimaryButton
-              label="Create account"
+              label={loading ? 'Creating account...' : 'Create account'}
               onPress={handleSubmit}
-              disabled={!canSubmit}
+              disabled={!canSubmit || loading}
               style={styles.signUpButton}
             />
 

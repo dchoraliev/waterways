@@ -17,12 +17,20 @@ const runtimeEnv =
     ? (globalThis as { process?: { env?: RuntimeEnv } }).process?.env
     : undefined) ?? {};
 
+// Expo only inlines EXPO_PUBLIC_* when referenced directly as process.env.EXPO_PUBLIC_*.
+const expoPublicSupabaseUrl =
+  typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_SUPABASE_URL : undefined;
+const expoPublicSupabaseAnonKey =
+  typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY : undefined;
+
 const supabaseUrl =
+  expoPublicSupabaseUrl ||
   runtimeEnv.EXPO_PUBLIC_SUPABASE_URL ||
   runtimeEnv.VITE_SUPABASE_URL ||
   runtimeEnv.SUPABASE_URL ||
   '';
 const supabaseAnonKey =
+  expoPublicSupabaseAnonKey ||
   runtimeEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   runtimeEnv.VITE_SUPABASE_ANON_KEY ||
   runtimeEnv.SUPABASE_ANON_KEY ||

@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@waterways/shared/src/supabase/client';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
-// You might need to install and import the User type if using TypeScript
-// import { User } from '@supabase/supabase-js';
+import { signIn, signUp, sendResetPasswordEmail } from '@waterways/shared/src/supabase/auth';
 
 interface AuthState {
-  // New/Updated State properties for user management
   userId: string | null;
-  // user: User | null; // You can add the full user object if needed
-
-  // Existing State properties
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
 }
 
 export function useAuth() {
-  // Updated initial state to include userId and assume loading until status is known
   const [state, setState] = useState<AuthState>({
     userId: null,
     isAuthenticated: false,
@@ -24,23 +18,35 @@ export function useAuth() {
     error: null,
   });
 
-  // ADDED: Logic to fetch and listen for the authenticated user
   useEffect(() => {
-    // 1. Set up the real-time listener for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        const user = session?.user ?? null;
-        setState((s) => ({
-          ...s,
-          userId: user?.id ?? null,
-          isAuthenticated: !!user,
-          loading: false,
-          error: null,
-        }));
-      }
-    );
+    let authListener: { subscription: { unsubscribe: () => void } } | null = null;
 
-    // 2. Initial fetch in case onAuthStateChange doesn't fire immediately
+    try {
+      const listenerResult = supabase.auth.onAuthStateChange(
+        (_event: AuthChangeEvent, session: Session | null) => {
+          const user = session?.user ?? null;
+          setState((s) => ({
+            ...s,
+            userId: user?.id ?? null,
+            isAuthenticated: !!user,
+            loading: false,
+            error: null,
+          }));
+        }
+      );
+      authListener = listenerResult.data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to initialize auth listener';
+      setState((s) => ({
+        ...s,
+        userId: null,
+        isAuthenticated: false,
+        loading: false,
+        error: message,
+      }));
+      return () => {};
+    }
+
     const checkInitialUser = async () => {
       try {
         const {
@@ -61,59 +67,122 @@ export function useAuth() {
         setState((s) => ({ ...s, loading: false, error: 'Failed to check session' }));
       }
     };
-    checkInitialUser();
+    void checkInitialUser();
 
-    // 3. Cleanup listener
     return () => {
-      authListener.subscription.unsubscribe();
+      authListener?.subscription.unsubscribe();
     };
-  }, []); // Only run once on mount
+  }, []);
 
-  /**
-   * Login with email & password.
-   * For now this is a fake implementation that just "logs in" immediately.
-   */
-  const login = async (_email: string, _password: string) => {
+  const login = async (email: string, password: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // TODO: replace with real API call using _email and _password
-    // The state update below is the original mock logic
-    setState({
-      userId: 'mock-user-id-after-login', // Added mock ID for consistency
-      isAuthenticated: true,
-      loading: false,
-      error: null,
-    });
+    try {
+      const { error } = await signIn(email, password);
+
+      if (error) {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          isAuthenticated: false,
+          userId: null,
+          error: error.message ?? 'Sign in failed',
+        }));
+        return;
+      }
+
+      const sessionResponse = await supabase.auth.getSession();
+      const user = sessionResponse.data.session?.user ?? null;
+
+      if (!user) {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          isAuthenticated: false,
+          userId: null,
+          error: 'Sign in did not return a user session',
+        }));
+        return;
+      }
+
+      setState((s) => ({
+        ...s,
+        userId: user.id,
+        isAuthenticated: true,
+        loading: false,
+        error: null,
+      }));
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        loading: false,
+        isAuthenticated: false,
+        userId: null,
+        error: error instanceof Error ? error.message : 'Sign in failed',
+      }));
+    }
   };
 
-  /**
-   * Signup with name, email, password.
-   */
-  const signup = async (_name: string, _email: string, _password: string) => {
+  const signup = async (name: string, email: string, password: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // TODO: replace with real API call using _name, _email, _password
-    // The state update below is the original mock logic
-    setState({
-      userId: 'mock-user-id-after-signup', // Added mock ID for consistency
-      isAuthenticated: true,
-      loading: false,
-      error: null,
-    });
+    try {
+      const trimmedName = name.trim();
+      const nameParts = trimmedName.length > 0 ? trimmedName.split(/\s+/) : [];
+      const firstName = nameParts[0] ?? '';
+      const lastName = nameParts.slice(1).join(' ');
+      const { error } = await signUp(email, password, firstName, lastName);
+
+      if (error) {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          isAuthenticated: false,
+          userId: null,
+          error: error.message ?? 'Sign up failed',
+        }));
+        return;
+      }
+
+      const userResponse = await supabase.auth.getUser();
+      const user = userResponse.data.user;
+
+      setState((s) => ({
+        ...s,
+        userId: user?.id ?? null,
+        isAuthenticated: !!user,
+        loading: false,
+        error: null,
+      }));
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        loading: false,
+        isAuthenticated: false,
+        userId: null,
+        error: error instanceof Error ? error.message : 'Sign up failed',
+      }));
+    }
   };
 
-  /**
-   * Trigger a password reset email.
-   */
-  const resetPassword = async (_email: string) => {
+  const resetPassword = async (email: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // TODO: replace with real API call using _email
-    // The state update below is the original mock logic
-    setState((s) => ({
-      ...s,
-      loading: false,
-    }));
+    try {
+      const { error } = await sendResetPasswordEmail(email);
+
+      setState((s) => ({
+        ...s,
+        loading: false,
+        error: error?.message ?? null,
+      }));
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Reset password failed',
+      }));
+    }
   };
 
   return {
