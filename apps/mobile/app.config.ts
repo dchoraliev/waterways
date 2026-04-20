@@ -22,10 +22,16 @@ export default {
     slug: 'mobile',
     owner: 'waterwaysse4330',
     version: '1.0.0',
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
     orientation: 'portrait',
     icon: './assets/logo/waterways-logo.png',
     userInterfaceStyle: 'light',
     newArchEnabled: false,
+    updates: {
+      url: 'https://u.expo.dev/5e066005-7d80-4ab3-a8c0-19a219f2b0a6',
+    },
 
     splash: {
       image: './assets/splash-icon.png',

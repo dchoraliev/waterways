@@ -36,14 +36,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.trim().length > 0;
+  const canSubmit = email.trim().length > 0 && password.length > 0;
 
   const handleSignIn = async () => {
     if (!canSubmit) return;
 
     setLoading(true);
     try {
-      const { data, error } = await signIn(email.trim(), password.trim());
+      const { data, error } = await signIn(email.trim(), password);
 
       if (error) {
         Alert.alert('Login Failed', error.message);
