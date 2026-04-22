@@ -1,7 +1,14 @@
 import { Observation } from '../types/observation';
 
+type LegendCategory = {
+  name: string;
+  color: string;
+  keywords: string[];
+};
+
 export function exportToCSV(
   observations: Observation[],
+  categories: LegendCategory[],
   filename: string = 'waterways-observations.csv'
 ) {
   const headers = [
@@ -23,6 +30,14 @@ export function exportToCSV(
     const photoUrls = obs.photos.length > 0 ? obs.photos.join(' | ') : '';
     const videoUrls = obs.videos.length > 0 ? obs.videos.join(' | ') : '';
 
+    const matchedCategory = categories.find((cat) => cat.name === obs.type);
+
+    const matchedKeywords = matchedCategory
+      ? matchedCategory.keywords.filter((kw) =>
+          obs.observation.toLowerCase().includes(kw.toLowerCase())
+        )
+      : [];
+
     return [
       obs.id,
       obs.projectName,
@@ -30,16 +45,15 @@ export function exportToCSV(
       obs.location.lng.toString(),
       obs.date,
       obs.timestamp,
-      obs.type,
+      matchedCategory?.name ?? obs.type,
       obs.observation,
       obs.observerName,
-      obs.keywords.join('; '),
+      matchedKeywords.join('; '),
       photoUrls,
       videoUrls,
     ];
   });
 
-  // Add BOM for UTF-8 encoding to help Excel recognize column widths
   const bom = '\uFEFF';
   const csvContent =
     bom +
