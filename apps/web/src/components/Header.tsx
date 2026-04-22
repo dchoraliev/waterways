@@ -24,6 +24,7 @@ import {
   ChevronDown,
   CalendarDays,
   Image as ImageIcon,
+  FileText,
   Info,
   Shield,
 } from 'lucide-react';
@@ -300,6 +301,11 @@ export function Header({
                     </DropdownMenuItem>
                   </>
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.location.assign('/terms')}>
+                  <FileText className="size-4 mr-2" />
+                  Terms and Conditions
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="size-4 mr-2" />
