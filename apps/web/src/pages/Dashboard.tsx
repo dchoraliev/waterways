@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { LoginPage } from './LoginPage';
 import { DEFAULT_FILTER_OPTIONS, type FilterOptions } from '@waterways/shared';
 import { AdminPage } from './Admin';
+import { fetchObservationCategories } from '../api/observations';
 
 const ObservationDetails = lazy(() =>
   import('../components/ObservationDetails').then((module) => ({
@@ -28,6 +29,14 @@ const DailyReportPopup = lazy(() =>
     default: module.DailyReportPopup,
   }))
 );
+
+type ObservationCategory = {
+  id: number;
+  type: string;
+  color: string | null;
+  keywords: string[] | null;
+  is_fallback: boolean;
+};
 
 function toUtcStartIso(dateString: string): string | undefined {
   if (!dateString) {
@@ -79,6 +88,7 @@ export function Dashboard() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [categories, setCategories] = useState<ObservationCategory[]>([]);
 
   const observationsCacheRef = useRef<
     Map<
@@ -333,6 +343,21 @@ export function Dashboard() {
     }
   }, [user, showLogin]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchObservationCategories();
+        if (!cancelled) setCategories(data);
+      } catch (err) {
+        console.error('Failed to load observation categories:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleAccountClick = () => {
     if (!user) {
       setShowLogin(true);
@@ -413,6 +438,16 @@ export function Dashboard() {
     });
   }, [observations, bannedUsers, filters.hasMedia]);
 
+  const legendCategories = useMemo(() => {
+    return categories
+      .filter((cat) => !cat.is_fallback && cat.color)
+      .map((cat) => ({
+        name: cat.type,
+        color: cat.color!,
+        keywords: cat.keywords || [],
+      }));
+  }, [categories]);
+
   const handleObservationClick = useCallback((observation: Observation) => {
     setSelectedObservation(observation);
     setDetailsOpen(true);
@@ -436,7 +471,7 @@ export function Dashboard() {
   }, [activeRequestLimit, dataDisplayMode, isResultsTruncated, loading, mapZoom]);
 
   const handleExportCSV = () => {
-    exportToCSV(filteredObservations);
+    exportToCSV(filteredObservations, legendCategories);
     toast.success(
       `Exported ${filteredObservations.length} observation${filteredObservations.length !== 1 ? 's' : ''} to CSV`
     );
@@ -482,6 +517,7 @@ export function Dashboard() {
       <main className="flex-1 relative overflow-hidden">
         <MapView
           observations={filteredObservations}
+          categories={categories}
           onObservationClick={handleObservationClick}
           onClusterOpen={() => {
             setDetailsOpen(false);

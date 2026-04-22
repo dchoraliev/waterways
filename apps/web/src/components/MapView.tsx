@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Map, Marker } from 'pigeon-maps';
 import type { Observation } from '../types/observation';
 import {
@@ -12,7 +12,6 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { clusterObservations, type Cluster } from '../utils/clustering';
-import { fetchObservationCategories } from '../api/observations';
 
 // ── Tile providers ──────────────────────────────────────────────
 const OSM_SUBDOMAINS = ['a', 'b', 'c'] as const;
@@ -98,6 +97,7 @@ function getObservationTypeColor(
 
 interface MapViewProps {
   observations: Observation[];
+  categories: ObservationCategory[];
   isTruncated?: boolean;
   onObservationClick: (observation: Observation) => void;
   onClusterOpen?: () => void;
@@ -108,6 +108,7 @@ interface MapViewProps {
 
 export function MapView({
   observations,
+  categories,
   onObservationClick,
   onClusterOpen,
   onBoundsChange,
@@ -121,30 +122,7 @@ export function MapView({
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [isSatellite, setIsSatellite] = useState(false);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
-  const [categories, setCategories] = useState<ObservationCategory[]>([]);
   const [, setClickedObservationId] = useState<string | null>(null);
-
-  // Load categories from database
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        console.log('Loading observation categories...');
-        const data = await fetchObservationCategories();
-        console.log('Loaded categories:', data);
-        if (!cancelled) {
-          setCategories(data);
-        }
-      } catch (err) {
-        console.error('Failed to load observation categories:', err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Build legend categories from database categories
   const legendCategories = useMemo(() => {
