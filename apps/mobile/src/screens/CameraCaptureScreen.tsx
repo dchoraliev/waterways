@@ -61,6 +61,7 @@ export default function CameraCaptureScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
   const [cameraSessionKey, setCameraSessionKey] = useState(0);
+  const cameraAutoRecoveryAttempts = useRef(0);
 
   // Animation for capture button press - using useMemo instead of useRef().current
   const scaleAnim = useMemo(() => new Animated.Value(1), []);
@@ -96,6 +97,7 @@ export default function CameraCaptureScreen() {
   useEffect(() => {
     if (isFocused) return;
 
+    cameraAutoRecoveryAttempts.current = 0;
     stopActiveRecording();
   }, [isFocused, stopActiveRecording]);
 
@@ -148,21 +150,42 @@ export default function CameraCaptureScreen() {
   function handleCameraReady() {
     setCameraReady(true);
     setCameraMountError(null);
+    cameraAutoRecoveryAttempts.current = 0;
   }
 
   function handleCameraMountError(event: CameraMountError) {
     const message = event?.message || 'Camera failed to initialize.';
     setCameraReady(false);
     setCameraMountError(message);
+    cameraAutoRecoveryAttempts.current = 0;
     console.error('[Camera] Mount error:', message);
   }
 
-  function retryCameraMount() {
+  const retryCameraMount = useCallback(() => {
     setCameraReady(false);
     setCameraMountError(null);
     setZoom(0);
     setCameraSessionKey((prev) => prev + 1);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused || !canUseCamera || cameraReady || cameraMountError) {
+      return;
+    }
+
+    if (cameraAutoRecoveryAttempts.current >= 2) {
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      cameraAutoRecoveryAttempts.current += 1;
+      retryCameraMount();
+    }, 3000);
+
+    return () => {
+      globalThis.clearTimeout(timeout);
+    };
+  }, [isFocused, canUseCamera, cameraReady, cameraMountError, retryCameraMount]);
 
   function ensureCameraSessionReady() {
     if (cameraMountError) {
@@ -238,6 +261,8 @@ export default function CameraCaptureScreen() {
       // Clean up state BEFORE navigating back
       setBusy(false);
       setProcessing(false);
+      setCameraReady(false);
+      cameraAutoRecoveryAttempts.current = 0;
 
       router.back();
     } catch (e) {
@@ -316,7 +341,9 @@ export default function CameraCaptureScreen() {
       setRecording(false);
       setBusy(false);
       setProcessing(false);
+      setCameraReady(false);
       recordingCancelled.current = false;
+      cameraAutoRecoveryAttempts.current = 0;
 
       router.back();
     } catch (e) {
@@ -426,6 +453,8 @@ export default function CameraCaptureScreen() {
               return; // Stay on camera screen
             }
             // Not recording - close camera screen
+            setCameraReady(false);
+            cameraAutoRecoveryAttempts.current = 0;
             router.back();
           }}
           style={styles.closeBtn}
@@ -461,7 +490,7 @@ export default function CameraCaptureScreen() {
             onTouchEnd={handlePinchEnd}
           >
             <CameraView
-              key={cameraSessionKey}
+              key={`${cameraSessionKey}-${isFocused ? 'focused' : 'blurred'}`}
               ref={cameraRef}
               style={{ flex: 1 }}
               facing="back"

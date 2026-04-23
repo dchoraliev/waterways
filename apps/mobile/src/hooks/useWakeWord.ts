@@ -1,38 +1,6 @@
-/**
- * useWakeWord - Production-grade React hook for wake word detection
- *
- * This hook provides a complete wake word detection solution with:
- * - Continuous listening for wake word
- * - Automatic transition to recording mode after detection
- * - Robust error handling and recovery
- * - Proper cleanup and lifecycle management
- *
- * Wake word detection is handled entirely by VoiceRecognitionService.
- * This hook reacts to onWakeWordDetected callbacks and manages the
- * recording lifecycle — it does NOT do its own speech matching.
- *
- * Usage:
- * ```tsx
- * const wakeWord = useWakeWord({
- *   wakeWord: 'hey wade start recording',
- *   onWakeWordDetected: () => console.log('Wake word detected!'),
- *   onTranscript: (text) => console.log('Transcribed:', text),
- * });
- *
- * // Start listening
- * await wakeWord.startListening();
- *
- * // Stop
- * await wakeWord.stop();
- * ```
- */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
-import VoiceRecognitionService, {
-  RecognitionResult,
-  RecognitionError,
-  RecognitionState,
-} from '../services/VoiceRecognitionService';
 import AudioRecordingService, {
   RecordingResult,
   RecordingStopReason,
@@ -40,14 +8,83 @@ import AudioRecordingService, {
 import { WakeWordMatch } from '../utils/stringMatching';
 import { hasNativeModules } from '../utils/platformDetection';
 
+type SpeechResult = {
+  transcript: string;
+  confidence: number;
+};
+
+type SpeechResultEvent = {
+  isFinal: boolean;
+  results: SpeechResult[];
+};
+
+type SpeechErrorCode =
+  | 'aborted'
+  | 'audio-capture'
+  | 'busy'
+  | 'client'
+  | 'interrupted'
+  | 'language-not-supported'
+  | 'network'
+  | 'no-speech'
+  | 'not-allowed'
+  | 'service-not-allowed'
+  | 'speech-timeout'
+  | 'unknown';
+
+type SpeechErrorEvent = {
+  error: SpeechErrorCode;
+  message: string;
+  code?: number;
+};
+
+type SpeechPermission = {
+  granted: boolean;
+};
+
+type SpeechSubscription = {
+  remove: () => void;
+};
+
+type SpeechModule = {
+  start: (options: Record<string, unknown>) => void;
+  stop: () => void;
+  abort: () => void;
+  addListener: (
+    eventName: 'start' | 'result' | 'error' | 'end',
+    listener: (event: unknown) => void
+  ) => SpeechSubscription;
+  requestPermissionsAsync: () => Promise<SpeechPermission>;
+  isRecognitionAvailable: () => boolean;
+};
+
+async function resolveSpeechModule(): Promise<SpeechModule | null> {
+  try {
+    const speechPackage = (await import('expo-speech-recognition')) as {
+      ExpoSpeechRecognitionModule?: SpeechModule;
+    };
+    return speechPackage.ExpoSpeechRecognitionModule ?? null;
+  } catch (error) {
+    console.warn('[useWakeWord] expo-speech-recognition unavailable:', error);
+    return null;
+  }
+}
+
+export interface RecognitionError {
+  code?: string | number;
+  message?: string;
+  isRecoverable: boolean;
+  timestamp: number;
+}
+
 export type WakeWordState =
-  | 'idle' // Not active
-  | 'initializing' // Starting up
-  | 'listening' // Listening for wake word
-  | 'detected' // Wake word detected, transitioning
-  | 'recording' // Recording user's command/input
-  | 'processing' // Processing final results
-  | 'error'; // Error state
+  | 'idle'
+  | 'initializing'
+  | 'listening'
+  | 'detected'
+  | 'recording'
+  | 'processing'
+  | 'error';
 
 export interface WakeWordConfig {
   wakeWord: string;
@@ -65,19 +102,15 @@ export interface WakeWordConfig {
 }
 
 export interface WakeWordControls {
-  // Control methods
   startListening: () => Promise<boolean>;
   stop: () => Promise<void>;
+  stopAndRestart: () => Promise<boolean>;
   reset: () => void;
-
-  // State
   state: WakeWordState;
   isListening: boolean;
   isRecording: boolean;
   isAvailable: boolean;
   isAudioRecording: boolean;
-
-  // Results
   partialTranscript: string;
   finalTranscript: string;
   lastWakeWordMatch: WakeWordMatch | null;
@@ -90,22 +123,39 @@ export interface WakeWordControls {
     endedAt: number | null;
   };
   recordings: RecordingResult[];
-
-  // Debugging
   debugInfo: {
     consecutiveErrors: number;
     totalDetections: number;
     lastDetectionTime: number | null;
   };
+  voiceService: unknown | null;
+}
 
-  // Advanced features
-  voiceService: VoiceRecognitionService | null;
+const EXTERNAL_RECORDING_COOLDOWN_MS = 1200;
+const WAKE_WORD_COOLDOWN_MS = 2000;
+const RESTART_DELAY_MS = 350;
+const STOP_RESTART_DELAY_MS = 250;
+const RECOVERABLE_ERRORS = new Set<SpeechErrorCode>([
+  'aborted',
+  'audio-capture',
+  'busy',
+  'client',
+  'interrupted',
+  'no-speech',
+  'speech-timeout',
+]);
+
+function normalize(input: string): string {
+  return input.toLowerCase().trim();
+}
+
+function hasWakeWord(text: string, wakeWord: string): boolean {
+  return normalize(text).includes(normalize(wakeWord));
 }
 
 export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   const {
     wakeWord,
-    threshold = 0.85,
     locale = 'en-US',
     continuous = true,
     maxAlternatives = 5,
@@ -118,9 +168,6 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     recordingDurationMs = 20000,
   } = config;
 
-  const EXTERNAL_RECORDING_COOLDOWN_MS = 1200;
-
-  // State
   const [state, setState] = useState<WakeWordState>('idle');
   const [isAvailable, setIsAvailable] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
@@ -136,29 +183,48 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
     endedAt: null as number | null,
   });
   const [isAudioRecording, setIsAudioRecording] = useState(false);
-
-  // Debug state
   const [debugInfo, setDebugInfo] = useState({
     consecutiveErrors: 0,
     totalDetections: 0,
     lastDetectionTime: null as number | null,
   });
 
-  // Refs for stable references
-  const voiceService = useRef(VoiceRecognitionService.getInstance());
+  const speechModuleRef = useRef<SpeechModule | null>(null);
+  const subscriptionsRef = useRef<SpeechSubscription[]>([]);
+
   const audioService = useRef(AudioRecordingService.getInstance());
-  const isRecordingMode = useRef(false);
+  const isRecordingModeRef = useRef(false);
+  const ignoreResultsRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  const wakeWordDetectedRef = useRef(false);
+  const wakeWordCooldownUntilRef = useRef(0);
+
+  const onStateChangeRef = useRef(onStateChange);
+  const onWakeWordDetectedRef = useRef(onWakeWordDetected);
+  const onTranscriptRef = useRef(onTranscript);
+  const onErrorRef = useRef(onError);
+
   const transitionTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const recordingStartTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const recordingStopTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const ignoreResultsRef = useRef(false);
-  const onStateChangeRef = useRef(onStateChange);
+  const restartTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   useEffect(() => {
     onStateChangeRef.current = onStateChange;
   }, [onStateChange]);
 
-  // Update state with callback
+  useEffect(() => {
+    onWakeWordDetectedRef.current = onWakeWordDetected;
+  }, [onWakeWordDetected]);
+
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
   const updateState = useCallback((newState: WakeWordState) => {
     setState(newState);
     onStateChangeRef.current?.(newState);
@@ -173,6 +239,16 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       globalThis.clearTimeout(recordingStopTimeout.current);
       recordingStopTimeout.current = null;
     }
+    if (transitionTimeout.current) {
+      globalThis.clearTimeout(transitionTimeout.current);
+      transitionTimeout.current = null;
+    }
+  }, []);
+
+  const clearRestartTimer = useCallback(() => {
+    if (!restartTimeout.current) return;
+    globalThis.clearTimeout(restartTimeout.current);
+    restartTimeout.current = null;
   }, []);
 
   const stopAudioRecording = useCallback(
@@ -207,7 +283,7 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       } catch (error) {
         console.error('[useWakeWord] Failed to stop audio recording:', error);
       } finally {
-        isRecordingMode.current = false;
+        isRecordingModeRef.current = false;
         ignoreResultsRef.current = true;
         updateState('processing');
       }
@@ -235,10 +311,61 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       }
     } catch (error) {
       console.error('[useWakeWord] Failed to start audio recording:', error);
-      isRecordingMode.current = false;
+      isRecordingModeRef.current = false;
       updateState('error');
     }
   }, [recordingDurationMs, stopAudioRecording, updateState]);
+
+  const stopNativeRecognition = useCallback(() => {
+    const speechModule = speechModuleRef.current;
+    if (!speechModule) return;
+
+    try {
+      speechModule.stop();
+    } catch {
+      speechModule.abort();
+    }
+  }, []);
+
+  const startNativeRecognition = useCallback((): boolean => {
+    const speechModule = speechModuleRef.current;
+    if (!speechModule) {
+      return false;
+    }
+
+    try {
+      const startOptions = {
+        lang: locale,
+        interimResults: true,
+        continuous: true,
+        maxAlternatives,
+        iosTaskHint: 'dictation',
+      } as Record<string, unknown>;
+
+      if (Platform.OS === 'ios') {
+        startOptions.useApplicationAudioSession = false;
+      }
+
+      speechModule.start(startOptions);
+      return true;
+    } catch (error) {
+      console.error('[useWakeWord] Failed to start recognition:', error);
+      return false;
+    }
+  }, [locale, maxAlternatives]);
+
+  const scheduleRestart = useCallback(() => {
+    if (!shouldListenRef.current) {
+      return;
+    }
+
+    clearRestartTimer();
+    restartTimeout.current = globalThis.setTimeout(() => {
+      restartTimeout.current = null;
+      if (!shouldListenRef.current) return;
+      startNativeRecognition();
+    }, RESTART_DELAY_MS);
+  }, [clearRestartTimer, startNativeRecognition]);
 
   const triggerWakeWordFlow = useCallback(
     (match: WakeWordMatch) => {
@@ -250,14 +377,13 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
       }));
 
       updateState('detected');
-      onWakeWordDetected?.(match);
+      onWakeWordDetectedRef.current?.(match);
       setPartialTranscript('');
       setFinalTranscript('');
       clearRecordingTimers();
 
       if (recordingDurationMs <= 0) {
-        // External recording mode
-        isRecordingMode.current = false;
+        isRecordingModeRef.current = false;
         ignoreResultsRef.current = true;
 
         const cooldownMs = Math.max(recordingDelayMs, EXTERNAL_RECORDING_COOLDOWN_MS);
@@ -269,157 +395,139 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
         return;
       }
 
-      isRecordingMode.current = true;
+      isRecordingModeRef.current = true;
       ignoreResultsRef.current = false;
 
       transitionTimeout.current = globalThis.setTimeout(() => {
-        updateState('recording');
         transitionTimeout.current = null;
+        updateState('recording');
       }, recordingDelayMs);
 
       recordingStartTimeout.current = globalThis.setTimeout(() => {
-        void startAudioRecording();
         recordingStartTimeout.current = null;
+        void startAudioRecording();
       }, recordingDelayMs);
     },
-    [
-      clearRecordingTimers,
-      onWakeWordDetected,
-      recordingDelayMs,
-      recordingDurationMs,
-      startAudioRecording,
-      updateState,
-    ]
+    [clearRecordingTimers, recordingDelayMs, recordingDurationMs, startAudioRecording, updateState]
   );
 
-  // Called by VoiceRecognitionService when wake word is confirmed.
-  // This is the single entry point for wake word detection — the hook
-  // does NOT do its own speech matching.
-  const handleWakeWordDetected = useCallback(() => {
-    console.log('[useWakeWord] Wake word confirmed by service');
-    const match: WakeWordMatch = {
-      isMatch: true,
-      confidence: 1,
-      stage: 'full',
-    };
-    triggerWakeWordFlow(match);
-  }, [triggerWakeWordFlow]);
-
-  // Handle final recognition results — command transcription only.
-  // Wake word detection has already been handled by the service.
-  const handleResults = useCallback(
-    (results: RecognitionResult[]) => {
-      if (results.length === 0) return;
+  const handleResultEvent = useCallback(
+    (event: SpeechResultEvent) => {
       if (ignoreResultsRef.current) return;
+      if (!event.results.length) return;
 
-      const text = results[0].text;
-      console.log(`[useWakeWord] Command result: "${text}"`);
+      const text = event.results[0]?.transcript ?? '';
+      if (!text) return;
 
-      if (isRecordingMode.current) {
+      if (!wakeWordDetectedRef.current) {
+        if (hasWakeWord(text, wakeWord)) {
+          const now = Date.now();
+          if (now < wakeWordCooldownUntilRef.current) {
+            return;
+          }
+
+          wakeWordDetectedRef.current = true;
+          wakeWordCooldownUntilRef.current = now + WAKE_WORD_COOLDOWN_MS;
+
+          const match: WakeWordMatch = {
+            isMatch: true,
+            confidence: 1,
+            stage: 'full',
+          };
+          triggerWakeWordFlow(match);
+        }
+        return;
+      }
+
+      if (event.isFinal) {
+        wakeWordDetectedRef.current = false;
+      }
+
+      if (!isRecordingModeRef.current) {
+        return;
+      }
+
+      if (event.isFinal) {
         setFinalTranscript(text);
-        onTranscript?.(text, true);
-
+        onTranscriptRef.current?.(text, true);
         if (!continuous) {
           updateState('processing');
-          voiceService.current.stop();
+          shouldListenRef.current = false;
+          stopNativeRecognition();
         }
+      } else {
+        setPartialTranscript(text);
+        onTranscriptRef.current?.(text, false);
       }
-      // No wake word check here — the service handles that before onResults fires
     },
-    [continuous, onTranscript, updateState]
+    [continuous, stopNativeRecognition, triggerWakeWordFlow, updateState, wakeWord]
   );
 
-  // Handle partial results — transcription only, no wake word matching.
-  const handlePartialResults = useCallback(
-    (results: RecognitionResult[]) => {
-      if (results.length === 0) return;
-      if (ignoreResultsRef.current) return;
-      if (!isRecordingMode.current) return; // no partials during wake word listening phase
+  const handleErrorEvent = useCallback(
+    (event: SpeechErrorEvent) => {
+      const isRecoverable = RECOVERABLE_ERRORS.has(event.error);
+      const error: RecognitionError = {
+        code: event.error,
+        message: event.message,
+        isRecoverable,
+        timestamp: Date.now(),
+      };
 
-      const text = results[0].text;
-      setPartialTranscript(text);
-      onTranscript?.(text, false);
-    },
-    [onTranscript]
-  );
-
-  // Handle errors
-  const handleError = useCallback(
-    (error: RecognitionError) => {
-      // Ignore "no speech detected" timeout - this is a normal part of continuous listening
-      if (error.code === 'recognition_fail' && error.message?.includes('No speech detected')) {
-        return;
-      }
-
-      if (error.isRecoverable) {
-        if (isRecordingMode.current) {
-          isRecordingMode.current = false;
+      if (isRecoverable) {
+        if (isRecordingModeRef.current) {
+          isRecordingModeRef.current = false;
           updateState('listening');
+        }
+        if (shouldListenRef.current) {
+          scheduleRestart();
         }
         return;
       }
-
-      // FIXED: Don't log "No speech detected" errors - these are normal during silent periods
-      const isNoSpeechError =
-        error.message?.includes('1110') ||
-        error.message?.toLowerCase().includes('no speech detected');
-
-      if (isNoSpeechError) {
-        // Treat as recoverable even if marked otherwise
-        if (isRecordingMode.current) {
-          isRecordingMode.current = false;
-          updateState('listening');
-        }
-        return;
-      }
-
-      console.error('[useWakeWord] Error:', error);
 
       setLastError(error);
-      onError?.(error);
-
       setDebugInfo((prev) => ({
         ...prev,
         consecutiveErrors: prev.consecutiveErrors + 1,
       }));
-
+      onErrorRef.current?.(error);
       updateState('error');
     },
-    [onError, updateState]
+    [scheduleRestart, updateState]
   );
 
-  // Handle state changes from service
-  const handleServiceStateChange = useCallback(
-    (serviceState: RecognitionState) => {
-      switch (serviceState) {
-        case 'idle':
-          if (state !== 'idle') {
-            updateState('idle');
-          }
-          break;
-        case 'initializing':
-          updateState('initializing');
-          break;
-        case 'listening':
-          if (!isRecordingMode.current) {
-            if (!ignoreResultsRef.current) {
-              updateState('listening');
-            }
-          }
-          break;
-        case 'error':
-          updateState('error');
-          break;
-      }
-    },
-    [state, updateState]
-  );
-
-  // Initialize service
   useEffect(() => {
-    const recognitionService = voiceService.current;
-    const recordingService = audioService.current;
+    const speechModule = speechModuleRef.current;
+    if (!isAvailable || !speechModule) return;
 
+    subscriptionsRef.current.forEach((subscription) => subscription.remove());
+    subscriptionsRef.current = [
+      speechModule.addListener('start', () => {
+        if (!shouldListenRef.current) return;
+        if (isRecordingModeRef.current || ignoreResultsRef.current) return;
+        updateState('listening');
+      }),
+      speechModule.addListener('result', (event) => {
+        handleResultEvent(event as SpeechResultEvent);
+      }),
+      speechModule.addListener('error', (event) => {
+        handleErrorEvent(event as SpeechErrorEvent);
+      }),
+      speechModule.addListener('end', () => {
+        if (!shouldListenRef.current) {
+          updateState('idle');
+          return;
+        }
+        scheduleRestart();
+      }),
+    ];
+
+    return () => {
+      subscriptionsRef.current.forEach((subscription) => subscription.remove());
+      subscriptionsRef.current = [];
+    };
+  }, [handleErrorEvent, handleResultEvent, isAvailable, scheduleRestart, updateState]);
+
+  useEffect(() => {
     const init = async () => {
       if (!hasNativeModules()) {
         setIsAvailable(false);
@@ -427,113 +535,120 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
         return;
       }
 
-      const success = await recognitionService.initialize({
-        locale,
-        continuous: true,
-        maxAlternatives,
-        returnPartialResults: true,
-        wakeWord,
-        wakeWordThreshold: threshold,
-      });
+      const speechModule = await resolveSpeechModule();
+      speechModuleRef.current = speechModule;
 
-      setIsAvailable(success);
-
-      if (!success) {
-        updateState('error');
+      if (!speechModule || !speechModule.isRecognitionAvailable()) {
+        setIsAvailable(false);
+        updateState('idle');
+        return;
       }
+
+      setIsAvailable(true);
+      updateState('idle');
     };
 
     void init();
 
     return () => {
-      if (recognitionService.isListening()) {
-        recognitionService.stop();
-      }
-      if (transitionTimeout.current) {
-        globalThis.clearTimeout(transitionTimeout.current);
-      }
+      shouldListenRef.current = false;
       clearRecordingTimers();
-      if (recordingService.isRecording()) {
-        recordingService.stopRecording('manual').catch(() => {
-          /* noop */
-        });
+      clearRestartTimer();
+      stopNativeRecognition();
+      subscriptionsRef.current.forEach((subscription) => subscription.remove());
+      subscriptionsRef.current = [];
+      if (audioService.current.isRecording()) {
+        audioService.current.stopRecording('manual').catch(() => undefined);
       }
     };
-  }, [locale, maxAlternatives, wakeWord, threshold, clearRecordingTimers, updateState]);
+  }, [clearRecordingTimers, clearRestartTimer, stopNativeRecognition, updateState]);
 
-  // Start listening for wake word
   const startListening = useCallback(async (): Promise<boolean> => {
-    if (!isAvailable) {
-      console.error('[useWakeWord] Voice recognition not available');
+    const speechModule = speechModuleRef.current;
+    if (!isAvailable || !speechModule) {
       return false;
     }
 
-    // Reset state
-    isRecordingMode.current = false;
-    setPartialTranscript('');
-    setFinalTranscript('');
-    setLastError(null);
-    setDebugInfo((prev) => ({ ...prev, consecutiveErrors: 0 }));
-    ignoreResultsRef.current = false;
-
-    if (transitionTimeout.current) {
-      globalThis.clearTimeout(transitionTimeout.current);
-      transitionTimeout.current = null;
+    const permission = await speechModule.requestPermissionsAsync();
+    if (!permission.granted) {
+      const deniedError: RecognitionError = {
+        code: 'not-allowed',
+        message: 'Microphone or speech recognition permission denied',
+        isRecoverable: false,
+        timestamp: Date.now(),
+      };
+      setLastError(deniedError);
+      onErrorRef.current?.(deniedError);
+      updateState('error');
+      return false;
     }
+
     clearRecordingTimers();
+    clearRestartTimer();
 
     if (audioService.current.isRecording()) {
       await audioService.current.stopRecording('manual');
     }
     setIsAudioRecording(false);
 
+    isRecordingModeRef.current = false;
+    ignoreResultsRef.current = false;
+    shouldListenRef.current = true;
+    wakeWordDetectedRef.current = false;
+    wakeWordCooldownUntilRef.current = 0;
+
+    setPartialTranscript('');
+    setFinalTranscript('');
+    setLastError(null);
+    setDebugInfo((prev) => ({ ...prev, consecutiveErrors: 0 }));
     updateState('initializing');
 
-    const success = await voiceService.current.start({
-      onResults: handleResults,
-      onPartialResults: handlePartialResults,
-      onError: handleError,
-      onStateChange: handleServiceStateChange,
-      onWakeWordDetected: handleWakeWordDetected,
-    });
-
-    if (success) {
-      updateState('listening');
-    } else {
+    const started = startNativeRecognition();
+    if (!started) {
+      shouldListenRef.current = false;
       updateState('error');
+      return false;
     }
 
-    return success;
-  }, [
-    isAvailable,
-    handleResults,
-    handlePartialResults,
-    handleError,
-    handleServiceStateChange,
-    handleWakeWordDetected,
-    updateState,
-    clearRecordingTimers,
-  ]);
+    updateState('listening');
+    return true;
+  }, [clearRecordingTimers, clearRestartTimer, isAvailable, startNativeRecognition, updateState]);
 
-  // Stop listening
   const stop = useCallback(async () => {
-    if (transitionTimeout.current) {
-      globalThis.clearTimeout(transitionTimeout.current);
-      transitionTimeout.current = null;
-    }
-
+    shouldListenRef.current = false;
+    wakeWordDetectedRef.current = false;
+    wakeWordCooldownUntilRef.current = 0;
     clearRecordingTimers();
+    clearRestartTimer();
+
     if (audioService.current.isRecording()) {
       await stopAudioRecording('manual');
     }
-    isRecordingMode.current = false;
-    await voiceService.current.stop();
-    updateState('idle');
-  }, [clearRecordingTimers, stopAudioRecording, updateState]);
+    isRecordingModeRef.current = false;
+    ignoreResultsRef.current = true;
 
-  // Reset to initial state
+    stopNativeRecognition();
+    updateState('idle');
+  }, [
+    clearRecordingTimers,
+    clearRestartTimer,
+    stopAudioRecording,
+    stopNativeRecognition,
+    updateState,
+  ]);
+
+  const stopAndRestart = useCallback(async (): Promise<boolean> => {
+    await stop();
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, STOP_RESTART_DELAY_MS);
+    });
+    return startListening();
+  }, [startListening, stop]);
+
   const reset = useCallback(() => {
-    isRecordingMode.current = false;
+    isRecordingModeRef.current = false;
+    wakeWordDetectedRef.current = false;
+    wakeWordCooldownUntilRef.current = 0;
     setPartialTranscript('');
     setFinalTranscript('');
     setLastWakeWordMatch(null);
@@ -546,30 +661,22 @@ export function useWakeWord(config: WakeWordConfig): WakeWordControls {
   }, []);
 
   return {
-    // Control methods
     startListening,
     stop,
+    stopAndRestart,
     reset,
-
-    // State
     state,
     isListening: state === 'listening' || state === 'detected',
     isRecording: state === 'recording' || state === 'processing',
     isAvailable,
     isAudioRecording,
-
-    // Results
     partialTranscript,
     finalTranscript,
     lastWakeWordMatch,
     lastError,
     recording: currentRecording,
     recordings,
-
-    // Debugging
     debugInfo,
-
-    // Voice service instance for advanced features
-    voiceService: voiceService.current,
+    voiceService: null,
   };
 }

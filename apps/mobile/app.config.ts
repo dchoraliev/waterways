@@ -89,7 +89,21 @@ export default {
       favicon: './assets/favicon.png',
     },
 
-    plugins: ['expo-router', 'expo-notifications', './plugins/withAndroidCompatibility.js'],
+    plugins: [
+      'expo-router',
+      'expo-notifications',
+      [
+        'expo-speech-recognition',
+        {
+          microphonePermission:
+            'Waterways needs microphone access to listen for your wake phrase and record observations.',
+          speechRecognitionPermission:
+            'Waterways needs speech recognition to detect your wake phrase and transcribe voice input.',
+          androidSpeechServicePackages: ['com.google.android.googlequicksearchbox'],
+        },
+      ],
+      './plugins/withAndroidCompatibility.js',
+    ],
 
     experiments: {
       autolinkingModuleResolution: true,
