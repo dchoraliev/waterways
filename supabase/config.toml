@@ -146,3 +146,6 @@ backend = "postgres"
 # Configures Postgres Core extensions that are packaged with the CLI.
 # https://github.com/supabase/postgres-extensions
 # enable_core_extensions = ["hypopg", "index_advisor"]
+
+[functions.send-daily-summary-emails]
+verify_jwt = false

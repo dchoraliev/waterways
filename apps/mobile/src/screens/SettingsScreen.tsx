@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Pressable,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Linking,
@@ -41,6 +41,12 @@ interface SettingsScreenProps {
   onSignOutSuccess: () => void;
 }
 
+type DailySummaryEmailSettingsResponse = {
+  dailySummary: boolean;
+  lastDailySummary: string | null;
+  updatedAt: string | null;
+};
+
 const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onNavigateToProjects,
   onSignOutSuccess,
@@ -61,6 +67,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
+  const [showEmailPreferencesDialog, setShowEmailPreferencesDialog] = useState(false);
 
   // Form state
   const [newEmail, setNewEmail] = useState('');
@@ -85,11 +92,95 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   // Toggles
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [dailySummaryEmailEnabled, setDailySummaryEmailEnabled] = useState(false);
+  const [dailySummaryEmailSyncPending, setDailySummaryEmailSyncPending] = useState(false);
+  const [isUpdatingDailySummaryEmail, setIsUpdatingDailySummaryEmail] = useState(false);
   const [showNameOnMap, setShowNameOnMap] = useState(true);
+  const [showNameOnMapSyncPending, setShowNameOnMapSyncPending] = useState(false);
 
   const [isUpdatingShowNameOnMap, setIsUpdatingShowNameOnMap] = useState(false);
 
-  const loadUserProfile = async () => {
+  const persistDailySummaryLocally = useCallback(
+    async (value: boolean, syncPending: boolean): Promise<void> => {
+      await updateLocalSettings({
+        dailySummaryEmailEnabled: value,
+        dailySummaryEmailSyncPending: syncPending,
+      });
+      setDailySummaryEmailSyncPending(syncPending);
+    },
+    []
+  );
+
+  const persistShowNameOnMapLocally = useCallback(
+    async (value: boolean, syncPending: boolean): Promise<void> => {
+      await updateLocalSettings({
+        showNameOnMap: value,
+        showNameOnMapSyncPending: syncPending,
+      });
+      setShowNameOnMapSyncPending(syncPending);
+    },
+    []
+  );
+
+  const syncPendingDailySummaryEmailSetting = useCallback(async (): Promise<void> => {
+    try {
+      const localSettings = await getLocalSettings();
+
+      if (!localSettings.dailySummaryEmailSyncPending) {
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke<DailySummaryEmailSettingsResponse>(
+        'daily-summary-email-settings',
+        {
+          body: {
+            action: 'set',
+            dailySummary: localSettings.dailySummaryEmailEnabled,
+          },
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        setDailySummaryEmailEnabled(data.dailySummary);
+        await persistDailySummaryLocally(data.dailySummary, false);
+      }
+    } catch (error) {
+      console.warn('Failed to sync pending daily summary setting:', error);
+    }
+  }, [persistDailySummaryLocally]);
+
+  const syncPendingShowNameOnMapSetting = useCallback(
+    async (userId: string): Promise<void> => {
+      try {
+        const localSettings = await getLocalSettings();
+
+        if (!localSettings.showNameOnMapSyncPending) {
+          return;
+        }
+
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ share_name_on_map: localSettings.showNameOnMap })
+          .eq('id', userId);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        setShowNameOnMap(localSettings.showNameOnMap);
+        await persistShowNameOnMapLocally(localSettings.showNameOnMap, false);
+      } catch (error) {
+        console.warn('Failed to sync pending show name on map setting:', error);
+      }
+    },
+    [persistShowNameOnMapLocally]
+  );
+
+  const loadUserProfile = useCallback(async () => {
     const {
       data: { session },
       error,
@@ -103,10 +194,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
     const user = session?.user;
     const email = user?.email ?? null;
+    const localSettingsAtLoad = await getLocalSettings().catch(() => null);
+    const hadPendingShowNameOnMapSync = localSettingsAtLoad?.showNameOnMapSyncPending ?? false;
 
     let firstNameFromDb: string | null = null;
     let lastNameFromDb: string | null = null;
-    let showNameOnMapFromDb = true;
+    let showNameOnMapFromDb: boolean | null = null;
 
     if (user) {
       const { data: dbUser, error: dbUserError } = await supabase
@@ -140,30 +233,63 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         email,
         name: nameFromMeta ? String(nameFromMeta) : 'User',
       });
-      setShowNameOnMap(showNameOnMapFromDb);
+
+      await syncPendingShowNameOnMapSetting(user.id);
+
+      if (showNameOnMapFromDb !== null && !hadPendingShowNameOnMapSync) {
+        setShowNameOnMap(showNameOnMapFromDb);
+        await persistShowNameOnMapLocally(showNameOnMapFromDb, false);
+      }
+
+      await syncPendingDailySummaryEmailSetting();
+
+      const { data: emailSettingsData, error: emailSettingsError } =
+        await supabase.functions.invoke<DailySummaryEmailSettingsResponse>(
+          'daily-summary-email-settings',
+          {
+            body: { action: 'get' },
+          }
+        );
+
+      if (emailSettingsError) {
+        console.warn('Failed to load daily summary email setting:', emailSettingsError.message);
+      } else if (emailSettingsData) {
+        setDailySummaryEmailEnabled(emailSettingsData.dailySummary);
+        await persistDailySummaryLocally(emailSettingsData.dailySummary, false);
+      }
     } else {
       setUserProfile(null);
       setShowNameOnMap(true);
     }
-  };
+  }, [
+    persistDailySummaryLocally,
+    persistShowNameOnMapLocally,
+    syncPendingDailySummaryEmailSetting,
+    syncPendingShowNameOnMapSetting,
+  ]);
 
-  const loadLocalSettings = async () => {
+  const loadLocalSettings = useCallback(async () => {
     try {
       const localSettings = await getLocalSettings();
       setNotificationsEnabled(localSettings.notificationsEnabled);
+      setDailySummaryEmailEnabled(localSettings.dailySummaryEmailEnabled);
+      setDailySummaryEmailSyncPending(localSettings.dailySummaryEmailSyncPending);
+      setShowNameOnMap(localSettings.showNameOnMap);
+      setShowNameOnMapSyncPending(localSettings.showNameOnMapSyncPending);
     } catch (error) {
       console.warn('Failed to load local settings:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const loadAll = async () => {
       setIsInitialLoading(true);
-      await Promise.all([loadUserProfile(), loadLocalSettings()]);
+      await loadLocalSettings();
+      await loadUserProfile();
       setIsInitialLoading(false);
     };
-    loadAll();
-  }, []);
+    void loadAll();
+  }, [loadLocalSettings, loadUserProfile]);
 
   const handleDarkModeToggle = async (value: boolean) => {
     await setMode(value ? 'dark' : 'light');
@@ -177,6 +303,40 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       await updateLocalSettings({ notificationsEnabled: nextNotificationsEnabled });
     } catch (error) {
       console.warn('Failed to persist notifications setting:', error);
+    }
+  };
+
+  const handleDailySummaryEmailToggle = async (value: boolean) => {
+    if (isUpdatingDailySummaryEmail) return;
+
+    setDailySummaryEmailEnabled(value);
+    setIsUpdatingDailySummaryEmail(true);
+
+    try {
+      await persistDailySummaryLocally(value, true);
+
+      const { data, error } = await supabase.functions.invoke<DailySummaryEmailSettingsResponse>(
+        'daily-summary-email-settings',
+        {
+          body: {
+            action: 'set',
+            dailySummary: value,
+          },
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        setDailySummaryEmailEnabled(data.dailySummary);
+        await persistDailySummaryLocally(data.dailySummary, false);
+      }
+    } catch (error: unknown) {
+      console.warn('Daily summary setting queued for sync:', error);
+    } finally {
+      setIsUpdatingDailySummaryEmail(false);
     }
   };
 
@@ -211,6 +371,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleMyProjects = () => {
     onNavigateToProjects?.();
+  };
+
+  const handleReturnToLogin = () => {
+    router.replace(ROUTES.login);
+  };
+
+  const resetEmailDialog = () => {
+    setShowEmailDialog(false);
+    setNewEmail('');
+    setConfirmEmail('');
+    setEmailPassword('');
+    setEmailError('');
   };
 
   const resetDeleteDialog = () => {
@@ -513,21 +685,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   const performShowNameOnMapUpdate = async (value: boolean) => {
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError || !session?.user) {
-      Alert.alert('Error', 'Unable to update setting right now. Please try again.');
-      return;
-    }
-
-    const previousValue = showNameOnMap;
     setShowNameOnMap(value);
     setIsUpdatingShowNameOnMap(true);
 
     try {
+      await persistShowNameOnMapLocally(value, true);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        throw sessionError ?? new Error('No active session');
+      }
+
       const { error: updateError } = await supabase
         .from('users')
         .update({ share_name_on_map: value })
@@ -536,11 +708,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       if (updateError) {
         throw updateError;
       }
+
+      await persistShowNameOnMapLocally(value, false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unable to save this setting.';
-      console.error('Error updating share_name_on_map:', error);
-      setShowNameOnMap(previousValue);
-      Alert.alert('Update failed', message);
+      console.warn('Show name on map setting queued for sync:', error);
     } finally {
       setIsUpdatingShowNameOnMap(false);
     }
@@ -590,6 +761,26 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={styles.title}>Settings</Text>
             <Text style={styles.subtitle}>Manage your WaDE preferences and data.</Text>
           </View>
+
+          {!userProfile && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Account</Text>
+              <View style={styles.cardBody}>
+                <Text style={styles.metaValue}>
+                  You are currently using the app without logging in.
+                </Text>
+                <View style={{ height: 12 }} />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.button, styles.buttonPrimary]}
+                  onPress={handleReturnToLogin}
+                >
+                  <Ionicons name="log-in-outline" size={18} color="#FFFFFF" />
+                  <Text style={[styles.buttonText, styles.buttonTextSolid]}>Return to Login</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Profile */}
           {userProfile && (
@@ -722,9 +913,40 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
           </View>
 
+          {/* Email */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Email</Text>
+            <View style={styles.cardBody}>
+              <Pressable
+                onPress={() => setShowEmailPreferencesDialog(true)}
+                style={({ pressed }) => [styles.navRow, pressed && styles.pressed]}
+              >
+                <View style={styles.navLeft}>
+                  <Ionicons name="mail-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.navLabel}>Customize email messages</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={tokens.mutedText} />
+              </Pressable>
+            </View>
+          </View>
+
           {/* Display */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Display</Text>
+            <View style={styles.cardBody}>
+              <View style={styles.switchRow}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="moon-outline" size={20} color={tokens.primary} />
+                  <Text style={styles.rowLabel}>Dark mode</Text>
+                </View>
+                <Switch value={mode === 'dark'} onValueChange={handleDarkModeToggle} />
+              </View>
+            </View>
+          </View>
+
+          {/* Privacy */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Privacy</Text>
             <View style={styles.cardBody}>
               <View style={styles.switchRow}>
                 <View style={styles.rowLeft}>
@@ -737,13 +959,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   disabled={isUpdatingShowNameOnMap}
                 />
               </View>
-              <View style={styles.switchRow}>
-                <View style={styles.rowLeft}>
-                  <Ionicons name="moon-outline" size={20} color={tokens.primary} />
-                  <Text style={styles.rowLabel}>Dark mode</Text>
-                </View>
-                <Switch value={mode === 'dark'} onValueChange={handleDarkModeToggle} />
-              </View>
+              {showNameOnMapSyncPending && (
+                <Text style={[styles.metaValue, { marginTop: 8 }]}>
+                  Saved offline. This setting will sync when you are back online.
+                </Text>
+              )}
             </View>
           </View>
 
@@ -773,7 +993,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         visible={showEmailDialog}
         title="Change Email Address"
         description="Update your email address. You'll need to enter your current password to confirm."
-        onClose={() => setShowEmailDialog(false)}
+        onClose={resetEmailDialog}
         styles={styles}
         useKeyboardAvoidingView
       >
@@ -814,7 +1034,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <TouchableOpacity
             activeOpacity={0.85}
             style={[styles.button, styles.buttonOutline]}
-            onPress={() => setShowEmailDialog(false)}
+            onPress={resetEmailDialog}
           >
             <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
           </TouchableOpacity>
@@ -971,6 +1191,37 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </TouchableOpacity>
         </View>
       </SheetModal>
+
+      {/* Email Modal */}
+      <SheetModal
+        visible={showEmailPreferencesDialog}
+        title="Email Settings"
+        description={
+          dailySummaryEmailSyncPending
+            ? 'Manage your email message preferences. Daily Summary is saved locally and will sync when online.'
+            : 'Manage your email message preferences. More options will be available soon.'
+        }
+        onClose={() => setShowEmailPreferencesDialog(false)}
+        styles={styles}
+      >
+        <View style={styles.switchRow}>
+          <Text style={styles.fieldLabel}>Daily Summary</Text>
+          <Switch
+            value={dailySummaryEmailEnabled}
+            onValueChange={handleDailySummaryEmailToggle}
+            disabled={isUpdatingDailySummaryEmail}
+          />
+        </View>
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[styles.button, styles.buttonPrimary, { alignSelf: 'flex-end' }]}
+            onPress={() => setShowEmailPreferencesDialog(false)}
+          >
+            <Text style={[styles.buttonText, styles.buttonTextSolid]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </SheetModal>
     </SafeAreaView>
   );
 };
@@ -1021,31 +1272,70 @@ function SheetModal({
   styles: SettingsStyles;
   useKeyboardAvoidingView?: boolean;
 }) {
-  const content = (
-    <>
-      <View style={styles.sheetHeader}>
-        <Text style={styles.sheetTitle}>{title}</Text>
-        {!!description && <Text style={styles.sheetDesc}>{description}</Text>}
-      </View>
-      <View style={styles.sheetBody}>{children}</View>
-    </>
-  );
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const formScrollRef = useRef<ScrollView | null>(null);
+
+  useEffect(() => {
+    if (!visible || !useKeyboardAvoidingView) {
+      return;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates?.height ?? 0);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+      // Reset any in-sheet scroll offset so the modal snaps back to its original closed layout.
+      globalThis.setTimeout(() => {
+        formScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+      }, 0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [visible, useKeyboardAvoidingView]);
+
+  const isKeyboardVisible = keyboardHeight > 0;
+  const keyboardShift = isKeyboardVisible ? Math.min(Math.round(keyboardHeight * 0.6), 240) : 0;
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheetWrap}>
-        {useKeyboardAvoidingView ? (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.sheet}
-          >
-            {content}
-          </KeyboardAvoidingView>
-        ) : (
-          <View style={styles.sheet}>{content}</View>
-        )}
-      </View>
+      {useKeyboardAvoidingView ? (
+        <View style={[styles.sheetWrap, { paddingBottom: keyboardShift }]}>
+          <View style={[styles.sheet, isKeyboardVisible && { maxHeight: '86%' }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{title}</Text>
+              {!!description && <Text style={styles.sheetDesc}>{description}</Text>}
+            </View>
+            <ScrollView
+              ref={formScrollRef}
+              style={{ maxHeight: '100%' }}
+              contentContainerStyle={styles.sheetBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={isKeyboardVisible}
+            >
+              {children}
+            </ScrollView>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.sheetWrap}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{title}</Text>
+              {!!description && <Text style={styles.sheetDesc}>{description}</Text>}
+            </View>
+            <View style={styles.sheetBody}>{children}</View>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -1077,80 +1367,118 @@ function DeletePasswordModal({
   styles: SettingsStyles;
   tokens: SettingsTokens;
 }) {
-  const modalContent = (
-    <View style={styles.confirmBox}>
-      <Text style={styles.sheetTitle}>Delete Account</Text>
-      <View style={{ height: 8 }} />
-      <Text style={styles.sheetDesc}>
-        {hasRequestedReauth
-          ? 'Enter the reauthentication code we emailed you to permanently delete your account and all related data.'
-          : 'Enter your password to receive a reauthentication code by email before deletion.'}
-      </Text>
-      <View style={{ height: 12 }} />
-      <TextInput
-        value={password}
-        onChangeText={onPasswordChange}
-        placeholder="Enter your password"
-        placeholderTextColor={tokens.placeholder}
-        secureTextEntry
-        style={styles.input}
-        autoCapitalize="none"
-        editable={!isSubmitting && !hasRequestedReauth}
-      />
-      {hasRequestedReauth && (
-        <>
-          <View style={{ height: 10 }} />
-          <TextInput
-            value={reauthCode}
-            onChangeText={onReauthCodeChange}
-            placeholder="Enter reauthentication code"
-            placeholderTextColor={tokens.placeholder}
-            style={styles.input}
-            autoCapitalize="none"
-            keyboardType="number-pad"
-            editable={!isSubmitting}
-          />
-        </>
-      )}
-      {!!passwordError && (
-        <View style={{ marginTop: 8 }}>
-          <ErrorBox message={passwordError} styles={styles} />
-        </View>
-      )}
-      <View style={{ height: 16 }} />
-      <View style={styles.modalFooter}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.button, styles.buttonOutline]}
-          onPress={onCancel}
-          disabled={isSubmitting}
-        >
-          <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
-        </TouchableOpacity>
-        <View style={{ width: 12 }} />
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.button, styles.buttonDestructive]}
-          onPress={onConfirm}
-          disabled={isSubmitting}
-        >
-          <Text style={[styles.buttonText, styles.buttonTextSolid]}>
-            {isSubmitting
-              ? hasRequestedReauth
-                ? 'Deleting...'
-                : 'Sending code...'
-              : hasRequestedReauth
-                ? 'Confirm and Delete'
-                : 'Send Reauthentication Code'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const deleteScrollRef = useRef<ScrollView | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates?.height ?? 0);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+      globalThis.setTimeout(() => {
+        deleteScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+      }, 0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [visible]);
+
+  const isKeyboardVisible = keyboardHeight > 0;
+  const keyboardShift = isKeyboardVisible ? Math.min(Math.round(keyboardHeight * 0.6), 240) : 0;
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.backdropSolid}>{modalContent}</View>
+      <Pressable style={styles.backdrop} onPress={onCancel} />
+      <View style={[styles.sheetWrap, { paddingBottom: keyboardShift }]}>
+        <View style={[styles.sheet, isKeyboardVisible && { maxHeight: '86%' }]}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Delete Account</Text>
+            <Text style={styles.sheetDesc}>
+              {hasRequestedReauth
+                ? 'Enter the reauthentication code we emailed you to permanently delete your account and all related data.'
+                : 'Enter your password to receive a reauthentication code by email before deletion.'}
+            </Text>
+          </View>
+          <ScrollView
+            ref={deleteScrollRef}
+            style={{ maxHeight: '100%' }}
+            contentContainerStyle={styles.sheetBody}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={isKeyboardVisible}
+          >
+            <TextInput
+              value={password}
+              onChangeText={onPasswordChange}
+              placeholder="Enter your password"
+              placeholderTextColor={tokens.placeholder}
+              secureTextEntry
+              style={styles.input}
+              autoCapitalize="none"
+              editable={!isSubmitting && !hasRequestedReauth}
+            />
+            {hasRequestedReauth && (
+              <>
+                <View style={{ height: 10 }} />
+                <TextInput
+                  value={reauthCode}
+                  onChangeText={onReauthCodeChange}
+                  placeholder="Enter reauthentication code"
+                  placeholderTextColor={tokens.placeholder}
+                  style={styles.input}
+                  autoCapitalize="none"
+                  keyboardType="number-pad"
+                  editable={!isSubmitting}
+                />
+              </>
+            )}
+            {!!passwordError && (
+              <View style={{ marginTop: 8 }}>
+                <ErrorBox message={passwordError} styles={styles} />
+              </View>
+            )}
+            <View style={{ height: 16 }} />
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.button, styles.buttonOutline]}
+                onPress={onCancel}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.buttonText, styles.buttonTextOutline]}>Cancel</Text>
+              </TouchableOpacity>
+              <View style={{ width: 12 }} />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.button, styles.buttonDestructive]}
+                onPress={onConfirm}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.buttonText, styles.buttonTextSolid]}>
+                  {isSubmitting
+                    ? hasRequestedReauth
+                      ? 'Deleting...'
+                      : 'Sending code...'
+                    : hasRequestedReauth
+                      ? 'Confirm and Delete'
+                      : 'Send Reauthentication Code'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 }
