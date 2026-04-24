@@ -23,7 +23,7 @@ const TextInputField: React.FC<TextInputFieldProps> = ({
   style,
   ...inputProps
 }) => {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -63,6 +63,9 @@ const TextInputField: React.FC<TextInputFieldProps> = ({
       <TextInput
         style={[styles.input, style]}
         placeholderTextColor={colors.textMuted}
+        selectionColor={colors.textPrimary}
+        cursorColor={colors.textPrimary}
+        keyboardAppearance={mode === 'dark' ? 'dark' : 'light'}
         {...inputProps}
       />
 

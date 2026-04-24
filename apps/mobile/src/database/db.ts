@@ -158,6 +158,10 @@ export async function getDatabase() {
 export async function getLocalSettings(): Promise<{
   darkModeEnabled: boolean;
   notificationsEnabled: boolean;
+  dailySummaryEmailEnabled: boolean;
+  dailySummaryEmailSyncPending: boolean;
+  showNameOnMap: boolean;
+  showNameOnMapSyncPending: boolean;
 }> {
   const database = await getDatabase();
 
@@ -165,32 +169,120 @@ export async function getLocalSettings(): Promise<{
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY,
       dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
-      notifications_enabled INTEGER NOT NULL DEFAULT 1
+      notifications_enabled INTEGER NOT NULL DEFAULT 1,
+      daily_summary_email_enabled INTEGER NOT NULL DEFAULT 0,
+      daily_summary_email_sync_pending INTEGER NOT NULL DEFAULT 0,
+      show_name_on_map INTEGER NOT NULL DEFAULT 1,
+      show_name_on_map_sync_pending INTEGER NOT NULL DEFAULT 0
     );
   `);
 
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN daily_summary_email_enabled INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN daily_summary_email_sync_pending INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN show_name_on_map INTEGER NOT NULL DEFAULT 1;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN show_name_on_map_sync_pending INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
   await database!.runAsync(
-    `INSERT OR IGNORE INTO settings (id, dark_mode_enabled, notifications_enabled)
-     VALUES (?, ?, ?)`,
-    [LOCAL_SETTINGS_ID, 1, 1]
+    `INSERT OR IGNORE INTO settings (
+      id,
+      dark_mode_enabled,
+      notifications_enabled,
+      daily_summary_email_enabled,
+      daily_summary_email_sync_pending,
+      show_name_on_map,
+      show_name_on_map_sync_pending
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [LOCAL_SETTINGS_ID, 1, 1, 0, 0, 1, 0]
   );
 
   const rows = await database!.getAllAsync<{
     dark_mode_enabled: number;
     notifications_enabled: number;
-  }>(`SELECT dark_mode_enabled, notifications_enabled FROM settings WHERE id = ? LIMIT 1`, [
-    LOCAL_SETTINGS_ID,
-  ]);
+    daily_summary_email_enabled: number;
+    daily_summary_email_sync_pending: number;
+    show_name_on_map: number;
+    show_name_on_map_sync_pending: number;
+  }>(
+    `SELECT
+      dark_mode_enabled,
+      notifications_enabled,
+      daily_summary_email_enabled,
+      daily_summary_email_sync_pending,
+      show_name_on_map,
+      show_name_on_map_sync_pending
+    FROM settings
+    WHERE id = ?
+    LIMIT 1`,
+    [LOCAL_SETTINGS_ID]
+  );
 
-  const row = rows[0] ?? { dark_mode_enabled: 1, notifications_enabled: 1 };
+  const row = rows[0] ?? {
+    dark_mode_enabled: 1,
+    notifications_enabled: 1,
+    daily_summary_email_enabled: 0,
+    daily_summary_email_sync_pending: 0,
+    show_name_on_map: 1,
+    show_name_on_map_sync_pending: 0,
+  };
+
   return {
     darkModeEnabled: row.dark_mode_enabled === 1,
     notificationsEnabled: row.notifications_enabled === 1,
+    dailySummaryEmailEnabled: row.daily_summary_email_enabled === 1,
+    dailySummaryEmailSyncPending: row.daily_summary_email_sync_pending === 1,
+    showNameOnMap: row.show_name_on_map === 1,
+    showNameOnMapSyncPending: row.show_name_on_map_sync_pending === 1,
   };
 }
 
 export async function updateLocalSettings(
-  updates: Partial<{ darkModeEnabled: boolean; notificationsEnabled: boolean }>
+  updates: Partial<{
+    darkModeEnabled: boolean;
+    notificationsEnabled: boolean;
+    dailySummaryEmailEnabled: boolean;
+    dailySummaryEmailSyncPending: boolean;
+    showNameOnMap: boolean;
+    showNameOnMapSyncPending: boolean;
+  }>
 ): Promise<void> {
   const database = await getDatabase();
 
@@ -198,14 +290,69 @@ export async function updateLocalSettings(
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY,
       dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
-      notifications_enabled INTEGER NOT NULL DEFAULT 1
+      notifications_enabled INTEGER NOT NULL DEFAULT 1,
+      daily_summary_email_enabled INTEGER NOT NULL DEFAULT 0,
+      daily_summary_email_sync_pending INTEGER NOT NULL DEFAULT 0,
+      show_name_on_map INTEGER NOT NULL DEFAULT 1,
+      show_name_on_map_sync_pending INTEGER NOT NULL DEFAULT 0
     );
   `);
 
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN daily_summary_email_enabled INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN daily_summary_email_sync_pending INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN show_name_on_map INTEGER NOT NULL DEFAULT 1;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
+  await database!
+    .execAsync(
+      `
+    ALTER TABLE settings
+    ADD COLUMN show_name_on_map_sync_pending INTEGER NOT NULL DEFAULT 0;
+  `
+    )
+    .catch(() => {
+      // Column may already exist on upgraded databases.
+    });
+
   await database!.runAsync(
-    `INSERT OR IGNORE INTO settings (id, dark_mode_enabled, notifications_enabled)
-     VALUES (?, ?, ?)`,
-    [LOCAL_SETTINGS_ID, 1, 1]
+    `INSERT OR IGNORE INTO settings (
+      id,
+      dark_mode_enabled,
+      notifications_enabled,
+      daily_summary_email_enabled,
+      daily_summary_email_sync_pending,
+      show_name_on_map,
+      show_name_on_map_sync_pending
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [LOCAL_SETTINGS_ID, 1, 1, 0, 0, 1, 0]
   );
 
   const setParts: string[] = [];
@@ -219,6 +366,26 @@ export async function updateLocalSettings(
   if (updates.notificationsEnabled !== undefined) {
     setParts.push('notifications_enabled = ?');
     params.push(updates.notificationsEnabled ? 1 : 0);
+  }
+
+  if (updates.dailySummaryEmailEnabled !== undefined) {
+    setParts.push('daily_summary_email_enabled = ?');
+    params.push(updates.dailySummaryEmailEnabled ? 1 : 0);
+  }
+
+  if (updates.dailySummaryEmailSyncPending !== undefined) {
+    setParts.push('daily_summary_email_sync_pending = ?');
+    params.push(updates.dailySummaryEmailSyncPending ? 1 : 0);
+  }
+
+  if (updates.showNameOnMap !== undefined) {
+    setParts.push('show_name_on_map = ?');
+    params.push(updates.showNameOnMap ? 1 : 0);
+  }
+
+  if (updates.showNameOnMapSyncPending !== undefined) {
+    setParts.push('show_name_on_map_sync_pending = ?');
+    params.push(updates.showNameOnMapSyncPending ? 1 : 0);
   }
 
   if (setParts.length === 0) return;
