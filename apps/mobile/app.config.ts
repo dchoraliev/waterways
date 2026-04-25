@@ -65,19 +65,19 @@ export default {
       },
       infoPlist: {
         NSUserNotificationUsageDescription:
-          'We use notifications to remind you to review and submit draft journeys.',
+          'Waterways sends optional reminders for unfinished journey drafts so you can review and submit them.',
         NSMicrophoneUsageDescription:
-          'Waterways needs microphone access to record and transcribe field observations.',
+          'Waterways uses the microphone only while you are actively recording an observation or using voice controls during a journey.',
         NSSpeechRecognitionUsageDescription:
-          'Waterways needs speech recognition to convert your voice notes into text observations.',
+          'Waterways uses on-device speech recognition to detect your wake phrase and transcribe spoken observations while the app is in use.',
         NSCameraUsageDescription:
-          'Waterways needs camera access to attach photos to your observations.',
+          'Waterways uses the camera when you choose to capture photos or videos to attach to an observation.',
         NSPhotoLibraryUsageDescription:
-          'Waterways needs photo library access to let you attach existing images to observations.',
+          'Waterways accesses your photo library only when you choose existing photos or videos to attach to an observation.',
         NSPhotoLibraryAddUsageDescription:
-          'Waterways can save captured photos to your photo library when you choose to.',
+          'Waterways saves captured media to your photo library only when you explicitly choose to save it.',
         NSLocationWhenInUseUsageDescription:
-          'Waterways uses your location while the app is in use to tag observation locations accurately.',
+          'Waterways uses your location while the app is open to tag observations with place information and improve map accuracy.',
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
@@ -96,9 +96,9 @@ export default {
         'expo-speech-recognition',
         {
           microphonePermission:
-            'Waterways needs microphone access to listen for your wake phrase and record observations.',
+            'Waterways uses the microphone to listen for your wake phrase and capture observation recordings while a journey is active.',
           speechRecognitionPermission:
-            'Waterways needs speech recognition to detect your wake phrase and transcribe voice input.',
+            'Waterways uses speech recognition to detect your wake phrase and convert spoken observations to text while the app is in use.',
           androidSpeechServicePackages: ['com.google.android.googlequicksearchbox'],
         },
       ],
