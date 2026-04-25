@@ -5,13 +5,24 @@ import { useTheme } from '../contexts/ThemeContext';
 
 export type RecentObservationItemProps = {
   title: string;
-  subtitle?: string; // ✅ add this
-  onPress: () => void;
+  subtitle?: string;
+  onPress?: () => void;
 };
 
 export function RecentObservationItem({ title, subtitle, onPress }: RecentObservationItemProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createRecentObservationItemStyles(colors), [colors]);
+
+  if (!onPress) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.textBlock}>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Pressable
@@ -23,7 +34,6 @@ export function RecentObservationItem({ title, subtitle, onPress }: RecentObserv
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
 
-      {/* no icons/fonts */}
       <Text style={styles.chevron}>›</Text>
     </Pressable>
   );

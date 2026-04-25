@@ -555,8 +555,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
     });
   }, [lastObservationId, secondsElapsed, router]);
 
-  // End journey button
-  const onEndJourneyPress = useCallback(async () => {
+  const endJourney = useCallback(async () => {
     if (!tripId) {
       showToast('No active journey to end.');
       return;
@@ -621,6 +620,34 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
       setEndingJourney(false);
     }
   }, [tripId, router, endingJourney, observations]);
+
+  // End journey button
+  const onEndJourneyPress = useCallback(() => {
+    if (!tripId) {
+      showToast('No active journey to end.');
+      return;
+    }
+
+    if (endingJourney) {
+      return;
+    }
+
+    const hasObservations = observations.length > 0;
+    const message = hasObservations
+      ? 'This will end your current journey and move it to review as a draft. Continue?'
+      : 'This journey has no observations and will be discarded. Continue?';
+
+    Alert.alert('End journey?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Journey',
+        style: 'destructive',
+        onPress: () => {
+          void endJourney();
+        },
+      },
+    ]);
+  }, [tripId, endingJourney, observations.length, endJourney]);
 
   const obsCount = observations.length;
   const shouldRenderWakeWordStatus = true;
@@ -782,7 +809,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
                 key={o.id}
                 title={`Observation #${obsCount - idx}`}
                 subtitle={o.created_at ? new Date(o.created_at).toLocaleString() : undefined}
-                onPress={() => console.log('Pressed observation', o.id)}
               />
             ))}
           </>

@@ -20,6 +20,35 @@ function reminderKey(tripId: string) {
   return `${REMINDER_PREFIX}${tripId}`;
 }
 
+function parseStoredReminderIds(value: string | null): string[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.length > 0
+      );
+    }
+  } catch {
+    // Backward compatibility for the old single-ID storage format.
+  }
+
+  return value.length > 0 ? [value] : [];
+}
+
+async function cancelScheduledReminderNotifications(tripId: string): Promise<void> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const matching = scheduled.filter((notification) => {
+    const dataTripId = notification.content.data?.tripId;
+    return typeof dataTripId === 'string' && dataTripId === tripId;
+  });
+
+  for (const notification of matching) {
+    await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+  }
+}
+
 async function ensurePermissions(): Promise<boolean> {
   const settings = await Notifications.getPermissionsAsync();
   if (
@@ -85,17 +114,21 @@ export async function scheduleDraftReminder(tripId: string, createdAt: number): 
     trigger,
   });
 
-  await AsyncStorage.setItem(reminderKey(tripId), notificationId);
+  await AsyncStorage.setItem(reminderKey(tripId), JSON.stringify([notificationId]));
 }
 
 export async function cancelDraftReminder(tripId: string): Promise<void> {
   if (!tripId) return;
 
   const key = reminderKey(tripId);
-  const notificationId = await AsyncStorage.getItem(key);
-  if (!notificationId) return;
+  const storedValue = await AsyncStorage.getItem(key);
+  const storedIds = parseStoredReminderIds(storedValue);
 
-  await Notifications.cancelScheduledNotificationAsync(notificationId);
+  for (const notificationId of storedIds) {
+    await Notifications.cancelScheduledNotificationAsync(notificationId);
+  }
+
+  await cancelScheduledReminderNotifications(tripId);
   await AsyncStorage.removeItem(key);
 }
 
