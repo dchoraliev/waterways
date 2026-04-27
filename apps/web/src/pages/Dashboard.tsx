@@ -16,7 +16,46 @@ import { useAuth } from '../contexts/AuthContext';
 import { LoginPage } from './LoginPage';
 import { DEFAULT_FILTER_OPTIONS, type FilterOptions } from '@waterways/shared';
 import { AdminPage } from './Admin';
+import { LegalPage } from './LegalPage';
 import { fetchObservationCategories } from '../api/observations';
+
+type AppRoute = 'map' | 'login' | 'admin' | 'terms';
+
+function isLegalPath(pathname: string): boolean {
+  return pathname === '/terms' || pathname === '/privacy';
+}
+
+function getRouteFromPath(pathname: string): AppRoute {
+  if (isLegalPath(pathname)) {
+    return 'terms';
+  }
+
+  if (pathname === '/admin') {
+    return 'admin';
+  }
+
+  if (pathname === '/login') {
+    return 'login';
+  }
+
+  return 'map';
+}
+
+function getPathFromRoute(route: AppRoute): string {
+  if (route === 'terms') {
+    return '/terms';
+  }
+
+  if (route === 'admin') {
+    return '/admin';
+  }
+
+  if (route === 'login') {
+    return '/login';
+  }
+
+  return '/';
+}
 
 const ObservationDetails = lazy(() =>
   import('../components/ObservationDetails').then((module) => ({
@@ -70,7 +109,7 @@ export function Dashboard() {
   const AGGREGATE_CLUSTER_MAX_ZOOM = 9;
   const DETAILED_QUERY_LIMIT = 500;
   const CACHE_TTL_MS = 60_000;
-  const [showLogin, setShowLogin] = useState(false);
+  const [route, setRoute] = useState<AppRoute>(() => getRouteFromPath(window.location.pathname));
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
   const [observationTypes, setObservationTypes] = useState<string[]>([]);
@@ -87,8 +126,19 @@ export function Dashboard() {
   const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [categories, setCategories] = useState<ObservationCategory[]>([]);
+  const navigateTo = useCallback((nextRoute: AppRoute, options?: { replace?: boolean }) => {
+    const nextPath = getPathFromRoute(nextRoute);
+    if (window.location.pathname !== nextPath) {
+      if (options?.replace) {
+        window.history.replaceState({}, '', nextPath);
+      } else {
+        window.history.pushState({}, '', nextPath);
+      }
+    }
+
+    setRoute(nextRoute);
+  }, []);
 
   const observationsCacheRef = useRef<
     Map<
@@ -217,6 +267,28 @@ export function Dashboard() {
   }, [selectedAdminUserId, sessionVersion, user?.id, user?.isAdmin]);
 
   useEffect(() => {
+    const handlePopState = () => {
+      setRoute(getRouteFromPath(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route === 'login' && user) {
+      navigateTo('map', { replace: true });
+      return;
+    }
+
+    if (route === 'admin' && !user?.isAdmin) {
+      navigateTo(user ? 'map' : 'login', { replace: true });
+    }
+  }, [navigateTo, route, user, user?.isAdmin]);
+
+  useEffect(() => {
     observationsCacheRef.current.clear();
   }, [selectedAdminUserId, sessionVersion, user?.id, user?.isAdmin]);
 
@@ -336,13 +408,6 @@ export function Dashboard() {
     user?.isAdmin,
   ]);
 
-  // Reset showLogin when user state changes
-  useEffect(() => {
-    if (user && showLogin) {
-      setShowLogin(false);
-    }
-  }, [user, showLogin]);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -360,12 +425,20 @@ export function Dashboard() {
 
   const handleAccountClick = () => {
     if (!user) {
-      setShowLogin(true);
+      navigateTo('login');
     }
   };
 
   const handleAdminClick = () => {
-    setAdminOpen(true);
+    navigateTo('admin');
+  };
+
+  const handleTermsClick = () => {
+    navigateTo('terms');
+  };
+
+  const handleCloseTerms = () => {
+    navigateTo('map');
   };
 
   // Admin action handlers
@@ -477,23 +550,26 @@ export function Dashboard() {
     );
   };
 
-  // Show login page if user clicked account button and isn't logged in
-  if (showLogin && !user) {
+  if (route === 'login' && !user) {
     return (
       <LoginPage
-        onSuccess={() => setShowLogin(false)}
-        onNavigateToHome={() => setShowLogin(false)}
+        onSuccess={() => navigateTo('map', { replace: true })}
+        onNavigateToHome={() => navigateTo('map')}
       />
     );
   }
 
   if (user) console.log('Dashboard passing projects:', user.projects);
-  if (adminOpen) {
+  if (route === 'admin' && user?.isAdmin) {
     return (
       <Suspense fallback={null}>
-        <AdminPage onClose={() => setAdminOpen(false)} />
+        <AdminPage onClose={() => navigateTo('map')} />
       </Suspense>
     );
+  }
+
+  if (route === 'terms') {
+    return <LegalPage onNavigateToHome={handleCloseTerms} />;
   }
 
   return (
@@ -511,6 +587,7 @@ export function Dashboard() {
         onAdminUserFilterChange={setSelectedAdminUserId}
         adminUserFilterLoading={adminUsersLoading}
         onDailyReportClick={() => setDailyReportOpen(true)}
+        onTermsClick={handleTermsClick}
         projects={user?.projects || []}
         onOwnDataDeleted={(userId) => {
           observationsCacheRef.current.clear();
