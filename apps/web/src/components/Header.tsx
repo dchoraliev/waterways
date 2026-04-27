@@ -15,7 +15,14 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+} from './ui/dialog';
 import {
   Download,
   User,
@@ -27,6 +34,7 @@ import {
   FileText,
   Info,
   Shield,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { SignIn } from '../pages/SignIn';
@@ -34,6 +42,8 @@ import { SignUp } from '../pages/SignUp';
 import { toast } from 'sonner';
 import { WaveIcon } from './WaveIcon';
 import { DateRangeFilter } from './DateRangeFilter';
+import { anonymizeOwnObservations, deleteAccount } from '../api/account';
+import { supabase } from '../services/supabase';
 
 interface HeaderProps {
   filters: FilterOptions;
@@ -49,30 +59,45 @@ interface HeaderProps {
   onDailyReportClick?: () => void;
   projects?: Array<{ id: string; name: string }>;
   onAdminClick?: () => void;
+  onOwnDataDeleted?: (userId: string) => void;
 }
 
 type AuthDialog = 'signin' | 'signup' | null;
+const DELETE_DATA_CONFIRMATION = 'DELETE DATA';
+const DELETE_ACCOUNT_CONFIRMATION = 'DELETE ACCOUNT';
 
-export function Header({
-  filters,
-  onFilterChange,
-  observationTypes,
-  mapAlertMessage,
-  onExportCSV,
-  onAccountClick,
-  onAdminClick,
-  adminUserOptions,
-  selectedAdminUserId,
-  onAdminUserFilterChange,
-  adminUserFilterLoading,
-  onDailyReportClick,
-  projects,
-}: HeaderProps) {
+export function Header(props: Readonly<HeaderProps>) {
+  const {
+    filters,
+    onFilterChange,
+    observationTypes,
+    mapAlertMessage,
+    onExportCSV,
+    onAccountClick,
+    onAdminClick,
+    adminUserOptions,
+    selectedAdminUserId,
+    onAdminUserFilterChange,
+    adminUserFilterLoading,
+    onDailyReportClick,
+    projects,
+    onOwnDataDeleted,
+  } = props;
+
   const { user, signOut } = useAuth();
   const visibleUserName = user?.showNameOnMap === false ? 'Anonymous' : user?.name;
   const [authDialog, setAuthDialog] = useState<AuthDialog>(null);
   const [mapAlertOpen, setMapAlertOpen] = useState(false);
   const [mapAlertStyle, setMapAlertStyle] = useState<globalThis.React.CSSProperties>({});
+  const [deleteDataDialogOpen, setDeleteDataDialogOpen] = useState(false);
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [deleteDataConfirmation, setDeleteDataConfirmation] = useState('');
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('');
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deleteDataError, setDeleteDataError] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [isDeletingData, setIsDeletingData] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const mapAlertTriggerRef = useRef<globalThis.HTMLButtonElement | null>(null);
 
   const handleFilterChange = (key: keyof FilterOptions, value: string | boolean) => {
@@ -107,14 +132,15 @@ export function Header({
   };
 
   const handleExportClick = () => {
-    if (!user) {
-      toast.error('Please log in to export CSV files', {
-        icon: <WaveIcon className="size-5 text-blue-700" />,
-      });
-      setAuthDialog('signin');
-    } else {
+    if (user) {
       onExportCSV();
+      return;
     }
+
+    toast.error('Please log in to export CSV files', {
+      icon: <WaveIcon className="size-5 text-blue-700" />,
+    });
+    setAuthDialog('signin');
   };
 
   const openMapAlert = () => {
@@ -135,6 +161,99 @@ export function Header({
 
   const closeMapAlert = () => {
     setMapAlertOpen(false);
+  };
+
+  const resetDeleteDataDialog = () => {
+    setDeleteDataConfirmation('');
+    setDeleteDataError('');
+  };
+
+  const resetDeleteAccountDialog = () => {
+    setDeleteAccountConfirmation('');
+    setDeleteAccountPassword('');
+    setDeleteAccountError('');
+  };
+
+  const handleDeleteOwnData = async () => {
+    const activeUser = user;
+    if (activeUser == null) {
+      return;
+    }
+
+    if (deleteDataConfirmation.trim().toUpperCase() !== DELETE_DATA_CONFIRMATION) {
+      setDeleteDataError(`Please type ${DELETE_DATA_CONFIRMATION} to continue.`);
+      return;
+    }
+
+    try {
+      setIsDeletingData(true);
+      setDeleteDataError('');
+
+      const result = await anonymizeOwnObservations({ action: 'confirm-anonymize' });
+      if (!result.success) {
+        setDeleteDataError(result.error ?? 'Unable to anonymize your data.');
+        return;
+      }
+
+      onOwnDataDeleted?.(activeUser.id);
+      setDeleteDataDialogOpen(false);
+      resetDeleteDataDialog();
+      toast.success('Your observations were anonymized successfully.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDeleteDataError(message || 'Unable to anonymize your data.');
+    } finally {
+      setIsDeletingData(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const activeUser = user;
+    if (activeUser == null) {
+      return;
+    }
+
+    if (deleteAccountConfirmation.trim().toUpperCase() !== DELETE_ACCOUNT_CONFIRMATION) {
+      setDeleteAccountError(`Please type ${DELETE_ACCOUNT_CONFIRMATION} to continue.`);
+      return;
+    }
+
+    if (!deleteAccountPassword.trim()) {
+      setDeleteAccountError('Current password is required.');
+      return;
+    }
+
+    try {
+      setIsDeletingAccount(true);
+      setDeleteAccountError('');
+
+      const result = await deleteAccount({
+        action: 'confirm-delete',
+        currentPassword: deleteAccountPassword,
+      });
+
+      if (!result.success) {
+        setDeleteAccountError(result.error ?? 'Unable to delete account.');
+        return;
+      }
+
+      setDeleteAccountDialogOpen(false);
+      resetDeleteAccountDialog();
+      toast.success('Your account was deleted successfully.');
+
+      try {
+        await signOut();
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' });
+      }
+
+      globalThis.location.assign('/');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDeleteAccountError(message || 'Unable to delete account.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const showAdminUserFilter = Boolean(user?.isAdmin && onAdminUserFilterChange);
@@ -302,9 +421,30 @@ export function Header({
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.location.assign('/terms')}>
+                <DropdownMenuItem onClick={() => globalThis.location.assign('/terms')}>
                   <FileText className="size-4 mr-2" />
                   Terms and Conditions
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    resetDeleteDataDialog();
+                    setDeleteDataDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="size-4 mr-2" />
+                  Delete My Data
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    resetDeleteAccountDialog();
+                    setDeleteAccountDialogOpen(true);
+                  }}
+                >
+                  <Trash2 className="size-4 mr-2" />
+                  Delete My Account
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
@@ -363,6 +503,112 @@ export function Header({
             onNavigateToSignIn={() => setAuthDialog('signin')}
             onSuccess={handleSignInSuccess}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteDataDialogOpen}
+        onOpenChange={(open: boolean) => {
+          setDeleteDataDialogOpen(open);
+          if (!open) {
+            resetDeleteDataDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Your Data</DialogTitle>
+            <DialogDescription>
+              This will remove personal identifiers from your observations and keep the observations
+              as anonymous records. Type <strong>{DELETE_DATA_CONFIRMATION}</strong> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteDataConfirmation}
+            onChange={(event) => setDeleteDataConfirmation(event.target.value)}
+            placeholder={DELETE_DATA_CONFIRMATION}
+            autoComplete="off"
+          />
+          {deleteDataError ? <p className="text-sm text-destructive">{deleteDataError}</p> : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteDataDialogOpen(false);
+                resetDeleteDataDialog();
+              }}
+              disabled={isDeletingData}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteOwnData}
+              disabled={isDeletingData}
+            >
+              {isDeletingData ? 'Anonymizing Data...' : 'Delete My Data'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteAccountDialogOpen}
+        onOpenChange={(open: boolean) => {
+          setDeleteAccountDialogOpen(open);
+          if (!open) {
+            resetDeleteAccountDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Your Account</DialogTitle>
+            <DialogDescription>
+              This permanently deletes your account. Type{' '}
+              <strong>{DELETE_ACCOUNT_CONFIRMATION}</strong> and enter your current password to
+              continue.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteAccountConfirmation}
+            onChange={(event) => setDeleteAccountConfirmation(event.target.value)}
+            placeholder={DELETE_ACCOUNT_CONFIRMATION}
+            autoComplete="off"
+          />
+          <Input
+            value={deleteAccountPassword}
+            onChange={(event) => setDeleteAccountPassword(event.target.value)}
+            placeholder="Current password"
+            type="password"
+            autoComplete="current-password"
+          />
+          {deleteAccountError ? (
+            <p className="text-sm text-destructive">{deleteAccountError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteAccountDialogOpen(false);
+                resetDeleteAccountDialog();
+              }}
+              disabled={isDeletingAccount}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? 'Deleting Account...' : 'Delete My Account'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
