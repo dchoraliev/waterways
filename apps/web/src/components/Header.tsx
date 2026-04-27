@@ -59,6 +59,7 @@ interface HeaderProps {
   onDailyReportClick?: () => void;
   projects?: Array<{ id: string; name: string }>;
   onAdminClick?: () => void;
+  onTermsClick?: () => void;
   onOwnDataDeleted?: (userId: string) => void;
 }
 
@@ -66,24 +67,23 @@ type AuthDialog = 'signin' | 'signup' | null;
 const DELETE_DATA_CONFIRMATION = 'DELETE DATA';
 const DELETE_ACCOUNT_CONFIRMATION = 'DELETE ACCOUNT';
 
-export function Header(props: Readonly<HeaderProps>) {
-  const {
-    filters,
-    onFilterChange,
-    observationTypes,
-    mapAlertMessage,
-    onExportCSV,
-    onAccountClick,
-    onAdminClick,
-    adminUserOptions,
-    selectedAdminUserId,
-    onAdminUserFilterChange,
-    adminUserFilterLoading,
-    onDailyReportClick,
-    projects,
-    onOwnDataDeleted,
-  } = props;
-
+export function Header({
+  filters,
+  onFilterChange,
+  observationTypes,
+  mapAlertMessage,
+  onExportCSV,
+  onAccountClick,
+  onAdminClick,
+  adminUserOptions,
+  selectedAdminUserId,
+  onAdminUserFilterChange,
+  adminUserFilterLoading,
+  onDailyReportClick,
+  projects,
+  onTermsClick,
+  onOwnDataDeleted,
+}: HeaderProps) {
   const { user, signOut } = useAuth();
   const visibleUserName = user?.showNameOnMap === false ? 'Anonymous' : user?.name;
   const [authDialog, setAuthDialog] = useState<AuthDialog>(null);
@@ -421,7 +421,7 @@ export function Header(props: Readonly<HeaderProps>) {
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => globalThis.location.assign('/terms')}>
+                <DropdownMenuItem onClick={() => onTermsClick?.()}>
                   <FileText className="size-4 mr-2" />
                   Terms and Conditions
                 </DropdownMenuItem>

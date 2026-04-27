@@ -1,15 +1,26 @@
 import { WaveIcon } from '../components/WaveIcon';
 
-export function LegalPage() {
+interface LegalPageProps {
+  onNavigateToHome?: () => void;
+}
+
+export function LegalPage({ onNavigateToHome }: LegalPageProps) {
+  const handleNavigateHome = () => {
+    if (onNavigateToHome) {
+      onNavigateToHome();
+      return;
+    }
+
+    window.location.href = '/';
+  };
+
   return (
     <div className="bg-white relative min-h-screen">
       <header className="bg-blue-200 border-b">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-4 py-2 sm:px-6 lg:px-8">
           <button
             type="button"
-            onClick={() => {
-              window.location.href = '/';
-            }}
+            onClick={handleNavigateHome}
             className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-blue-300/50"
             aria-label="Go to map"
           >
