@@ -951,7 +951,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <View style={styles.switchRow}>
                 <View style={styles.rowLeft}>
                   <Ionicons name="person-outline" size={20} color={tokens.primary} />
-                  <Text style={styles.rowLabel}>Show my name on map</Text>
+                  <Text style={styles.rowLabel}>Show name publicly</Text>
                 </View>
                 <Switch
                   value={showNameOnMap}
@@ -959,8 +959,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   disabled={isUpdatingShowNameOnMap}
                 />
               </View>
+              <Text style={[styles.navSubLabel, { marginTop: 8 }]}>
+                Turn this off to hide your name from the public on observations.
+              </Text>
               {showNameOnMapSyncPending && (
-                <Text style={[styles.metaValue, { marginTop: 8 }]}>
+                <Text style={[styles.navSubLabel, { marginTop: 8 }]}>
                   Saved offline. This setting will sync when you are back online.
                 </Text>
               )}
@@ -1173,7 +1176,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <SheetModal
         visible={showNotificationsDialog}
         title="Notification Settings"
-        description="Manage your notification preferences. More options will be available soon."
+        description="Manage your notification preferences."
         onClose={() => setShowNotificationsDialog(false)}
         styles={styles}
       >
@@ -1199,7 +1202,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
         description={
           dailySummaryEmailSyncPending
             ? 'Manage your email message preferences. Daily Summary is saved locally and will sync when online.'
-            : 'Manage your email message preferences. More options will be available soon.'
+            : 'Manage your email message preferences.'
         }
         onClose={() => setShowEmailPreferencesDialog(false)}
         styles={styles}
