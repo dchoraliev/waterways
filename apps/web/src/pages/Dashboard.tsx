@@ -512,6 +512,20 @@ export function Dashboard() {
         adminUserFilterLoading={adminUsersLoading}
         onDailyReportClick={() => setDailyReportOpen(true)}
         projects={user?.projects || []}
+        onOwnDataDeleted={(userId) => {
+          observationsCacheRef.current.clear();
+          setObservations((prev) =>
+            prev.map((observation) =>
+              observation.userId === userId
+                ? {
+                    ...observation,
+                    userId: '',
+                    observerName: 'Anonymous',
+                  }
+                : observation
+            )
+          );
+        }}
       />
 
       <main className="flex-1 relative overflow-hidden">

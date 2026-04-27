@@ -41,14 +41,13 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const requestBody = await req.json().catch(() => ({}));
-    const action =
-      requestBody && typeof requestBody === 'object' && 'action' in requestBody
-        ? String((requestBody as { action?: unknown }).action ?? '')
-        : '';
+    const body =
+      requestBody && typeof requestBody === 'object'
+        ? (requestBody as Record<string, unknown>)
+        : {};
+    const action = typeof body.action === 'string' ? body.action : '';
     const currentPassword =
-      requestBody && typeof requestBody === 'object' && 'currentPassword' in requestBody
-        ? String((requestBody as { currentPassword?: unknown }).currentPassword ?? '')
-        : '';
+      typeof body.currentPassword === 'string' ? body.currentPassword : '';
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -119,63 +118,7 @@ serve(async (req: Request): Promise<Response> => {
       },
     });
 
-    const { error: deleteMembershipError } = await adminClient
-      .from('project_membership')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (deleteMembershipError) {
-      return new Response(
-        JSON.stringify({
-          error: `Failed to delete user project memberships: ${deleteMembershipError.message}`,
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-
-    const deletedAt = new Date().toISOString();
-    const sanitizedEmail = `deleted-${user.id}@deleted.local`;
-
-    const anonymizedUserPayload = {
-      first_name: null,
-      last_name: null,
-      email: sanitizedEmail,
-      verified: false,
-      status: 'deleted',
-      role: 'regular',
-      share_name_on_map: false,
-      banned_at: deletedAt,
-    };
-
-    let { error: anonymizeUserProfileError } = await adminClient
-      .from('users')
-      .update(anonymizedUserPayload)
-      .eq('id', user.id);
-
-    if (anonymizeUserProfileError) {
-      return new Response(
-        JSON.stringify({
-          error: `Failed to anonymize user profile: ${anonymizeUserProfileError.message}`,
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-
-    const randomPassword = `${crypto.randomUUID().replace(/-/g, '')}Aa1!`;
-
-    const { error: deleteError } = await adminClient.auth.admin.updateUserById(user.id, {
-      email: sanitizedEmail,
-      password: randomPassword,
-      user_metadata: {
-        deleted_at: deletedAt,
-      },
-    });
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id, false);
 
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
