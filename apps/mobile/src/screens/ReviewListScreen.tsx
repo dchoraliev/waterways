@@ -14,6 +14,7 @@ interface SubmittedJourney {
   observationCount: number;
   submittedDate: string;
   projectName: string;
+  startTime: string | null;
 }
 
 type TripRow = {
@@ -132,6 +133,13 @@ const ReviewListScreen = () => {
           duration,
           observationCount: observationCounts[row.id] ?? 0,
           submittedDate: new Date(row.created_at).toLocaleDateString(),
+          startTime: row.start_time
+            ? new Date(row.start_time).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })
+            : null,
           projectName,
         };
       });
@@ -198,7 +206,10 @@ const ReviewListScreen = () => {
               >
                 <View style={styles.cardRow}>
                   <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle}>📅 {journey.submittedDate}</Text>
+                    <Text style={styles.cardTitle}>
+                      📅 {journey.submittedDate}
+                      {journey.startTime ? ` · ${journey.startTime}` : ''}
+                    </Text>
                     <View style={{ marginTop: 8 }}>
                       <Text style={styles.cardMeta}>⏱️ {formatDuration(journey.duration)}</Text>
                     </View>
