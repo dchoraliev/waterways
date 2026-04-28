@@ -301,6 +301,7 @@ function mapRowToObservation(
 
   return {
     id: row.id,
+    tripId: row.trip_id ?? undefined,
     projectName,
     journeyStartLocation: projectName || 'Trip start',
     location: {

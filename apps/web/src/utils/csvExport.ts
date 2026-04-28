@@ -12,8 +12,9 @@ export function exportToCSV(
   filename: string = 'waterways-observations.csv'
 ) {
   const headers = [
-    'ID',
+    'Observation ID',
     'Project Name',
+    'Journey Id',
     'Latitude',
     'Longitude',
     'Date',
@@ -41,6 +42,7 @@ export function exportToCSV(
     return [
       obs.id,
       obs.projectName,
+      obs.tripId ?? '',
       obs.location.lat.toString(),
       obs.location.lng.toString(),
       obs.date,
