@@ -24,6 +24,31 @@ function osmProvider(x: number, y: number, z: number): string {
 function satelliteProvider(x: number, y: number, z: number): string {
   return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
 }
+
+function formatScaleDistance(meters: number): string {
+  if (meters >= 2000) {
+    return `${Math.round(meters / 1000)} km`;
+  }
+  return `${Math.round(meters)} m`;
+}
+
+function getNiceScaleDistance(maxDistance: number): number {
+  if (maxDistance <= 0) return 0;
+
+  const exponent = Math.floor(Math.log10(maxDistance));
+  const magnitude = 10 ** exponent;
+  const niceSteps = [1, 2, 5];
+
+  let best = magnitude;
+  for (const step of niceSteps) {
+    const candidate = step * magnitude;
+    if (candidate <= maxDistance) {
+      best = candidate;
+    }
+  }
+
+  return best;
+}
 // ────────────────────────────────────────────────────────────────
 
 interface ObservationCategory {
@@ -138,6 +163,23 @@ export function MapView({
   const clusters = useMemo(() => {
     return clusterObservations(observations, zoom);
   }, [observations, zoom]);
+
+  const scaleBar = useMemo(() => {
+    const latitude = center[0];
+    const metersPerPixel = (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / 2 ** zoom;
+    const maxScaleWidthPx = 72;
+    const maxDistanceMeters = metersPerPixel * maxScaleWidthPx;
+    const niceDistanceMeters = getNiceScaleDistance(maxDistanceMeters);
+
+    if (!Number.isFinite(metersPerPixel) || metersPerPixel <= 0 || niceDistanceMeters <= 0) {
+      return null;
+    }
+
+    return {
+      widthPx: niceDistanceMeters / metersPerPixel,
+      label: formatScaleDistance(niceDistanceMeters),
+    };
+  }, [center, zoom]);
 
   const handleMarkerClick = (cluster: Cluster) => {
     if (cluster.isCluster) {
@@ -309,6 +351,21 @@ export function MapView({
       {loading && !zoomTooLow && (
         <div className="absolute top-3 right-3 z-[900] bg-white/60 rounded-md px-2 py-1 text-xs text-gray-500">
           Loading observations…
+        </div>
+      )}
+
+      {scaleBar && (
+        <div className="absolute bottom-0 right-51 z-[850] pointer-events-none select-none">
+          <div className="inline-flex items-center gap-1.5 rounded-sm bg-white/50 border border-gray-300 px-1.5 py-1 shadow-sm">
+            <div className="relative h-2" style={{ width: `${Math.max(scaleBar.widthPx, 12)}px` }}>
+              <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-900" />
+              <div className="absolute left-0 top-0 h-2 w-px bg-gray-900" />
+              <div className="absolute right-0 top-0 h-2 w-px bg-gray-900" />
+            </div>
+            <div className="text-[10px] font-medium leading-none text-gray-700">
+              {scaleBar.label}
+            </div>
+          </div>
         </div>
       )}
 
