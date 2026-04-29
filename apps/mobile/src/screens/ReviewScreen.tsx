@@ -453,7 +453,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journey review</Text>
-          <Text style={styles.subtitle}>Trip ID: {tripId}</Text>
+          <Text style={styles.subtitle}>Journey ID: {tripId}</Text>
         </View>
 
         {/* Active journey banner */}

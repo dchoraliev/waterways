@@ -221,6 +221,9 @@ const ReviewListScreen = () => {
                         <Text style={styles.tagMutedText}>{journey.projectName}</Text>
                       </View>
                     </View>
+                    <Text style={[styles.cardMeta, { marginTop: 4, fontSize: 11, opacity: 0.6 }]}>
+                      ID: {journey.id}
+                    </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
                 </View>
