@@ -99,7 +99,6 @@ const DraftsScreen: React.FC = () => {
               >
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.cardTitle}>Journey {item.id}</Text>
-                  <Text style={styles.cardStatus}>Draft</Text>
                 </View>
                 <Text style={styles.cardMeta}>
                   {item.observations.length} observations ·{' '}
