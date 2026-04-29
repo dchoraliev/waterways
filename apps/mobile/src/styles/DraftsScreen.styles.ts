@@ -84,10 +84,6 @@ export const createDraftsScreenStyles = (themeColors: AppColors) =>
       fontWeight: '600',
       color: themeColors.textPrimary,
     },
-    cardStatus: {
-      fontSize: 12,
-      color: themeColors.primary,
-    },
     cardMeta: {
       fontSize: 12,
       color: themeColors.textMuted,

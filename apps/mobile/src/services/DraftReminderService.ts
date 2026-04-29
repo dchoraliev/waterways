@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 const REMINDER_PREFIX = 'draftReminder:';
+const ACTIVE_REMINDER_KEY = 'draftReminder:active';
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const ANDROID_CHANNEL_ID = 'draft-reminders';
 
@@ -82,6 +83,14 @@ export async function scheduleDraftReminder(tripId: string, createdAt: number): 
   if (!permitted) return;
 
   await ensureAndroidChannel();
+
+  // Cancel the previously active reminder from any other trip
+  const previousActiveTripId = await AsyncStorage.getItem(ACTIVE_REMINDER_KEY);
+  if (previousActiveTripId && previousActiveTripId !== tripId) {
+    await cancelDraftReminder(previousActiveTripId);
+  }
+
+  // Cancel any existing reminders for this trip
   await cancelDraftReminder(tripId);
 
   const now = Date.now();
@@ -115,6 +124,7 @@ export async function scheduleDraftReminder(tripId: string, createdAt: number): 
   });
 
   await AsyncStorage.setItem(reminderKey(tripId), JSON.stringify([notificationId]));
+  await AsyncStorage.setItem(ACTIVE_REMINDER_KEY, tripId);
 }
 
 export async function cancelDraftReminder(tripId: string): Promise<void> {
@@ -130,6 +140,12 @@ export async function cancelDraftReminder(tripId: string): Promise<void> {
 
   await cancelScheduledReminderNotifications(tripId);
   await AsyncStorage.removeItem(key);
+
+  // Clear active reminder tracking if this was the active reminder
+  const currentActive = await AsyncStorage.getItem(ACTIVE_REMINDER_KEY);
+  if (currentActive === tripId) {
+    await AsyncStorage.removeItem(ACTIVE_REMINDER_KEY);
+  }
 }
 
 export async function cancelDraftRemindersForTrips(tripIds: string[]): Promise<void> {
