@@ -136,6 +136,15 @@ export function ObservationDetails({
           </div>
 
           <Separator />
+          {observation.tripId && (
+            <div className="flex items-start gap-2">
+              <MapPin className="size-4 mt-0.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-sm text-muted-foreground">Journey ID</p>
+                <p className="text-sm font-mono">{observation.tripId}</p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-start gap-2">
