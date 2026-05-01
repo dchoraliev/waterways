@@ -5,6 +5,8 @@ import { Home } from 'lucide-react';
 import imgImageWithFallback from '../assets/images/background.png';
 import { supabase } from '../services/supabase';
 
+const PASSWORD_RECOVERY_STORAGE_KEY = 'waterways.passwordRecoveryPending';
+
 interface LoginPageProps {
   onSuccess: () => void;
   onNavigateToHome?: () => void;
@@ -17,7 +19,29 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [hasSentResetCode, setHasSentResetCode] = useState(false);
+  const [isResetCodeVerified, setIsResetCodeVerified] = useState(false);
   const { signIn, signUp } = useAuth();
+
+  const setPasswordRecoveryPending = (isPending: boolean) => {
+    if (isPending) {
+      globalThis.sessionStorage.setItem(PASSWORD_RECOVERY_STORAGE_KEY, '1');
+      return;
+    }
+
+    globalThis.sessionStorage.removeItem(PASSWORD_RECOVERY_STORAGE_KEY);
+  };
+
+  const clearResetPasswordState = () => {
+    setResetCode('');
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    setHasSentResetCode(false);
+    setIsResetCodeVerified(false);
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,23 +75,89 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendResetCode = async () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${globalThis.location.origin}/reset-password`,
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+
+      if (error) throw error;
+
+      setHasSentResetCode(true);
+      toast.success('Verification code sent to your email.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Failed to send verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSendResetCode();
+  };
+
+  const handleVerifyResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setPasswordRecoveryPending(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: resetCode.trim(),
+        type: 'recovery',
       });
 
       if (error) throw error;
 
-      toast.success('Password reset link sent to your email!');
+      setIsResetCodeVerified(true);
+      toast.success('Code verified. You can now set a new password.');
+    } catch (error: unknown) {
+      setPasswordRecoveryPending(false);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(message || 'Invalid verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPasswordWithCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (resetNewPassword.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      toast.error('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: resetNewPassword,
+      });
+
+      if (error) throw error;
+
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+      if (signOutError) {
+        throw signOutError;
+      }
+
+      toast.success('Password updated successfully. Please sign in.');
+      setPasswordRecoveryPending(false);
+      clearResetPasswordState();
       setIsForgotPassword(false);
-      setEmail('');
+      setPassword('');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      toast.error(message || 'Failed to send reset link. Please try again.');
+      toast.error(message || 'Failed to update password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -128,26 +218,86 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
                 Reset Password
               </h3>
               <p className="font-['Arimo',_sans-serif] font-normal leading-[24px] text-[#717182] text-[16px] text-center">
-                Enter your email to receive a password reset link
+                Verify your email code to set a new password
               </p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleForgotPassword} className="space-y-[16px]">
+            <form
+              onSubmit={
+                isResetCodeVerified
+                  ? handleResetPasswordWithCode
+                  : hasSentResetCode
+                    ? handleVerifyResetCode
+                    : handleForgotPassword
+              }
+              className="space-y-[16px]"
+            >
               {/* Email Field */}
               <div className="space-y-[8px]">
                 <label className="font-['Arimo',_sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
                   Email
                 </label>
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="Enter your email"
+                  disabled={hasSentResetCode}
                   className="bg-[#f3f3f5] h-[36px] w-full rounded-[8px] px-[12px] py-[4px] font-['Arimo',_sans-serif] font-normal text-[14px] text-neutral-950 placeholder:text-[#717182] border-[0.8px] border-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
+
+              {hasSentResetCode && !isResetCodeVerified && (
+                <div className="space-y-[8px]">
+                  <label className="font-['Arimo',_sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
+                    Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    required
+                    placeholder="Enter 6-digit code"
+                    className="bg-[#f3f3f5] h-[36px] w-full rounded-[8px] px-[12px] py-[4px] font-['Arimo',_sans-serif] font-normal text-[14px] text-neutral-950 placeholder:text-[#717182] border-[0.8px] border-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              )}
+
+              {isResetCodeVerified && (
+                <>
+                  <div className="space-y-[8px]">
+                    <label className="font-['Arimo',_sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      required
+                      placeholder="Enter new password"
+                      className="bg-[#f3f3f5] h-[36px] w-full rounded-[8px] px-[12px] py-[4px] font-['Arimo',_sans-serif] font-normal text-[14px] text-neutral-950 placeholder:text-[#717182] border-[0.8px] border-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <div className="space-y-[8px]">
+                    <label className="font-['Arimo',_sans-serif] font-normal leading-[14px] text-[14px] text-neutral-950">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={resetConfirmPassword}
+                      onChange={(e) => setResetConfirmPassword(e.target.value)}
+                      required
+                      placeholder="Confirm new password"
+                      className="bg-[#f3f3f5] h-[36px] w-full rounded-[8px] px-[12px] py-[4px] font-['Arimo',_sans-serif] font-normal text-[14px] text-neutral-950 placeholder:text-[#717182] border-[0.8px] border-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Submit Button */}
               <button
@@ -155,8 +305,27 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
                 disabled={loading}
                 className="bg-[#030213] h-[36px] w-full rounded-[8px] font-['Arimo',_sans-serif] font-normal leading-[20px] text-[14px] text-white text-center hover:bg-[#030213]/90 transition-colors disabled:opacity-50"
               >
-                {loading ? 'Sending...' : 'Send Reset Link'}
+                {loading
+                  ? 'Please wait...'
+                  : isResetCodeVerified
+                    ? 'Reset Password'
+                    : hasSentResetCode
+                      ? 'Verify Code'
+                      : 'Send Code'}
               </button>
+
+              {hasSentResetCode && !isResetCodeVerified && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSendResetCode();
+                  }}
+                  disabled={loading}
+                  className="font-['Arimo',_sans-serif] font-normal leading-[20px] text-[#030213] text-[14px] w-full text-center hover:underline disabled:opacity-50"
+                >
+                  Resend Code
+                </button>
+              )}
 
               {/* Divider */}
               <div className="bg-[rgba(0,0,0,0.1)] h-px w-full my-[16px]" />
@@ -168,7 +337,12 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setIsForgotPassword(false)}
+                  onClick={() => {
+                    setPasswordRecoveryPending(false);
+                    void supabase.auth.signOut({ scope: 'local' });
+                    clearResetPasswordState();
+                    setIsForgotPassword(false);
+                  }}
                   className="bg-white h-[36px] w-full rounded-[8px] font-['Arimo',_sans-serif] font-normal leading-[20px] text-[14px] text-neutral-950 text-center border-[0.8px] border-[rgba(0,0,0,0.1)] hover:bg-[#f3f3f5] transition-colors"
                 >
                   Back to Sign In
@@ -267,7 +441,9 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
                   Email
                 </label>
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -393,7 +569,9 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
                 Email
               </label>
               <input
-                type="email"
+                type="text"
+                inputMode="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -429,7 +607,11 @@ export function LoginPage({ onSuccess, onNavigateToHome }: LoginPageProps) {
             {/* Forgot Password */}
             <button
               type="button"
-              onClick={() => setIsForgotPassword(true)}
+              onClick={() => {
+                setPasswordRecoveryPending(false);
+                clearResetPasswordState();
+                setIsForgotPassword(true);
+              }}
               className="font-['Arimo',_sans-serif] font-normal leading-[20px] text-[#030213] text-[14px] w-full text-center hover:underline"
             >
               Forgot your password?

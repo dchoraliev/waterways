@@ -46,7 +46,15 @@ export const EXPECTED_SCHEMA: Record<string, string[]> = {
     'sync_status',
     'last_synced_at',
   ],
-  settings: ['id', 'dark_mode_enabled', 'notifications_enabled'],
+  settings: [
+    'id',
+    'dark_mode_enabled',
+    'notifications_enabled',
+    'daily_summary_email_enabled',
+    'daily_summary_email_sync_pending',
+    'show_name_on_map',
+    'show_name_on_map_sync_pending',
+  ],
   categories: ['id', 'name', 'is_fallback', 'color', 'keywords'],
 };
 
@@ -150,7 +158,11 @@ export const CREATE_SETTINGS_TABLE = `
 CREATE TABLE IF NOT EXISTS settings (
   id INTEGER PRIMARY KEY,
   dark_mode_enabled INTEGER NOT NULL DEFAULT 1,
-  notifications_enabled INTEGER NOT NULL DEFAULT 1
+  notifications_enabled INTEGER NOT NULL DEFAULT 1,
+  daily_summary_email_enabled INTEGER NOT NULL DEFAULT 0,
+  daily_summary_email_sync_pending INTEGER NOT NULL DEFAULT 0,
+  show_name_on_map INTEGER NOT NULL DEFAULT 1,
+  show_name_on_map_sync_pending INTEGER NOT NULL DEFAULT 0
 );
 `;
 
