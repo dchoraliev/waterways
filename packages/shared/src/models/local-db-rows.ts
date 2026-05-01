@@ -80,9 +80,13 @@ export interface SyncLog {
  * Represents app-level settings persisted in local SQLite.
  */
 export interface LocalSettings {
-  id: string;
+  id: number;
   dark_mode_enabled: number;
   notifications_enabled: number;
+  daily_summary_email_enabled: number;
+  daily_summary_email_sync_pending: number;
+  show_name_on_map: number;
+  show_name_on_map_sync_pending: number;
 }
 
 /**

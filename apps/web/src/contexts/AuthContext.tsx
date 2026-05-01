@@ -14,6 +14,12 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { getUserProjects } from '../api/projects';
 // Use browser setTimeout instead of Node.js timers
 
+const PASSWORD_RECOVERY_STORAGE_KEY = 'waterways.passwordRecoveryPending';
+
+function isPasswordRecoveryPending(): boolean {
+  return globalThis.sessionStorage.getItem(PASSWORD_RECOVERY_STORAGE_KEY) === '1';
+}
+
 interface User {
   id: string;
   name: string;
@@ -45,6 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserFromSupabase = useCallback(
     async (supabaseUser: SupabaseUser, syncId?: number) => {
+      if (isPasswordRecoveryPending()) {
+        setUser(null);
+        return;
+      }
+
       let role: string | null = null;
       let status: string | null = null;
       let showNameOnMap = true;
