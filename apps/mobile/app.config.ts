@@ -34,9 +34,9 @@ export default {
     },
 
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/logo/waterways-logo.png',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#4A9FD8',
     },
 
     android: {

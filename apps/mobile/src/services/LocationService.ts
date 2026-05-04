@@ -1,23 +1,30 @@
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Coordinates {
   latitude: number;
   longitude: number;
-  accuracy?: number; // meters
-  source?: 'gps' | 'dead_reckoning' | 'cached';
 }
 
 export enum GPSQuality {
-  GOOD = 'good', // < 5 meters
-  MEDIUM = 'medium', // 5-15 meters
-  POOR = 'poor', // > 15 meters
+  GOOD = 'good',
+  MEDIUM = 'medium',
+  BAD = 'bad',
+  POOR = 'poor',
+  DEAD_RECKONING = 'dead_reckoning',
 }
 
 export interface LocationQualityInfo {
   quality: GPSQuality;
   accuracy: number | null;
   usingDeadReckoning: boolean;
-  lastGoodFix: number | null; // timestamp
+  lastGoodFix: number | null;
+}
+
+export interface LocationQuality {
+  status: 'good' | 'medium' | 'bad' | 'poor' | 'dead_reckoning';
+  accuracy: number | null;
+  label: string;
 }
 
 // -------- Internal Module State --------
@@ -25,102 +32,263 @@ let subscription: Location.LocationSubscription | null = null;
 let lastCoordinates: Coordinates | null = null;
 let _lastAccuracy: number | null = null;
 let _lastTimestamp: number | null = null;
-let _lastGoodFixTimestamp: number | null = null;
 let isTracking = false;
+let _lastGoodFixTimestamp: number | null = null;
 
-// Dead reckoning state
-let _deadReckoningEnabled = true;
-let _lastHeading: number | null = null; // degrees from GPS
-let _lastSpeed: number | null = null; // m/s from GPS
+// Feature flag - loaded from AsyncStorage
+let USE_IMPROVED_GPS = false;
 
-// Quality thresholds (in meters)
-const GOOD_ACCURACY_THRESHOLD = 5;
-const MEDIUM_ACCURACY_THRESHOLD = 15;
-const POOR_GPS_TIMEOUT_MS = 30000; // 30 seconds without good GPS = poor
-const DEAD_RECKONING_UPDATE_INTERVAL = 1000; // Update position every 1 second when dead reckoning
+// GPS averaging state (only used when improved GPS is enabled)
+const recentReadings: Array<{ coords: Coordinates; accuracy: number | null; timestamp: number }> =
+  [];
+const MAX_READINGS = 10; // Increased from 5 - average more readings for smoother results
+const MAX_READING_AGE = 15_000; // Increased from 10s - keep readings longer for better averaging
 
-// Listeners for quality changes
+// Outlier filtering (only used when improved GPS is enabled)
+let lastValidCoordinates: Coordinates | null = null;
+const MAX_SPEED_MPS = 25; // Reduced from 50 - stricter outlier filtering (25 m/s = 90 km/h)
+
+// Quality change listeners
 type QualityChangeListener = (info: LocationQualityInfo) => void;
 const qualityListeners: Set<QualityChangeListener> = new Set();
 
 /**
- * Get current GPS quality level based on accuracy
+ * Load the GPS feature flag from storage
  */
-function getGPSQuality(accuracy: number | null): GPSQuality {
-  if (accuracy === null) return GPSQuality.POOR;
-  if (accuracy < GOOD_ACCURACY_THRESHOLD) return GPSQuality.GOOD;
-  if (accuracy < MEDIUM_ACCURACY_THRESHOLD) return GPSQuality.MEDIUM;
-  return GPSQuality.POOR;
+export async function loadGPSFeatureFlag(): Promise<void> {
+  try {
+    const value = await AsyncStorage.getItem('@waterways:use_improved_gps');
+    USE_IMPROVED_GPS = value === 'true';
+    console.log('[GPS] Improved GPS features:', USE_IMPROVED_GPS ? 'ENABLED' : 'DISABLED');
+  } catch (error) {
+    console.warn('[GPS] Failed to load feature flag:', error);
+    USE_IMPROVED_GPS = false;
+  }
 }
 
 /**
- * Check if we should use dead reckoning based on GPS quality
+ * Get current state of GPS improvements
  */
-function shouldUseDeadReckoning(): boolean {
-  if (!_deadReckoningEnabled) return false;
-
-  const now = Date.now();
-  const timeSinceGoodFix = _lastGoodFixTimestamp ? now - _lastGoodFixTimestamp : Infinity;
-  const currentQuality = getGPSQuality(_lastAccuracy);
-
-  // Use dead reckoning if:
-  // 1. GPS quality is poor, OR
-  // 2. Haven't had a good fix in 30 seconds
-  return currentQuality === GPSQuality.POOR || timeSinceGoodFix > POOR_GPS_TIMEOUT_MS;
+export function isImprovedGPSEnabled(): boolean {
+  return USE_IMPROVED_GPS;
 }
 
 /**
- * Calculate new position using dead reckoning
- * Based on last known position, heading, speed, and time elapsed
+ * Calculate distance between two coordinates in meters (Haversine formula)
+ * Only used when improved GPS is enabled
  */
-function calculateDeadReckoningPosition(
-  lastPos: Coordinates,
-  heading: number | null,
-  speed: number | null,
-  elapsedSeconds: number
-): Coordinates {
-  if (!heading || !speed || speed < 0.5) {
-    // Not moving or no heading data - return last position
-    return { ...lastPos, source: 'dead_reckoning' };
+function calculateDistance(coord1: Coordinates, coord2: Coordinates): number {
+  const R = 6371e3;
+  const φ1 = (coord1.latitude * Math.PI) / 180;
+  const φ2 = (coord2.latitude * Math.PI) / 180;
+  const Δφ = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
+  const Δλ = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+/**
+ * Check if a GPS reading is an outlier
+ * Only used when improved GPS is enabled
+ */
+function isOutlier(newCoords: Coordinates, timestamp: number): boolean {
+  if (!USE_IMPROVED_GPS) return false;
+  if (!lastValidCoordinates || !_lastTimestamp) return false;
+
+  const distance = calculateDistance(lastValidCoordinates, newCoords);
+  const timeDelta = (timestamp - _lastTimestamp) / 1000;
+
+  if (timeDelta <= 0) return false;
+
+  const speed = distance / timeDelta;
+  return speed > MAX_SPEED_MPS;
+}
+
+/**
+ * Add a reading to the averaging buffer
+ * Only used when improved GPS is enabled
+ */
+function addReading(coords: Coordinates, accuracy: number | null, timestamp: number): void {
+  if (!USE_IMPROVED_GPS) {
+    // Old behavior: just update last coordinates directly
+    lastCoordinates = coords;
+    return;
   }
 
-  // Convert heading to radians
-  const headingRad = (heading * Math.PI) / 180;
+  // New behavior: outlier filtering + averaging
+  if (isOutlier(coords, timestamp)) {
+    console.warn('[GPS] Outlier rejected:', {
+      coords,
+      distance: lastValidCoordinates
+        ? calculateDistance(lastValidCoordinates, coords).toFixed(1)
+        : 'N/A',
+      timeSinceLast: _lastTimestamp ? ((timestamp - _lastTimestamp) / 1000).toFixed(1) : 'N/A',
+    });
+    return;
+  }
 
-  // Calculate distance traveled (speed * time)
-  const distanceMeters = speed * elapsedSeconds;
+  recentReadings.push({ coords, accuracy, timestamp });
 
-  // Earth's radius in meters
-  const earthRadius = 6371000;
+  const now = Date.now();
+  while (recentReadings.length > 0) {
+    const oldest = recentReadings[0];
+    if (now - oldest.timestamp > MAX_READING_AGE || recentReadings.length > MAX_READINGS) {
+      recentReadings.shift();
+    } else {
+      break;
+    }
+  }
 
-  // Calculate new latitude
-  const deltaLat = (distanceMeters * Math.cos(headingRad)) / earthRadius;
-  const newLat = lastPos.latitude + (deltaLat * 180) / Math.PI;
+  lastValidCoordinates = coords;
+}
 
-  // Calculate new longitude
-  const deltaLon =
-    (distanceMeters * Math.sin(headingRad)) /
-    (earthRadius * Math.cos((lastPos.latitude * Math.PI) / 180));
-  const newLon = lastPos.longitude + (deltaLon * 180) / Math.PI;
+/**
+ * Get averaged coordinates from recent readings with exponential weighting
+ * Newer readings have more weight, better accuracy has more weight
+ */
+function getAveragedCoordinates(): Coordinates | null {
+  if (!USE_IMPROVED_GPS || recentReadings.length === 0) return null;
+
+  let totalWeight = 0;
+  let weightedLat = 0;
+  let weightedLng = 0;
+  const now = Date.now();
+
+  for (const reading of recentReadings) {
+    // Weight based on accuracy (better accuracy = higher weight)
+    const accuracyWeight = reading.accuracy ? 1 / Math.max(reading.accuracy, 1) : 0.1;
+
+    // Weight based on age (newer readings = higher weight, exponential decay)
+    const age = (now - reading.timestamp) / 1000; // age in seconds
+    const ageWeight = Math.exp(-age / 5); // Decay with 5 second half-life
+
+    // Combined weight
+    const weight = accuracyWeight * ageWeight;
+
+    totalWeight += weight;
+    weightedLat += reading.coords.latitude * weight;
+    weightedLng += reading.coords.longitude * weight;
+  }
+
+  if (totalWeight === 0) {
+    // Fallback to simple average if no valid weights
+    const lat =
+      recentReadings.reduce((sum, r) => sum + r.coords.latitude, 0) / recentReadings.length;
+    const lng =
+      recentReadings.reduce((sum, r) => sum + r.coords.longitude, 0) / recentReadings.length;
+    return { latitude: lat, longitude: lng };
+  }
 
   return {
-    latitude: newLat,
-    longitude: newLon,
-    accuracy: 20, // Dead reckoning is less accurate
-    source: 'dead_reckoning',
+    latitude: weightedLat / totalWeight,
+    longitude: weightedLng / totalWeight,
   };
 }
 
 /**
- * Notify all listeners of quality changes
+ * Get best accuracy from recent readings
+ * Only used when improved GPS is enabled
  */
-function notifyQualityChange(): void {
-  const info = getLocationQualityInfo();
-  qualityListeners.forEach((listener) => listener(info));
+function getBestRecentAccuracy(): number | null {
+  if (!USE_IMPROVED_GPS || recentReadings.length === 0) return null;
+
+  const accuracies = recentReadings.map((r) => r.accuracy).filter((a): a is number => a !== null);
+
+  if (accuracies.length === 0) return null;
+
+  return Math.min(...accuracies);
 }
 
 /**
- * Subscribe to location quality changes
+ * Determine GPS quality based on accuracy
+ */
+export function getLocationQuality(): LocationQuality {
+  const accuracy = _lastAccuracy;
+
+  if (accuracy === null || accuracy === undefined) {
+    return {
+      status: 'dead_reckoning',
+      accuracy: null,
+      label: 'Dead Reckoning',
+    };
+  }
+
+  // Thresholds change based on feature flag
+  const goodThreshold = USE_IMPROVED_GPS ? 15 : 20;
+  const mediumThreshold = USE_IMPROVED_GPS ? 30 : 40;
+  const badThreshold = USE_IMPROVED_GPS ? 50 : 60;
+
+  if (accuracy <= goodThreshold) {
+    return {
+      status: 'good',
+      accuracy,
+      label: 'Good GPS',
+    };
+  }
+
+  if (accuracy <= mediumThreshold) {
+    return {
+      status: 'medium',
+      accuracy,
+      label: 'Medium GPS',
+    };
+  }
+
+  if (accuracy <= badThreshold) {
+    return {
+      status: 'bad',
+      accuracy,
+      label: 'Bad GPS',
+    };
+  }
+
+  return {
+    status: 'poor',
+    accuracy,
+    label: 'Poor GPS',
+  };
+}
+
+/**
+ * Get location quality info (for JourneyScreen)
+ */
+export function getLocationQualityInfo(): LocationQualityInfo {
+  const accuracy = _lastAccuracy;
+  const usingDeadReckoning = accuracy === null || accuracy === undefined;
+
+  const threshold = USE_IMPROVED_GPS ? 15 : 20;
+  const mediumThreshold = USE_IMPROVED_GPS ? 30 : 40;
+  const poorThreshold = USE_IMPROVED_GPS ? 50 : 60;
+
+  let quality: GPSQuality;
+  if (usingDeadReckoning) {
+    quality = GPSQuality.DEAD_RECKONING;
+  } else if (accuracy <= threshold) {
+    quality = GPSQuality.GOOD;
+    _lastGoodFixTimestamp = Date.now();
+  } else if (accuracy <= mediumThreshold) {
+    quality = GPSQuality.MEDIUM;
+  } else if (accuracy <= poorThreshold) {
+    quality = GPSQuality.BAD;
+  } else {
+    quality = GPSQuality.POOR;
+  }
+
+  return {
+    quality,
+    accuracy,
+    usingDeadReckoning,
+    lastGoodFix: _lastGoodFixTimestamp,
+  };
+}
+
+/**
+ * Add a listener for GPS quality changes
  */
 export function addQualityChangeListener(listener: QualityChangeListener): () => void {
   qualityListeners.add(listener);
@@ -128,27 +296,22 @@ export function addQualityChangeListener(listener: QualityChangeListener): () =>
 }
 
 /**
- * Get current location quality information
+ * Notify all quality listeners of a change
  */
-export function getLocationQualityInfo(): LocationQualityInfo {
-  return {
-    quality: getGPSQuality(_lastAccuracy),
-    accuracy: _lastAccuracy,
-    usingDeadReckoning: shouldUseDeadReckoning(),
-    lastGoodFix: _lastGoodFixTimestamp,
-  };
+function notifyQualityChange(): void {
+  const info = getLocationQualityInfo();
+  qualityListeners.forEach((listener) => listener(info));
 }
 
 /**
- * Enable or disable dead reckoning fallback
+ * Get the last known accuracy value
  */
-export function setDeadReckoningEnabled(enabled: boolean): void {
-  _deadReckoningEnabled = enabled;
-  console.log(`Dead reckoning ${enabled ? 'enabled' : 'disabled'}`);
+export function getLastAccuracy(): number | null {
+  return _lastAccuracy;
 }
 
 /**
- * Requests permissions and throws if denied.
+ * Requests permissions and throws if denied
  */
 export async function validateLocationPermission(): Promise<void> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -162,8 +325,8 @@ export async function validateLocationPermission(): Promise<void> {
 }
 
 /**
- * Starts background-safe tracking using watchPositionAsync.
- * Now includes dead reckoning fallback and quality monitoring.
+ * Starts background-safe tracking using watchPositionAsync
+ * Behavior changes based on USE_IMPROVED_GPS flag
  */
 export async function startLocationTracking(options?: {
   accuracy?: Location.Accuracy;
@@ -173,35 +336,37 @@ export async function startLocationTracking(options?: {
 }): Promise<void> {
   if (subscription || isTracking) return;
 
+  // ALWAYS reload feature flag before starting (allows real-time toggling)
+  await loadGPSFeatureFlag();
+
   isTracking = true;
-  _deadReckoningEnabled = options?.enableDeadReckoning ?? true;
 
   try {
     await validateLocationPermission();
 
-    const accuracy = options?.accuracy ?? Location.Accuracy.Balanced;
-    const distanceInterval = options?.distanceInterval ?? 25;
-    const timeInterval = options?.timeInterval ?? 10_000;
+    // Settings change based on improved GPS flag
+    const accuracy = USE_IMPROVED_GPS
+      ? Location.Accuracy.BestForNavigation // NEW: Always use highest when improved
+      : (options?.accuracy ?? Location.Accuracy.High);
+    const distanceInterval = USE_IMPROVED_GPS
+      ? 5 // NEW: Always 5m when improved (ignore passed options)
+      : (options?.distanceInterval ?? 25); // OLD: Use passed or default 25m
+    const timeInterval = USE_IMPROVED_GPS
+      ? 3_000 // NEW: Always 3s when improved (ignore passed options)
+      : (options?.timeInterval ?? 10_000); // OLD: Use passed or default 10s
 
-    // Prime with last known (cheap, no GPS wakeup)
+    // Prime with last known
     const lastKnown = await Location.getLastKnownPositionAsync({});
     if (lastKnown) {
-      lastCoordinates = {
+      const coords = {
         latitude: lastKnown.coords.latitude,
         longitude: lastKnown.coords.longitude,
-        accuracy: lastKnown.coords.accuracy ?? undefined,
-        source: 'cached',
       };
+      lastCoordinates = coords;
       _lastAccuracy = lastKnown.coords.accuracy ?? null;
       _lastTimestamp = lastKnown.timestamp;
-      _lastSpeed = lastKnown.coords.speed ?? null;
-      _lastHeading = lastKnown.coords.heading ?? null;
 
-      // Check if this is a good fix
-      const quality = getGPSQuality(_lastAccuracy);
-      if (quality === GPSQuality.GOOD) {
-        _lastGoodFixTimestamp = lastKnown.timestamp;
-      }
+      addReading(coords, _lastAccuracy, lastKnown.timestamp);
     }
 
     // Start watching for updates
@@ -213,44 +378,62 @@ export async function startLocationTracking(options?: {
         mayShowUserSettingsDialog: true,
       },
       (position) => {
-        const newAccuracy = position.coords.accuracy ?? null;
-        const previousQuality = getGPSQuality(_lastAccuracy);
-
-        lastCoordinates = {
+        const coords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: newAccuracy ?? undefined,
-          source: 'gps',
         };
-        _lastAccuracy = newAccuracy;
+
+        // Add to buffer (different behavior based on flag)
+        addReading(coords, position.coords.accuracy ?? null, position.timestamp);
+
+        if (USE_IMPROVED_GPS) {
+          // NEW: Use averaged coordinates
+          const averaged = getAveragedCoordinates();
+          if (averaged) {
+            lastCoordinates = averaged;
+          } else {
+            lastCoordinates = coords;
+          }
+
+          // Use best recent accuracy
+          const bestAccuracy = getBestRecentAccuracy();
+          _lastAccuracy = bestAccuracy ?? position.coords.accuracy ?? null;
+        } else {
+          // OLD: Use raw coordinates directly
+          lastCoordinates = coords;
+          _lastAccuracy = position.coords.accuracy ?? null;
+        }
+
         _lastTimestamp = position.timestamp;
-        _lastSpeed = position.coords.speed ?? null;
-        _lastHeading = position.coords.heading ?? null;
 
-        // Track when we got a good GPS fix
-        const currentQuality = getGPSQuality(newAccuracy);
-        if (currentQuality === GPSQuality.GOOD) {
-          _lastGoodFixTimestamp = position.timestamp;
-        }
+        // Notify listeners
+        notifyQualityChange();
 
-        // Notify listeners if quality changed
-        if (currentQuality !== previousQuality) {
-          notifyQualityChange();
-        }
+        console.log(
+          '[GPS] Updated:',
+          USE_IMPROVED_GPS
+            ? {
+                raw: coords,
+                averaged: lastCoordinates,
+                accuracy: _lastAccuracy?.toFixed(1),
+                readings: recentReadings.length,
+                mode: 'IMPROVED',
+              }
+            : {
+                coords: lastCoordinates,
+                accuracy: _lastAccuracy?.toFixed(1),
+                mode: 'STANDARD',
+              }
+        );
       }
     );
 
-    console.log('Started location tracking with options:', {
+    console.log('[GPS] Started tracking:', {
+      mode: USE_IMPROVED_GPS ? 'IMPROVED' : 'STANDARD',
       accuracy,
       distanceInterval,
       timeInterval,
-      deadReckoningEnabled: _deadReckoningEnabled,
     });
-
-    // Start dead reckoning update loop if enabled
-    if (_deadReckoningEnabled) {
-      startDeadReckoningLoop();
-    }
   } catch (error) {
     console.error('Failed to start location tracking:', error);
     isTracking = false;
@@ -259,46 +442,7 @@ export async function startLocationTracking(options?: {
 }
 
 /**
- * Dead reckoning update loop - runs when GPS quality is poor
- */
-let deadReckoningInterval: number | null = null;
-
-function startDeadReckoningLoop(): void {
-  if (deadReckoningInterval) return;
-
-  deadReckoningInterval = globalThis.setInterval(() => {
-    if (!shouldUseDeadReckoning() || !lastCoordinates) return;
-
-    const now = Date.now();
-    const elapsedSeconds = _lastTimestamp ? (now - _lastTimestamp) / 1000 : 0;
-
-    if (elapsedSeconds > 0 && elapsedSeconds < 60) {
-      // Update position using dead reckoning
-      const newPos = calculateDeadReckoningPosition(
-        lastCoordinates,
-        _lastHeading,
-        _lastSpeed,
-        elapsedSeconds
-      );
-
-      lastCoordinates = newPos;
-      _lastTimestamp = now;
-
-      // Notify quality change (we're now using dead reckoning)
-      notifyQualityChange();
-    }
-  }, DEAD_RECKONING_UPDATE_INTERVAL);
-}
-
-function stopDeadReckoningLoop(): void {
-  if (deadReckoningInterval) {
-    globalThis.clearInterval(deadReckoningInterval);
-    deadReckoningInterval = null;
-  }
-}
-
-/**
- * Stops tracking.
+ * Stops tracking
  */
 export function stopLocationTracking(): void {
   if (!subscription) return;
@@ -307,40 +451,23 @@ export function stopLocationTracking(): void {
   subscription = null;
   isTracking = false;
 
-  stopDeadReckoningLoop();
+  // Clear averaging state
+  recentReadings.length = 0;
+  lastValidCoordinates = null;
 
   console.log('Stopped location tracking');
 }
 
 /**
- * Returns:
- * - Cached coordinates instantly if tracking
- * - Dead reckoning estimate if GPS is poor
- * - Otherwise tries last known
- * - Otherwise fetches a new position
+ * Returns coordinates
  */
 export async function getCurrentCoordinates(options?: {
   forceHighAccuracy?: boolean;
 }): Promise<Coordinates> {
   await validateLocationPermission();
 
-  // If actively tracking and we have a value
+  // If actively tracking and we have coordinates, return them
   if (subscription && lastCoordinates) {
-    // Check if we should use dead reckoning
-    if (shouldUseDeadReckoning() && _deadReckoningEnabled) {
-      const now = Date.now();
-      const elapsedSeconds = _lastTimestamp ? (now - _lastTimestamp) / 1000 : 0;
-
-      if (elapsedSeconds > 0 && elapsedSeconds < 60) {
-        return calculateDeadReckoningPosition(
-          lastCoordinates,
-          _lastHeading,
-          _lastSpeed,
-          elapsedSeconds
-        );
-      }
-    }
-
     return lastCoordinates;
   }
 
@@ -352,24 +479,16 @@ export async function getCurrentCoordinates(options?: {
     mayShowUserSettingsDialog: true,
   });
 
-  const newAccuracy = position.coords.accuracy ?? null;
-
-  lastCoordinates = {
+  const coords = {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
-    accuracy: newAccuracy ?? undefined,
-    source: 'gps',
   };
-  _lastAccuracy = newAccuracy;
-  _lastTimestamp = position.timestamp;
-  _lastSpeed = position.coords.speed ?? null;
-  _lastHeading = position.coords.heading ?? null;
 
-  // Track good fix
-  const quality = getGPSQuality(newAccuracy);
-  if (quality === GPSQuality.GOOD) {
-    _lastGoodFixTimestamp = position.timestamp;
-  }
+  lastCoordinates = coords;
+  _lastAccuracy = position.coords.accuracy ?? null;
+  _lastTimestamp = position.timestamp;
+
+  addReading(coords, _lastAccuracy, position.timestamp);
 
   return lastCoordinates;
 }
