@@ -12,6 +12,10 @@ type RuntimeEnv = {
   SUPABASE_ANON_KEY?: string;
 };
 
+type SupabaseJwtPayload = {
+  role?: unknown;
+};
+
 const runtimeEnv =
   (typeof globalThis !== 'undefined'
     ? (globalThis as { process?: { env?: RuntimeEnv } }).process?.env
@@ -36,10 +40,41 @@ const supabaseAnonKey =
   runtimeEnv.SUPABASE_ANON_KEY ||
   '';
 
-function createUnavailableSupabaseClient(): SupabaseClient<Database> {
-  const errorMessage =
-    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for web, or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY for mobile.';
+const defaultUnavailableErrorMessage =
+  'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for web, or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY for mobile.';
 
+const decodeJwtPayload = (jwt: string): SupabaseJwtPayload | null => {
+  const parts = jwt.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const normalizedPayload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
+
+  try {
+    if (typeof globalThis.atob === 'function') {
+      return JSON.parse(globalThis.atob(paddedPayload)) as SupabaseJwtPayload;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const getSupabaseKeyRole = (key: string): string | null => {
+  const payload = decodeJwtPayload(key);
+  return typeof payload?.role === 'string' ? payload.role : null;
+};
+
+const supabaseKeyRole = getSupabaseKeyRole(supabaseAnonKey);
+const isUnexpectedSupabaseKeyRole = !!supabaseKeyRole && supabaseKeyRole !== 'anon';
+const invalidRoleErrorMessage = isUnexpectedSupabaseKeyRole
+  ? `Invalid Supabase client key role "${supabaseKeyRole}". Client applications must use the anon key.`
+  : defaultUnavailableErrorMessage;
+
+function createUnavailableSupabaseClient(errorMessage: string): SupabaseClient<Database> {
   const throwUnavailable = () => {
     throw new Error(errorMessage);
   };
@@ -52,9 +87,11 @@ function createUnavailableSupabaseClient(): SupabaseClient<Database> {
 }
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for web, or EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY for mobile.'
-  );
+  console.error(defaultUnavailableErrorMessage);
+}
+
+if (isUnexpectedSupabaseKeyRole) {
+  console.error(invalidRoleErrorMessage);
 }
 
 /**
@@ -62,7 +99,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * Can be used across mobile and web apps.
  */
 export const supabase =
-  supabaseUrl && supabaseAnonKey
+  supabaseUrl && supabaseAnonKey && !isUnexpectedSupabaseKeyRole
     ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: true,
@@ -70,7 +107,7 @@ export const supabase =
           storage: AsyncStorage,
         },
       })
-    : createUnavailableSupabaseClient();
+    : createUnavailableSupabaseClient(invalidRoleErrorMessage);
 
 // Export types for convenience
 export type { Database, Tables, TablesInsert, TablesUpdate } from '../models/database-types';
