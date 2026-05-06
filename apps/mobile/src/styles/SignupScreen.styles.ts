@@ -82,6 +82,18 @@ export const createSignupScreenStyles = (themeColors: AppColors) =>
       justifyContent: 'center',
       paddingVertical: 12,
     },
+    passwordRequirementText: {
+      marginTop: 8,
+      fontSize: 12,
+      lineHeight: 16,
+      color: themeColors.textMuted,
+    },
+    passwordRequirementError: {
+      color: themeColors.danger,
+    },
+    passwordRequirementSuccess: {
+      color: themeColors.success,
+    },
     termsRow: {
       marginTop: 14,
       flexDirection: 'row',

@@ -24,6 +24,10 @@ export interface SignupScreenProps {
   onBackToLogin: () => void;
 }
 
+const PASSWORD_MIN_LENGTH = 6;
+const PASSWORD_REQUIREMENT_MESSAGE =
+  'Use at least 6 characters, including 1 uppercase letter, 1 number, and 1 symbol.';
+
 const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
   const trimmedName = fullName.trim();
   const nameParts = trimmedName.split(/\s+/);
@@ -39,6 +43,52 @@ const parseFullName = (fullName: string): { firstName: string; lastName: string 
   }
 };
 
+const getMissingPasswordRequirements = (password: string): string[] => {
+  const missing: string[] = [];
+
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    missing.push('6+ characters');
+  }
+  if (!/[A-Z]/.test(password)) {
+    missing.push('uppercase letter');
+  }
+  if (!/\d/.test(password)) {
+    missing.push('number');
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    missing.push('symbol');
+  }
+
+  return missing;
+};
+
+const formatSignupErrorMessage = (rawMessage: string): string => {
+  const normalized = rawMessage.trim();
+  const message = normalized.toLowerCase();
+
+  if (message.includes('user already registered')) {
+    return 'An account with this email already exists. Try signing in or resetting your password.';
+  }
+
+  if (message.includes('invalid email')) {
+    return 'Please enter a valid email address.';
+  }
+
+  if (message.includes('signup is disabled')) {
+    return 'Sign up is currently unavailable. Please try again later.';
+  }
+
+  if (message.includes('rate') || message.includes('too many requests')) {
+    return 'Too many signup attempts. Please wait a few minutes and try again.';
+  }
+
+  if (message.includes('password')) {
+    return `Password requirements were not met. ${PASSWORD_REQUIREMENT_MESSAGE}`;
+  }
+
+  return normalized || 'Unable to create account. Please try again.';
+};
+
 const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLogin }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createSignupScreenStyles(colors), [colors]);
@@ -49,10 +99,19 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const missingPasswordRequirements = getMissingPasswordRequirements(password);
+  const hasPassword = password.length > 0;
+  const passwordIsValid = hasPassword && missingPasswordRequirements.length === 0;
+  const passwordHelpText = hasPassword
+    ? passwordIsValid
+      ? 'Password meets all requirements.'
+      : `Missing: ${missingPasswordRequirements.join(', ')}.`
+    : PASSWORD_REQUIREMENT_MESSAGE;
+
   const canSubmit =
     name.trim().length > 0 &&
     email.trim().length > 0 &&
-    password.length >= 6 &&
+    passwordIsValid &&
     password === confirm &&
     acceptedTerms;
 
@@ -64,13 +123,16 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
       const { firstName, lastName } = parseFullName(name);
       const { error } = await signUp(email, password, firstName, lastName);
       if (error) {
-        Alert.alert('Sign Up Failed', error.message);
+        Alert.alert('Sign Up Failed', formatSignupErrorMessage(error.message ?? ''));
         return;
       }
 
       onSignupSuccess();
     } catch (error) {
-      Alert.alert('Sign Up Failed', error instanceof Error ? error.message : 'Unexpected error');
+      Alert.alert(
+        'Sign Up Failed',
+        formatSignupErrorMessage(error instanceof Error ? error.message : '')
+      );
     } finally {
       setLoading(false);
     }
@@ -132,6 +194,18 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               value={password}
               onChangeText={setPassword}
             />
+            <Text
+              style={[
+                styles.passwordRequirementText,
+                hasPassword
+                  ? passwordIsValid
+                    ? styles.passwordRequirementSuccess
+                    : styles.passwordRequirementError
+                  : undefined,
+              ]}
+            >
+              {passwordHelpText}
+            </Text>
 
             <TextInputField
               label="Confirm password"
@@ -143,6 +217,9 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onBackToLo
               autoComplete="off"
               value={confirm}
               onChangeText={setConfirm}
+              errorText={
+                confirm.length > 0 && confirm !== password ? 'Passwords do not match.' : undefined
+              }
             />
 
             <View style={styles.termsRow}>
