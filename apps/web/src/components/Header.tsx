@@ -257,13 +257,13 @@ export function Header({
   };
 
   const showAdminUserFilter = Boolean(user?.isAdmin && onAdminUserFilterChange);
-  // Hide projects filter when admin user filter is active — the row has no room for both
-  const showProjectFilter = Boolean(user && !showAdminUserFilter);
+  // Always show project filter for logged-in users (admins can use both filters)
+  const showProjectFilter = Boolean(user);
 
   return (
     <>
       <header className="bg-blue-200 border-b">
-        <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
+        <div className="flex items-center gap-2 px-4 py-2 flex-nowrap">
           {/* Logo + title */}
           <WaveIcon className="size-8 text-blue-700 shrink-0" />
           <h1 className="shrink-0 whitespace-nowrap">Waterways Observation System</h1>
@@ -286,13 +286,14 @@ export function Header({
           </button>
 
           {/* Filters — grow to fill available space */}
-          <div className="flex items-center gap-2 flex-1 flex-wrap min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-nowrap">
             {showAdminUserFilter && (
               <AdminUserFilter
                 users={adminUserOptions ?? []}
                 selectedUserId={selectedAdminUserId ?? null}
                 onChange={onAdminUserFilterChange!}
                 loading={adminUserFilterLoading ?? false}
+                className="w-[100px] md:w-[120px] lg:w-[140px] font-semibold h-8"
               />
             )}
 
@@ -300,12 +301,22 @@ export function Header({
               dateFrom={filters.dateFrom}
               dateTo={filters.dateTo}
               onChange={({ dateFrom, dateTo }) => onFilterChange({ ...filters, dateFrom, dateTo })}
+              className="w-[100px] md:w-[120px] lg:w-[140px] font-semibold h-8"
             />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0 bg-background font-normal">
-                  {getTypeFilterLabel()}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 bg-background font-semibold h-8"
+                >
+                  <span
+                    className="w-[96px] inline-block overflow-hidden truncate align-middle text-left"
+                    title={getTypeFilterLabel()}
+                  >
+                    {getTypeFilterLabel()}
+                  </span>
                   <ChevronDown className="size-4 ml-2 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
@@ -337,14 +348,14 @@ export function Header({
               placeholder="Search keywords..."
               value={filters.keywords}
               onChange={(e) => handleFilterChange('keywords', e.target.value)}
-              className="min-w-[160px] flex-1 bg-background h-8 text-sm"
+              className="w-[140px] md:w-[160px] lg:w-[200px] bg-background h-8 text-sm font-semibold"
             />
 
             <Button
               type="button"
               variant={filters.hasMedia ? 'default' : 'outline'}
               size="sm"
-              className="shrink-0"
+              className="shrink-0 font-semibold h-8"
               onClick={() => handleFilterChange('hasMedia', !filters.hasMedia)}
               title="Only show observations with media"
             >
@@ -357,7 +368,10 @@ export function Header({
                 value={filters.myProjects || 'all'}
                 onValueChange={(value: string) => handleFilterChange('myProjects', value)}
               >
-                <SelectTrigger size="sm" className="w-[160px] bg-background shrink-0">
+                <SelectTrigger
+                  size="sm"
+                  className="w-[100px] md:w-[120px] lg:w-[140px] bg-background font-semibold shrink-0 h-8"
+                >
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999]">
@@ -399,9 +413,14 @@ export function Header({
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <User className="size-4 mr-2" />
-                  {visibleUserName}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title={visibleUserName}
+                  aria-label={visibleUserName}
+                  className="shrink-0"
+                >
+                  <User className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[9999]">

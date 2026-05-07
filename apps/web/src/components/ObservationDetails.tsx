@@ -202,7 +202,7 @@ export function ObservationDetails({
             <p className="text-sm">{observation.observation}</p>
           </div>
 
-          {observation.photos.length > 0 && (
+          {(observation.photos.length > 0 || observation.videos.length > 0) && (
             <div>
               <h3 className="font-medium mb-2">Media</h3>
               <div className="space-y-2">
@@ -214,18 +214,16 @@ export function ObservationDetails({
                     className="rounded-lg object-cover w-full h-48"
                   />
                 ))}
-              </div>
-            </div>
-          )}
-
-          {observation.videos.length > 0 && (
-            <div>
-              <h3 className="font-medium mb-2">Videos</h3>
-              <div className="space-y-2">
                 {observation.videos.map((video, index) => (
-                  <div key={`${video}-${index}`} className="text-sm text-muted-foreground">
-                    Video clip {index + 1}
-                  </div>
+                  <video
+                    key={`${video}-${index}`}
+                    controls
+                    preload="metadata"
+                    className="rounded-lg w-full h-48 bg-black"
+                  >
+                    <source src={video} />
+                    Your browser does not support this video format.
+                  </video>
                 ))}
               </div>
             </div>

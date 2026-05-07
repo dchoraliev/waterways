@@ -55,7 +55,7 @@ describe('fetchDailyObservations', () => {
           created_at: '2026-02-25T10:30:00.000Z',
           observation: 'Test observation',
           categories: ['Wildlife', 'Birds'],
-          observation_media: ['photo1.jpg'],
+          observation_media: ['photo1.jpg', 'clip1.mp4'],
           project_id: 'project-1',
           project_name: 'Test Project',
           project_description: null,
@@ -79,9 +79,10 @@ describe('fetchDailyObservations', () => {
       observerName: 'John Doe',
       userId: 'user-1',
       photos: ['photo1.jpg'],
+      videos: ['clip1.mp4'],
       type: 'Wildlife',
       keywords: ['Wildlife', 'Birds'],
-      videos: [],
     });
+    expect(result[0].timestamp).toMatch(/^\d{1,2}:\d{2}:\d{2}(?:\s?[AP]M)?(?:\s.+)?$/);
   });
 });
