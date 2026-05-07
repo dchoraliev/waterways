@@ -21,6 +21,7 @@
     "mobile:eas:build:ios:sandbox": "cd apps/mobile && cross-env APP_VARIANT=sandbox APP_DISPLAY_NAME=\"Waterways Sandbox\" IOS_BUNDLE_ID=com.waterways.mobile.sandbox EXPO_SCHEME=waterways-sandbox EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build --non-interactive -p ios --profile development_sandbox",
     "mobile:eas:build:ios": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build -p ios --profile production",
     "mobile:eas:build:ios:ci": "cd apps/mobile && cross-env EAS_SKIP_AUTO_FINGERPRINT=1 npx eas-cli build --non-interactive -p ios --profile production",
+    "mobile:eas:build:testflight": "cd apps/mobile && eas build --platform ios --profile production --auto-submit",
     "web": "cross-env VITE_CJS_IGNORE_WARNING=true yarn workspace @waterways/web dev",
     "build:shared": "yarn workspace @waterways/shared build",
     "types:generate": "npx supabase gen types typescript --project-id gvitbturpeirneatzagn > packages/shared/src/models/database-types.ts",
