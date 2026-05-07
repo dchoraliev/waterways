@@ -140,6 +140,42 @@ function getProfileFullName(profile: UserObserverProfileRow | undefined): string
   return `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
 }
 
+function normalizeMediaExtension(url: string): string {
+  // Remove query params and hash, then get the file extension
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  const dotIndex = cleanUrl.lastIndexOf('.');
+  return dotIndex >= 0 ? cleanUrl.slice(dotIndex + 1) : '';
+}
+
+function isVideoMediaUrl(url: string): boolean {
+  const extension = normalizeMediaExtension(url);
+  if (!extension) {
+    return /\/vidoes\/|\/videos\//i.test(url);
+  }
+
+  return ['mp4', 'mov', 'webm', 'm4v', 'mkv', 'avi', 'wmv', 'ogg', 'ogv'].includes(extension);
+}
+
+function splitObservationMedia(media: string[]): { photos: string[]; videos: string[] } {
+  const photos: string[] = [];
+  const videos: string[] = [];
+
+  for (const mediaUrl of media) {
+    if (!mediaUrl || typeof mediaUrl !== 'string') {
+      continue;
+    }
+
+    if (isVideoMediaUrl(mediaUrl)) {
+      videos.push(mediaUrl);
+      continue;
+    }
+
+    photos.push(mediaUrl);
+  }
+
+  return { photos, videos };
+}
+
 async function getObserverContext(rows: ObservationRow[]): Promise<{
   isAdminViewer: boolean;
   profilesById: Map<string, UserObserverProfileRow>;
@@ -299,6 +335,7 @@ function mapRowToObservation(
 
   const categories = Array.isArray(row.categories) ? row.categories : [];
   const media = Array.isArray(row.observation_media) ? row.observation_media : [];
+  const { photos, videos } = splitObservationMedia(media);
 
   return {
     id: row.id,
@@ -316,8 +353,8 @@ function mapRowToObservation(
     observation: row.observation ?? '',
     observerName,
     userId: row.user_id ?? '',
-    photos: media,
-    videos: [],
+    photos,
+    videos,
     type: categories[0] ?? 'Observation',
     keywords: categories,
   };
@@ -489,6 +526,7 @@ export async function fetchObservationsForRangeWithRelations(
     const created = new Date(dailyRow.created_at);
     const categories = Array.isArray(dailyRow.categories) ? dailyRow.categories : [];
     const media = Array.isArray(dailyRow.observation_media) ? dailyRow.observation_media : [];
+    const { photos, videos } = splitObservationMedia(media);
 
     return {
       id: dailyRow.id,
@@ -504,6 +542,7 @@ export async function fetchObservationsForRangeWithRelations(
       timestamp: created.toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
+        second: '2-digit',
       }),
       date: [
         created.getFullYear(),
@@ -513,8 +552,8 @@ export async function fetchObservationsForRangeWithRelations(
       observation: dailyRow.observation ?? '',
       observerName,
       userId: dailyRow.user_id ?? '',
-      photos: media,
-      videos: [],
+      photos,
+      videos,
       type: categories[0] ?? 'Observation',
       keywords: categories,
     } satisfies Observation;

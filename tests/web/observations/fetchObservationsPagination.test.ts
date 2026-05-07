@@ -96,6 +96,40 @@ describe('fetchObservations pagination metadata', () => {
     expect(result.nextOffset).toBeNull();
   });
 
+  it('splits image and video URLs into photos and videos arrays', async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [
+        {
+          id: 'obs-3',
+          location: null,
+          user_id: 'user-3',
+          trip_id: 'trip-3',
+          created_at: '2026-02-25T18:00:00.000Z',
+          observation: 'sample with media',
+          categories: ['Fish'],
+          observation_media: [
+            'https://example.com/media/photo.jpg',
+            'https://example.com/media/clip.mp4',
+          ],
+          project_id: 'proj-3',
+          project_name: 'Project 3',
+          project_description: null,
+          observer_first_name: 'Sam',
+          observer_last_name: 'River',
+          latitude: 44,
+          longitude: -90,
+          total_count: 1,
+        },
+      ],
+      error: null,
+    });
+
+    const result = await fetchObservations({ limit: 1000, offset: 0 });
+
+    expect(result.observations[0].photos).toEqual(['https://example.com/media/photo.jpg']);
+    expect(result.observations[0].videos).toEqual(['https://example.com/media/clip.mp4']);
+  });
+
   it('returns empty metadata when rpc errors', async () => {
     (supabase.rpc as jest.Mock).mockResolvedValue({
       data: null,

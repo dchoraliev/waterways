@@ -40,6 +40,14 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
+const OBSERVATION_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   day: 'numeric',
@@ -524,7 +532,7 @@ export function DailyReportPopup({
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Last observation:{' '}
-                          {DATE_TIME_FORMATTER.format(new Date(group.lastObservationAt))}
+                          {OBSERVATION_TIME_FORMATTER.format(new Date(group.lastObservationAt))}
                         </div>
                       </div>
                       <Badge variant="secondary" className="shrink-0">
@@ -567,7 +575,7 @@ export function DailyReportPopup({
                                     <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
                                       <span className="flex items-center gap-1">
                                         <Clock className="size-3" />
-                                        {DATE_TIME_FORMATTER.format(new Date(obs.createdAt))}
+                                        {OBSERVATION_TIME_FORMATTER.format(new Date(obs.createdAt))}
                                       </span>
                                       <span className="flex items-center gap-2">
                                         {hasMedia(obs) && (
@@ -599,7 +607,7 @@ export function DailyReportPopup({
                                 <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     <Clock className="size-3" />
-                                    {DATE_TIME_FORMATTER.format(new Date(obs.createdAt))}
+                                    {OBSERVATION_TIME_FORMATTER.format(new Date(obs.createdAt))}
                                   </span>
                                   <span className="flex items-center gap-2">
                                     {hasMedia(obs) && (

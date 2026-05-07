@@ -58,7 +58,7 @@ export function AdminUserFilter({
       <Button
         variant="outline"
         size="sm"
-        className={cn('w-[220px] justify-between bg-background font-normal', className)}
+        className={cn('w-[140px] justify-between bg-background font-normal', className)}
         onClick={() => setOpen(true)}
       >
         <span className="flex min-w-0 items-center gap-2">

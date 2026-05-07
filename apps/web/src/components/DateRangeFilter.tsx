@@ -201,7 +201,7 @@ export function DateRangeFilter({ dateFrom, dateTo, onChange, className }: DateR
         ref={triggerRef}
         variant="outline"
         size="sm"
-        className={cn('w-[240px] justify-between bg-background', className)}
+        className={cn('w-[140px] justify-between bg-background', className)}
         onClick={handleToggle}
       >
         <span className="truncate">{formatRangeLabel(appliedRange)}</span>
