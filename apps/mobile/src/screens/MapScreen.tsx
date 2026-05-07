@@ -259,7 +259,11 @@ function buildLeafletHTML(
       try {
         var d = new Date(isoString);
         var datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        var timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        var timePart = d.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit'
+        });
         return datePart + ' at ' + timePart;
       } catch(e) { return isoString; }
     }

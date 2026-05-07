@@ -104,7 +104,11 @@ const ReviewObservationsScreen = () => {
           const createdAt = new Date(row.created_at);
           return {
             id: row.id,
-            time: createdAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+            time: createdAt.toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              second: '2-digit',
+            }),
             description: row.observation ?? 'No observation text',
             tags: row.categories ?? [],
           };
