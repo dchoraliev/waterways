@@ -64,8 +64,6 @@ interface HeaderProps {
 }
 
 type AuthDialog = 'signin' | 'signup' | null;
-const DELETE_DATA_CONFIRMATION = 'DELETE DATA';
-const DELETE_ACCOUNT_CONFIRMATION = 'DELETE ACCOUNT';
 
 export function Header({
   filters,
@@ -91,11 +89,16 @@ export function Header({
   const [mapAlertStyle, setMapAlertStyle] = useState<globalThis.React.CSSProperties>({});
   const [deleteDataDialogOpen, setDeleteDataDialogOpen] = useState(false);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
-  const [deleteDataConfirmation, setDeleteDataConfirmation] = useState('');
-  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('');
+  const [deleteDataPassword, setDeleteDataPassword] = useState('');
+  const [deleteDataReauthCode, setDeleteDataReauthCode] = useState('');
+  const [hasRequestedDeleteDataReauth, setHasRequestedDeleteDataReauth] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deleteAccountReauthCode, setDeleteAccountReauthCode] = useState('');
+  const [hasRequestedDeleteAccountReauth, setHasRequestedDeleteAccountReauth] = useState(false);
   const [deleteDataError, setDeleteDataError] = useState('');
   const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [isRequestingDeleteDataReauth, setIsRequestingDeleteDataReauth] = useState(false);
+  const [isRequestingDeleteAccountReauth, setIsRequestingDeleteAccountReauth] = useState(false);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const mapAlertTriggerRef = useRef<globalThis.HTMLButtonElement | null>(null);
@@ -164,14 +167,72 @@ export function Header({
   };
 
   const resetDeleteDataDialog = () => {
-    setDeleteDataConfirmation('');
+    setDeleteDataPassword('');
+    setDeleteDataReauthCode('');
+    setHasRequestedDeleteDataReauth(false);
     setDeleteDataError('');
   };
 
   const resetDeleteAccountDialog = () => {
-    setDeleteAccountConfirmation('');
     setDeleteAccountPassword('');
+    setDeleteAccountReauthCode('');
+    setHasRequestedDeleteAccountReauth(false);
     setDeleteAccountError('');
+  };
+
+  const requestReauthEmail = async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase.auth.reauthenticate();
+
+    if (error) {
+      return { ok: false, message: error.message || 'Unable to send verification code.' };
+    }
+
+    return { ok: true };
+  };
+
+  const verifyReauthCode = async (
+    reauthCode: string
+  ): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const trimmedCode = reauthCode.trim();
+    if (!trimmedCode) {
+      return { ok: false, message: 'Verification code is required.' };
+    }
+
+    const {
+      data: { user: authUser },
+      error: getUserError,
+    } = await supabase.auth.getUser();
+
+    if (getUserError || !authUser) {
+      return { ok: false, message: getUserError?.message || 'No active user session.' };
+    }
+
+    const { error: verifyCodeError } = await supabase.auth.updateUser({
+      data: authUser.user_metadata ?? {},
+      nonce: trimmedCode,
+    });
+
+    if (verifyCodeError) {
+      return {
+        ok: false,
+        message: verifyCodeError.message || 'Verification code is invalid.',
+      };
+    }
+
+    return { ok: true };
+  };
+
+  const handleEnterSubmit = (
+    event: globalThis.React.KeyboardEvent<globalThis.HTMLInputElement>,
+    submit: () => Promise<void>,
+    disabled: boolean
+  ) => {
+    if (event.key !== 'Enter' || disabled) {
+      return;
+    }
+
+    event.preventDefault();
+    void submit();
   };
 
   const handleDeleteOwnData = async () => {
@@ -180,14 +241,52 @@ export function Header({
       return;
     }
 
-    if (deleteDataConfirmation.trim().toUpperCase() !== DELETE_DATA_CONFIRMATION) {
-      setDeleteDataError(`Please type ${DELETE_DATA_CONFIRMATION} to continue.`);
+    if (!deleteDataPassword.trim()) {
+      setDeleteDataError('Current password is required.');
+      return;
+    }
+
+    if (!hasRequestedDeleteDataReauth) {
+      try {
+        setIsRequestingDeleteDataReauth(true);
+        setDeleteDataError('');
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: activeUser.email,
+          password: deleteDataPassword,
+        });
+        if (signInError) {
+          setDeleteDataError(signInError.message || 'Current password is incorrect.');
+          return;
+        }
+
+        const reauthResult = await requestReauthEmail();
+        if (!reauthResult.ok) {
+          setDeleteDataError(reauthResult.message);
+          return;
+        }
+
+        setHasRequestedDeleteDataReauth(true);
+        toast.success('Verification code sent to your email.');
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        setDeleteDataError(message || 'Unable to send verification code.');
+      } finally {
+        setIsRequestingDeleteDataReauth(false);
+      }
+
       return;
     }
 
     try {
       setIsDeletingData(true);
       setDeleteDataError('');
+
+      const verifyCodeResult = await verifyReauthCode(deleteDataReauthCode);
+      if (!verifyCodeResult.ok) {
+        setDeleteDataError(verifyCodeResult.message);
+        return;
+      }
 
       const result = await anonymizeOwnObservations({ action: 'confirm-anonymize' });
       if (!result.success) {
@@ -213,19 +312,52 @@ export function Header({
       return;
     }
 
-    if (deleteAccountConfirmation.trim().toUpperCase() !== DELETE_ACCOUNT_CONFIRMATION) {
-      setDeleteAccountError(`Please type ${DELETE_ACCOUNT_CONFIRMATION} to continue.`);
+    if (!deleteAccountPassword.trim()) {
+      setDeleteAccountError('Current password is required.');
       return;
     }
 
-    if (!deleteAccountPassword.trim()) {
-      setDeleteAccountError('Current password is required.');
+    if (!hasRequestedDeleteAccountReauth) {
+      try {
+        setIsRequestingDeleteAccountReauth(true);
+        setDeleteAccountError('');
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: activeUser.email,
+          password: deleteAccountPassword,
+        });
+        if (signInError) {
+          setDeleteAccountError(signInError.message || 'Current password is incorrect.');
+          return;
+        }
+
+        const reauthResult = await requestReauthEmail();
+        if (!reauthResult.ok) {
+          setDeleteAccountError(reauthResult.message);
+          return;
+        }
+
+        setHasRequestedDeleteAccountReauth(true);
+        toast.success('Verification code sent to your email.');
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        setDeleteAccountError(message || 'Unable to send verification code.');
+      } finally {
+        setIsRequestingDeleteAccountReauth(false);
+      }
+
       return;
     }
 
     try {
       setIsDeletingAccount(true);
       setDeleteAccountError('');
+
+      const verifyCodeResult = await verifyReauthCode(deleteAccountReauthCode);
+      if (!verifyCodeResult.ok) {
+        setDeleteAccountError(verifyCodeResult.message);
+        return;
+      }
 
       const result = await deleteAccount({
         action: 'confirm-delete',
@@ -539,15 +671,40 @@ export function Header({
             <DialogTitle>Delete Your Data</DialogTitle>
             <DialogDescription>
               This will remove personal identifiers from your observations and keep the observations
-              as anonymous records. Type <strong>{DELETE_DATA_CONFIRMATION}</strong> to confirm.
+              as anonymous records. Enter your current password, then request and enter the email
+              verification code to continue.
             </DialogDescription>
           </DialogHeader>
           <Input
-            value={deleteDataConfirmation}
-            onChange={(event) => setDeleteDataConfirmation(event.target.value)}
-            placeholder={DELETE_DATA_CONFIRMATION}
-            autoComplete="off"
+            value={deleteDataPassword}
+            onChange={(event) => setDeleteDataPassword(event.target.value)}
+            onKeyDown={(event) =>
+              handleEnterSubmit(
+                event,
+                handleDeleteOwnData,
+                isDeletingData || isRequestingDeleteDataReauth
+              )
+            }
+            placeholder="Current password"
+            type="password"
+            autoComplete="current-password"
           />
+          {hasRequestedDeleteDataReauth && (
+            <Input
+              value={deleteDataReauthCode}
+              onChange={(event) => setDeleteDataReauthCode(event.target.value)}
+              onKeyDown={(event) =>
+                handleEnterSubmit(
+                  event,
+                  handleDeleteOwnData,
+                  isDeletingData || isRequestingDeleteDataReauth
+                )
+              }
+              placeholder="Email verification code"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+            />
+          )}
           {deleteDataError ? <p className="text-sm text-destructive">{deleteDataError}</p> : null}
           <DialogFooter>
             <Button
@@ -557,7 +714,7 @@ export function Header({
                 setDeleteDataDialogOpen(false);
                 resetDeleteDataDialog();
               }}
-              disabled={isDeletingData}
+              disabled={isDeletingData || isRequestingDeleteDataReauth}
             >
               Cancel
             </Button>
@@ -565,9 +722,15 @@ export function Header({
               type="button"
               variant="destructive"
               onClick={handleDeleteOwnData}
-              disabled={isDeletingData}
+              disabled={isDeletingData || isRequestingDeleteDataReauth}
             >
-              {isDeletingData ? 'Anonymizing Data...' : 'Delete My Data'}
+              {isRequestingDeleteDataReauth
+                ? 'Sending Code...'
+                : isDeletingData
+                  ? 'Anonymizing Data...'
+                  : hasRequestedDeleteDataReauth
+                    ? 'Confirm Delete My Data'
+                    : 'Send Verification Code'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -586,24 +749,40 @@ export function Header({
           <DialogHeader>
             <DialogTitle>Delete Your Account</DialogTitle>
             <DialogDescription>
-              This permanently deletes your account. Type{' '}
-              <strong>{DELETE_ACCOUNT_CONFIRMATION}</strong> and enter your current password to
-              continue.
+              This permanently deletes your account. Enter your current password, then verify with
+              the email code to continue.
             </DialogDescription>
           </DialogHeader>
           <Input
-            value={deleteAccountConfirmation}
-            onChange={(event) => setDeleteAccountConfirmation(event.target.value)}
-            placeholder={DELETE_ACCOUNT_CONFIRMATION}
-            autoComplete="off"
-          />
-          <Input
             value={deleteAccountPassword}
             onChange={(event) => setDeleteAccountPassword(event.target.value)}
+            onKeyDown={(event) =>
+              handleEnterSubmit(
+                event,
+                handleDeleteAccount,
+                isDeletingAccount || isRequestingDeleteAccountReauth
+              )
+            }
             placeholder="Current password"
             type="password"
             autoComplete="current-password"
           />
+          {hasRequestedDeleteAccountReauth && (
+            <Input
+              value={deleteAccountReauthCode}
+              onChange={(event) => setDeleteAccountReauthCode(event.target.value)}
+              onKeyDown={(event) =>
+                handleEnterSubmit(
+                  event,
+                  handleDeleteAccount,
+                  isDeletingAccount || isRequestingDeleteAccountReauth
+                )
+              }
+              placeholder="Email verification code"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+            />
+          )}
           {deleteAccountError ? (
             <p className="text-sm text-destructive">{deleteAccountError}</p>
           ) : null}
@@ -615,7 +794,7 @@ export function Header({
                 setDeleteAccountDialogOpen(false);
                 resetDeleteAccountDialog();
               }}
-              disabled={isDeletingAccount}
+              disabled={isDeletingAccount || isRequestingDeleteAccountReauth}
             >
               Cancel
             </Button>
@@ -623,9 +802,15 @@ export function Header({
               type="button"
               variant="destructive"
               onClick={handleDeleteAccount}
-              disabled={isDeletingAccount}
+              disabled={isDeletingAccount || isRequestingDeleteAccountReauth}
             >
-              {isDeletingAccount ? 'Deleting Account...' : 'Delete My Account'}
+              {isRequestingDeleteAccountReauth
+                ? 'Sending Code...'
+                : isDeletingAccount
+                  ? 'Deleting Account...'
+                  : hasRequestedDeleteAccountReauth
+                    ? 'Confirm Delete My Account'
+                    : 'Send Verification Code'}
             </Button>
           </DialogFooter>
         </DialogContent>
