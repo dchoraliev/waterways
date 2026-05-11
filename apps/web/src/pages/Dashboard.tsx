@@ -503,7 +503,8 @@ export function Dashboard() {
         return false;
       }
 
-      if (filters.hasMedia && obs.photos.length + obs.videos.length === 0) {
+      const hasAudio = Boolean(obs.audioRecordingId);
+      if (filters.hasMedia && obs.photos.length + obs.videos.length === 0 && !hasAudio) {
         return false;
       }
 

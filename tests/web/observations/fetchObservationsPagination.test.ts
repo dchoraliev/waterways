@@ -136,6 +136,8 @@ describe('fetchObservations pagination metadata', () => {
       error: { message: 'boom' },
     });
 
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     const result = await fetchObservations({ limit: 1000, offset: 0 });
 
     expect(result).toEqual({
@@ -145,5 +147,8 @@ describe('fetchObservations pagination metadata', () => {
       nextOffset: null,
       pageSize: 1000,
     });
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 });

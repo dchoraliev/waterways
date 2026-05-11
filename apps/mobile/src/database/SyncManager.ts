@@ -7,20 +7,25 @@ import { SyncStatus } from './SyncStatus';
 
 const IMAGE_BUCKET = 'Images';
 const VIDEO_BUCKET = 'Vidoes';
+const AUDIO_BUCKET = 'Audios';
 let observationMediaUpsertAvailable = true;
 
 function getMediaBucketName(mediaType: string | null | undefined): string {
-  return mediaType === 'video' ? VIDEO_BUCKET : IMAGE_BUCKET;
+  if (mediaType === 'audio') return AUDIO_BUCKET;
+  if (mediaType === 'video') return VIDEO_BUCKET;
+  return IMAGE_BUCKET;
 }
 
 function getMediaFileExtension(mediaType: string | null | undefined): string {
   if (mediaType === 'video') return 'mp4';
+  if (mediaType === 'audio') return 'm4a';
   return 'jpg';
 }
 
 function getMediaContentType(mediaType: string | null | undefined): string {
   if (mediaType === 'video') return 'video/mp4';
-  return 'image/jpeg';
+  if (mediaType === 'audio') return 'audio/m4a';
+  return 'image/jpg';
 }
 
 function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -256,7 +261,33 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
 
     let upload_failed = false;
     let observationMediaUrls: string[] | null = null;
-    // Observation has a local media file which needs to be uploaded first
+    let recordingId: string | null = null;
+
+    // Observation audio is synced first. Each observation has its own audio_media_id.
+    const audioMediaId = (obs as unknown as { audio_media_id?: string | null }).audio_media_id;
+    if (audioMediaId) {
+      const audioMedia = await getMediaById(audioMediaId);
+
+      if (audioMedia?.media_type === 'audio') {
+        const { success, audioRecordingId } = await syncAudioMedia(audioMediaId, obs.user_id);
+        if (success && audioRecordingId) {
+          recordingId = audioRecordingId;
+          await updateObservationById(obs.id, { supabase_audio_media_id: audioRecordingId });
+        } else {
+          console.warn(
+            `[SyncManager] Audio upload failed for observation ${obs.id}, syncing observation without audio`
+          );
+          upload_failed = true;
+        }
+      } else {
+        console.warn(
+          `[SyncManager] Audio media ${audioMediaId} for observation ${obs.id} was not found or is not audio`
+        );
+        upload_failed = true;
+      }
+    }
+
+    // Observation has an additional local media file which needs to be uploaded after audio
     if (obs.local_media_id) {
       const { success, url } = await syncMedia(obs.local_media_id);
       if (success && url) {
@@ -285,6 +316,7 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
       observation: obs.observation ?? undefined,
       categories: obs.category_id ? [obs.category_id] : null,
       observation_media: observationMediaUrls, // Will be null if media failed
+      audio_recording_id: recordingId,
     };
     console.log(`[SyncManager] Preparing to sync observation - `, payload);
     const { error } = await supabase
@@ -304,7 +336,7 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
       if (upload_failed) {
         console.log(`[SyncManager] Observation synced (without media) - ${obs.id}`);
       } else {
-        console.log(`[SyncManager] Observation synced - ${obs.id}`);
+        console.log(`[SyncManager] Observation synced (with media) - ${obs.id}`);
       }
       await updateObservationById(obs.id, {
         sync_status: SyncStatus.SYNCED,
@@ -318,7 +350,125 @@ async function syncObservations(tripId: string, supabaseTripId: string): Promise
 }
 
 /**
- * Upload all multimedia for a single observation.
+ * Uplaod audio media for a single observation in private bucket.
+ */
+async function syncAudioMedia(
+  mediaId: string,
+  userId?: string
+): Promise<{ success: boolean; audioRecordingId: string | null }> {
+  const media = await getMediaById(mediaId);
+  if (!media) {
+    console.error(`[SyncManager] Sync failed: media ${mediaId} was not found in local database`);
+    return { success: false, audioRecordingId: null };
+  }
+  if (media.media_type !== 'audio') {
+    console.error(`[SyncManager] Sync failed: media ${mediaId} is not audio`);
+    return { success: false, audioRecordingId: null };
+  }
+
+  const ownerUserId = userId;
+  if (!ownerUserId) {
+    console.error(
+      `[SyncManager] Sync failed: user_id is required to upload audio ${mediaId} into user folder`
+    );
+    await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+    return { success: false, audioRecordingId: null };
+  }
+
+  try {
+    const bucket = getMediaBucketName(media.media_type);
+    const extension = getMediaFileExtension(media.media_type);
+    const contentType = getMediaContentType(media.media_type);
+    const fileBuffer = await readFileAsArrayBuffer(media.local_file_path);
+    const byteLength = fileBuffer.byteLength;
+    let supabaseAudioRecordingId: string = '';
+
+    console.log(`[SyncManager] Creating audio recording row entry for ${media.id}`);
+    const { data: audioRowData, error: audioRowError } = await supabase
+      .from('audio_recordings')
+      .upsert(
+        {
+          user_id: ownerUserId,
+          mime_type: contentType,
+          size_bytes: byteLength,
+          unique_userID_localID_pair: ownerUserId + '-' + media.id,
+        },
+        { onConflict: 'unique_userID_localID_pair' }
+      )
+      .select('id')
+      .single();
+    if (audioRowData) {
+      supabaseAudioRecordingId = audioRowData.id;
+      console.log(`[SyncManager] Audio recording created: ${supabaseAudioRecordingId}`);
+    }
+    if (audioRowError) {
+      console.error(`[SyncManager] Audio_recordings upsert failed for ${mediaId}:`, audioRowError);
+      await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+      return { success: false, audioRecordingId: null };
+    }
+
+    const path = `${ownerUserId}/${supabaseAudioRecordingId}.${extension}`;
+
+    console.log(
+      `[SyncManager] Uploading audio file ${media.id} to bucket=${bucket} at path=${path}`
+    );
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, fileBuffer, {
+      contentType,
+      upsert: true,
+    });
+    if (uploadError) {
+      console.error(
+        `[SyncManager] Sync failed: Audio file upload error for media ${mediaId}`,
+        uploadError
+      );
+      await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+      return { success: false, audioRecordingId: null };
+    }
+
+    // Audio file upload was successful
+    const { error: updateError } = await supabase
+      .from('audio_recordings')
+      .update({ file_name: supabaseAudioRecordingId, file_path: path })
+      .eq('id', supabaseAudioRecordingId);
+    if (updateError) {
+      console.error(
+        `[SyncManager] Sync failed: Audio recording row update error for ${mediaId}`,
+        updateError
+      );
+      await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+      return { success: false, audioRecordingId: null };
+    }
+
+    console.log(`[SyncManager] Audio file and recording row uploaded successfully for ${media.id}`);
+    await updateMediaById(mediaId, {
+      sync_status: SyncStatus.SYNCED,
+      last_synced_at: Date.now(),
+    });
+
+    return { success: true, audioRecordingId: supabaseAudioRecordingId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (
+      errorMessage.includes('File does not exist') ||
+      errorMessage.includes('is not readable') ||
+      errorMessage.includes('is empty')
+    ) {
+      console.warn(
+        `[SyncManager] Audio file missing or unreadable (will sync observation without audio):`,
+        `Media ID: ${mediaId}`,
+        `Path: ${media.local_file_path}`
+      );
+    } else {
+      console.error(`[SyncManager] Unexpected error while uploading audio ${mediaId}:`, error);
+    }
+
+    await updateMediaById(mediaId, { sync_status: SyncStatus.ERROR });
+    return { success: false, audioRecordingId: null };
+  }
+}
+/**
+ * Upload media for a single observation.
  */
 async function syncMedia(mediaId: string): Promise<{ success: boolean; url: string | null }> {
   const media = await getMediaById(mediaId);

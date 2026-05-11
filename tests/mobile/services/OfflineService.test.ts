@@ -79,28 +79,20 @@ describe('OfflineService', () => {
       error: null,
     } as unknown as Awaited<ReturnType<typeof getSession>>);
 
-    // Trips returned for OFFLINE_USER_ID and 'local-user' (temp block in OfflineService)
+    // Trips returned for OFFLINE_USER_ID
     getTripsByUserIdMock.mockImplementation(async (userId: string) => {
       if (userId === OFFLINE_USER_ID) {
         return [{ id: 'trip-off-1' }, { id: 'trip-off-2' }] as unknown as Awaited<
           ReturnType<typeof getTripsByUserId>
         >;
       }
-      if (userId === 'local-user') {
-        return [{ id: 'trip-local-1' }] as unknown as Awaited<ReturnType<typeof getTripsByUserId>>;
-      }
       return [] as unknown as Awaited<ReturnType<typeof getTripsByUserId>>;
     });
 
-    // Observations returned for OFFLINE_USER_ID and 'local-user'
+    // Observations returned for OFFLINE_USER_ID
     getObservationsByUserIdMock.mockImplementation(async (userId: string) => {
       if (userId === OFFLINE_USER_ID) {
         return [{ id: 'obs-off-1' }] as unknown as Awaited<
-          ReturnType<typeof getObservationsByUserId>
-        >;
-      }
-      if (userId === 'local-user') {
-        return [{ id: 'obs-local-1' }, { id: 'obs-local-2' }] as unknown as Awaited<
           ReturnType<typeof getObservationsByUserId>
         >;
       }
@@ -112,29 +104,20 @@ describe('OfflineService', () => {
     // Session checked
     expect(getSessionMock).toHaveBeenCalledTimes(1);
 
-    // Trips fetched for both OFFLINE_USER_ID and local-user (temp block)
+    // Trips fetched for OFFLINE_USER_ID
     expect(getTripsByUserIdMock).toHaveBeenCalledWith(OFFLINE_USER_ID);
-    expect(getTripsByUserIdMock).toHaveBeenCalledWith('local-user');
 
     // Each trip updated to current user
-    expect(updateTripByIdMock).toHaveBeenCalledTimes(3);
+    expect(updateTripByIdMock).toHaveBeenCalledTimes(2);
     expect(updateTripByIdMock).toHaveBeenCalledWith('trip-off-1', { user_id: currentUserId });
     expect(updateTripByIdMock).toHaveBeenCalledWith('trip-off-2', { user_id: currentUserId });
-    expect(updateTripByIdMock).toHaveBeenCalledWith('trip-local-1', { user_id: currentUserId });
 
-    // Observations fetched for both OFFLINE_USER_ID and local-user (temp block)
+    // Observations fetched for OFFLINE_USER_ID
     expect(getObservationsByUserIdMock).toHaveBeenCalledWith(OFFLINE_USER_ID);
-    expect(getObservationsByUserIdMock).toHaveBeenCalledWith('local-user');
 
     // Each observation updated to current user
-    expect(updateObservationByIdMock).toHaveBeenCalledTimes(3);
+    expect(updateObservationByIdMock).toHaveBeenCalledTimes(1);
     expect(updateObservationByIdMock).toHaveBeenCalledWith('obs-off-1', { user_id: currentUserId });
-    expect(updateObservationByIdMock).toHaveBeenCalledWith('obs-local-1', {
-      user_id: currentUserId,
-    });
-    expect(updateObservationByIdMock).toHaveBeenCalledWith('obs-local-2', {
-      user_id: currentUserId,
-    });
 
     // One-time sync triggered at end
     expect(performAutoSyncTaskOnceMock).toHaveBeenCalledTimes(1);

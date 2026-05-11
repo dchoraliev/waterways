@@ -42,7 +42,7 @@ import { SignUp } from '../pages/SignUp';
 import { toast } from 'sonner';
 import { WaveIcon } from './WaveIcon';
 import { DateRangeFilter } from './DateRangeFilter';
-import { anonymizeOwnObservations, deleteAccount } from '../api/account';
+import { anonymizeOwnObservations, deleteAccount, deleteUserAudios } from '../api/account';
 import { supabase } from '../services/supabase';
 
 interface HeaderProps {
@@ -288,7 +288,21 @@ export function Header({
         return;
       }
 
-      const result = await anonymizeOwnObservations({ action: 'confirm-anonymize' });
+      // 1. Delete user's audio files + audio_recordings rows first
+      const audioResult = await deleteUserAudios({
+        action: 'confirm-delete-user-audio',
+      });
+
+      if (!audioResult.success) {
+        setDeleteDataError(audioResult.error ?? 'Unable to delete your audio recordings.');
+        return;
+      }
+
+      // 2. Then anonymize user's observations
+      const result = await anonymizeOwnObservations({
+        action: 'confirm-anonymize',
+      });
+
       if (!result.success) {
         setDeleteDataError(result.error ?? 'Unable to anonymize your data.');
         return;
@@ -297,10 +311,12 @@ export function Header({
       onOwnDataDeleted?.(activeUser.id);
       setDeleteDataDialogOpen(false);
       resetDeleteDataDialog();
-      toast.success('Your observations were anonymized successfully.');
+
+      toast.success('Your observations and audio recordings were deleted successfully.');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      setDeleteDataError(message || 'Unable to anonymize your data.');
+
+      setDeleteDataError(message || 'Unable to delete your data.');
     } finally {
       setIsDeletingData(false);
     }
@@ -671,8 +687,9 @@ export function Header({
             <DialogTitle>Delete Your Data</DialogTitle>
             <DialogDescription>
               This will remove personal identifiers from your observations and keep the observations
-              as anonymous records. Enter your current password, then request and enter the email
-              verification code to continue.
+              as anonymous records. Any audio recordings connected to your observations will also be
+              permanently deleted from storage. Enter your current password, then request and enter
+              the email verification code to continue.
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -727,7 +744,7 @@ export function Header({
               {isRequestingDeleteDataReauth
                 ? 'Sending Code...'
                 : isDeletingData
-                  ? 'Anonymizing Data...'
+                  ? 'Deleting Audio and Anonymizing Data...'
                   : hasRequestedDeleteDataReauth
                     ? 'Confirm Delete My Data'
                     : 'Send Verification Code'}

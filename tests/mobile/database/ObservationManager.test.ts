@@ -91,18 +91,21 @@ describe('ObservationManager', () => {
     expect(params[0]).toBe(obsId); // id
     expect(params[1]).toBe('user-1'); // user_id
     expect(params[2]).toBe('trip-1'); // trip_id
-    expect(params[3]).toBe(11.11); // latitude
-    expect(params[4]).toBe(22.22); // longitude
-    expect(params[5]).toBe(NOW); // created_at
-    expect(params[6]).toBeNull(); // audio_media_id
-    expect(params[7]).toBe(1); // audio_transcribed
-    expect(params[8]).toBe('Nice water quality'); // observation
-    expect(params[9]).toBe('cat-1'); // category_id
-    expect(params[10]).toBe('N'); // direction
-    expect(params[11]).toBe('media-1'); // local_media_id
-    expect(params[12]).toBe(SyncStatus.PENDING);
-    expect(params[13]).toBeNull(); // multimedia_url
-    expect(params[14]).toBe(0); // last_synced_at
+    // Note: schema includes supabase_trip_id and supabase_audio_media_id before latitude/audio_media_id
+    expect(params[3]).toBeNull(); // supabase_trip_id
+    expect(params[4]).toBe(11.11); // latitude
+    expect(params[5]).toBe(22.22); // longitude
+    expect(params[6]).toBe(NOW); // created_at
+    expect(params[7]).toBeNull(); // audio_media_id
+    expect(params[8]).toBeNull(); // supabase_audio_media_id
+    expect(params[9]).toBe(1); // audio_transcribed
+    expect(params[10]).toBe('Nice water quality'); // observation
+    expect(params[11]).toBe('cat-1'); // category_id
+    expect(params[12]).toBe('N'); // direction
+    expect(params[13]).toBe('media-1'); // local_media_id
+    expect(params[14]).toBe(SyncStatus.PENDING);
+    expect(params[15]).toBeNull(); // multimedia_url
+    expect(params[16]).toBe(0); // last_synced_at
   });
 
   test('createObservation uses provided coordinates instead of LocationService', async () => {
@@ -125,8 +128,10 @@ describe('ObservationManager', () => {
     expect(params[0]).toBe(obsId);
     expect(params[1]).toBe('user-2');
     expect(params[2]).toBe('trip-2');
-    expect(params[3]).toBe(44.4);
-    expect(params[4]).toBe(-90.9);
+    // account for inserted supabase_trip_id placeholder
+    expect(params[3]).toBeNull();
+    expect(params[4]).toBe(44.4);
+    expect(params[5]).toBe(-90.9);
   });
 
   test('getObservationById returns row when found', async () => {

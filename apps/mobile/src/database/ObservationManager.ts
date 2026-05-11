@@ -94,12 +94,14 @@ async function generateUUID(): Promise<string> {
 export async function createObservation(params: {
   user_id: string;
   trip_id: string;
+  supabase_trip_id?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   observation?: string | null;
   category_id?: string | null;
   direction?: string | null;
   audio_media_id?: string | null;
+  supabase_audio_media_id?: string | null;
   audio_transcribed?: boolean;
   local_media_id?: string | null;
   multimedia_url?: string | null;
@@ -122,18 +124,20 @@ export async function createObservation(params: {
 
   await db!.runAsync(
     `INSERT INTO observations (
-      id, user_id, trip_id, latitude, longitude, created_at,
-      audio_media_id, audio_transcribed, observation, category_id, direction, local_media_id,
+      id, user_id, trip_id, supabase_trip_id, latitude, longitude, created_at,
+      audio_media_id, supabase_audio_media_id, audio_transcribed, observation, category_id, direction, local_media_id,
       sync_status, multimedia_url, last_synced_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.user_id,
       params.trip_id,
+      params.supabase_trip_id ?? null,
       coordinate.latitude,
       coordinate.longitude,
       now,
       params.audio_media_id ?? null,
+      params.supabase_audio_media_id ?? null,
       (params.audio_transcribed ?? false) ? 1 : 0,
       params.observation ?? null,
       params.category_id ?? null,
@@ -246,6 +250,7 @@ export async function updateObservationById(
     'longitude',
     'created_at',
     'audio_media_id',
+    'supabase_audio_media_id',
     'audio_transcribed',
     'observation',
     'category_id',

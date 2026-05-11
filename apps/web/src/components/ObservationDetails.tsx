@@ -6,6 +6,8 @@ import { Calendar, Clock, MapPin, User, X, UserX, Trash2, Trash } from 'lucide-r
 import { ImageWithFallback } from './ImageWithFallback';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
 interface ObservationDetailsProps {
   observation: Observation | null;
@@ -28,6 +30,111 @@ export function ObservationDetails({
 }: Readonly<ObservationDetailsProps>) {
   const { user } = useAuth();
   const isAdmin = user?.isAdmin || false;
+
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    let objectUrl: string | null = null;
+
+    async function downloadAudioFromSignedUrl(
+      signedUrl: string,
+      fallbackMimeType: string | null
+    ): Promise<string> {
+      const resp = await globalThis.fetch(signedUrl);
+
+      if (!resp.ok) {
+        throw new Error(`Failed to download audio. Status: ${resp.status}`);
+      }
+
+      const downloadedBlob = await resp.blob();
+      const responseMimeType = resp.headers.get('content-type')?.split(';')[0] ?? null;
+      const effectiveMimeType = responseMimeType || downloadedBlob.type || fallbackMimeType;
+
+      // Some browsers are stricter when playing blob URLs. If the fetched blob has
+      // no type, recreate it with the mime_type saved in audio_recordings.
+      const playableBlob = effectiveMimeType
+        ? new globalThis.Blob([downloadedBlob], { type: effectiveMimeType })
+        : downloadedBlob;
+
+      if (mounted) {
+        setAudioMimeType(effectiveMimeType);
+      }
+
+      return globalThis.URL.createObjectURL(playableBlob);
+    }
+
+    async function loadAudioFromId() {
+      const audioRecordingId = observation?.audioRecordingId;
+
+      setAudioUrl(null);
+      setAudioMimeType(null);
+      setAudioError(null);
+
+      if (!open || !observation || !audioRecordingId) {
+        setAudioLoading(false);
+        return;
+      }
+
+      setAudioLoading(true);
+
+      try {
+        const { data: audioRow, error: audioRowError } = await supabase
+          .from('audio_recordings')
+          .select('file_path, bucket, mime_type')
+          .eq('id', audioRecordingId)
+          .maybeSingle();
+
+        if (audioRowError || !audioRow?.file_path) {
+          throw audioRowError ?? new Error('Audio metadata is missing.');
+        }
+
+        const bucketName = audioRow.bucket || 'Audios';
+
+        const { data: signed, error: signedError } = await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(audioRow.file_path, 60 * 60);
+
+        if (signedError || !signed?.signedUrl) {
+          throw signedError ?? new Error('Could not create signed audio URL.');
+        }
+
+        objectUrl = await downloadAudioFromSignedUrl(signed.signedUrl, audioRow.mime_type ?? null);
+
+        if (mounted) {
+          setAudioUrl(objectUrl);
+        }
+      } catch (err) {
+        console.warn('Failed to load observation audio:', err);
+
+        if (mounted) {
+          setAudioUrl(null);
+          setAudioMimeType(null);
+          setAudioError('You do not have access to this audio recording.');
+        }
+      } finally {
+        if (mounted) {
+          setAudioLoading(false);
+        }
+      }
+    }
+
+    loadAudioFromId();
+
+    return () => {
+      mounted = false;
+
+      if (objectUrl) {
+        globalThis.URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [open, observation]);
+
+  const hasAudio = Boolean(observation?.audioRecordingId);
+  const hasMedia = (observation?.photos?.length ?? 0) > 0 || (observation?.videos?.length ?? 0) > 0;
 
   if (!observation || !open) return null;
 
@@ -202,7 +309,38 @@ export function ObservationDetails({
             <p className="text-sm">{observation.observation}</p>
           </div>
 
-          {(observation.photos.length > 0 || observation.videos.length > 0) && (
+          {hasAudio && (
+            <div>
+              <h3 className="font-medium mb-2">Audio Recording</h3>
+
+              {audioLoading && <p className="text-sm text-muted-foreground">Loading audio...</p>}
+
+              {audioError && <p className="text-sm text-red-600">{audioError}</p>}
+
+              {audioUrl && !audioError && (
+                <audio
+                  key={audioUrl}
+                  src={audioUrl}
+                  controls
+                  preload="metadata"
+                  className="w-full"
+                  onError={(event) => {
+                    console.warn('Audio element failed to load/play:', {
+                      error: event.currentTarget.error,
+                      audioMimeType,
+                    });
+                    setAudioError(
+                      'This audio file could not be played. Your browser may not support this audio format.'
+                    );
+                  }}
+                >
+                  Your browser does not support audio playback.
+                </audio>
+              )}
+            </div>
+          )}
+
+          {hasMedia && (
             <div>
               <h3 className="font-medium mb-2">Media</h3>
               <div className="space-y-2">

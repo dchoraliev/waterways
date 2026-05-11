@@ -40,6 +40,7 @@ export interface Observation {
   longitude: number | null;
   created_at: number;
   audio_media_id: string | null;
+  supabase_audio_media_id: string | null;
   audio_transcribed: boolean | false;
   observation: string | null;
   category_id: string | null;

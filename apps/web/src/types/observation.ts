@@ -21,4 +21,8 @@ export interface Observation {
   videos: string[];
   type: string;
   keywords: string[];
+
+  // Optional Supabase audio recording id associated with this observation.
+  // Audio metadata and signed URLs are loaded on the detail page only.
+  audioRecordingId?: string;
 }
