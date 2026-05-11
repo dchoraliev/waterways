@@ -81,6 +81,7 @@ type ObservationRow = {
   latitude: number | null;
   longitude: number | null;
   deleted?: boolean | null;
+  audio_recording_id?: string | null;
   total_count?: number | string | null;
 };
 
@@ -103,6 +104,7 @@ type DailyObservationRow = {
   categories: string[] | null;
   observation_media: string[] | null;
   deleted?: boolean | null;
+  audio_recording_id?: string | null;
   observer: {
     first_name: string | null;
     last_name: string | null;
@@ -357,6 +359,7 @@ function mapRowToObservation(
     videos,
     type: categories[0] ?? 'Observation',
     keywords: categories,
+    audioRecordingId: row.audio_recording_id ?? undefined,
   };
 }
 
@@ -399,6 +402,7 @@ export async function fetchObservations(
   }
 
   const rows = (data ?? []) as ObservationRow[];
+
   const { isAdminViewer, profilesById } = await getObserverContext(rows);
   const observations = rows
     .filter((row) => row.deleted !== true)
@@ -488,6 +492,7 @@ export async function fetchObservationsForRangeWithRelations(
       observation,
       categories,
       observation_media,
+      audio_recording_id,
       observer:users!observations_user_id_fkey(first_name, last_name, email),
       trip:trips!observations_trip_id_fkey(
         project:projects!trips_project_id_fkey(name)
@@ -513,7 +518,9 @@ export async function fetchObservationsForRangeWithRelations(
     return [];
   }
 
-  return (data ?? []).map((row) => {
+  const dailyRows = (data ?? []) as DailyObservationRow[];
+
+  return dailyRows.map((row) => {
     const dailyRow = row as DailyObservationRow;
     const parsed = parseEwkbPoint(dailyRow.location);
 
@@ -556,7 +563,8 @@ export async function fetchObservationsForRangeWithRelations(
       videos,
       type: categories[0] ?? 'Observation',
       keywords: categories,
-    } satisfies Observation;
+      audioRecordingId: dailyRow.audio_recording_id ?? undefined,
+    };
   });
 }
 

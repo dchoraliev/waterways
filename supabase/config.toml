@@ -149,3 +149,25 @@ backend = "postgres"
 
 [functions.send-daily-summary-emails]
 verify_jwt = false
+
+[functions.delete-expired-audios]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-expired-audios/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/delete-expired-audios/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/delete-expired-audios/*.html" ]
+
+[functions.delete-user-audios]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-user-audios/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/delete-user-audios/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/delete-user-audios/*.html" ]

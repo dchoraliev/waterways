@@ -8,6 +8,74 @@ export type Database = {
   };
   public: {
     Tables: {
+      audio_recordings: {
+        Row: {
+          bucket: string;
+          created_at: string | null;
+          file_name: string | null;
+          file_path: string | null;
+          id: string;
+          mime_type: string | null;
+          scheduled_deletion: string | null;
+          size_bytes: number | null;
+          unique_userID_localID_pair: string;
+          user_id: string;
+        };
+        Insert: {
+          bucket?: string;
+          created_at?: string | null;
+          file_name?: string | null;
+          file_path?: string | null;
+          id?: string;
+          mime_type?: string | null;
+          scheduled_deletion?: string | null;
+          size_bytes?: number | null;
+          unique_userID_localID_pair: string;
+          user_id: string;
+        };
+        Update: {
+          bucket?: string;
+          created_at?: string | null;
+          file_name?: string | null;
+          file_path?: string | null;
+          id?: string;
+          mime_type?: string | null;
+          scheduled_deletion?: string | null;
+          size_bytes?: number | null;
+          unique_userID_localID_pair?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      email: {
+        Row: {
+          daily_summary: boolean;
+          last_daily_summary: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          daily_summary?: boolean;
+          last_daily_summary?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          daily_summary?: boolean;
+          last_daily_summary?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'email_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       observation_categories: {
         Row: {
           color: string | null;
@@ -37,6 +105,7 @@ export type Database = {
       };
       observations: {
         Row: {
+          audio_recording_id: string | null;
           categories: string[] | null;
           created_at: string;
           deleted: boolean;
@@ -50,6 +119,7 @@ export type Database = {
           user_id: string | null;
         };
         Insert: {
+          audio_recording_id?: string | null;
           categories?: string[] | null;
           created_at?: string;
           deleted?: boolean;
@@ -63,6 +133,7 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+          audio_recording_id?: string | null;
           categories?: string[] | null;
           created_at?: string;
           deleted?: boolean;
@@ -300,67 +371,93 @@ export type Database = {
       };
       water_data: {
         Row: {
-          Air_Temp_C: number | null;
+          Air_Temp_F: number | null;
+          batch_id: number | null;
           Humidity_Pct: number | null;
           id: string;
           Lat: number | null;
           Light_415nm: number | null;
           Light_555nm: number | null;
           Light_680nm: number | null;
-          Light_Clear: number | null;
+          Light_Clear_lux: number | null;
           Lon: number | null;
           PM1_0: number | null;
           PM10_0: number | null;
           PM2_5: number | null;
-          Pressure_hPa: number | null;
+          Pressure_inHg: number | null;
           Satellites: number | null;
           Sound_dB: number | null;
           Timestamp: string | null;
           Water_DO_mgL: number | null;
           Water_EC_uS: number | null;
-          Water_Temp_C: number | null;
+          Water_Temp_F: number | null;
         };
         Insert: {
-          Air_Temp_C?: number | null;
+          Air_Temp_F?: number | null;
+          batch_id?: number | null;
           Humidity_Pct?: number | null;
           id?: string;
           Lat?: number | null;
           Light_415nm?: number | null;
           Light_555nm?: number | null;
           Light_680nm?: number | null;
-          Light_Clear?: number | null;
+          Light_Clear_lux?: number | null;
           Lon?: number | null;
           PM1_0?: number | null;
           PM10_0?: number | null;
           PM2_5?: number | null;
-          Pressure_hPa?: number | null;
+          Pressure_inHg?: number | null;
           Satellites?: number | null;
           Sound_dB?: number | null;
           Timestamp?: string | null;
           Water_DO_mgL?: number | null;
           Water_EC_uS?: number | null;
-          Water_Temp_C?: number | null;
+          Water_Temp_F?: number | null;
         };
         Update: {
-          Air_Temp_C?: number | null;
+          Air_Temp_F?: number | null;
+          batch_id?: number | null;
           Humidity_Pct?: number | null;
           id?: string;
           Lat?: number | null;
           Light_415nm?: number | null;
           Light_555nm?: number | null;
           Light_680nm?: number | null;
-          Light_Clear?: number | null;
+          Light_Clear_lux?: number | null;
           Lon?: number | null;
           PM1_0?: number | null;
           PM10_0?: number | null;
           PM2_5?: number | null;
-          Pressure_hPa?: number | null;
+          Pressure_inHg?: number | null;
           Satellites?: number | null;
           Sound_dB?: number | null;
           Timestamp?: string | null;
           Water_DO_mgL?: number | null;
           Water_EC_uS?: number | null;
-          Water_Temp_C?: number | null;
+          Water_Temp_F?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'water_data_batch_id_fkey';
+            columns: ['batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'water_data_batch';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      water_data_batch: {
+        Row: {
+          created_at: string;
+          id: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: number;
         };
         Relationships: [];
       };
@@ -728,6 +825,7 @@ export type Database = {
         }[];
       };
       gettransactionid: { Args: never; Returns: unknown };
+      insert_water_batch: { Args: { rows: Json }; Returns: number };
       longtransactionsenabled: { Args: never; Returns: boolean };
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }

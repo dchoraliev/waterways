@@ -2,7 +2,7 @@ import { getSession } from '@waterways/shared/src/supabase/auth';
 import { getTripsByUserId, updateTripById } from '../database/TripManager';
 import { getObservationsByUserId, updateObservationById } from '../database/ObservationManager';
 import { performAutoSyncTaskOnce } from './NetworkService';
-import { Observation } from '@waterways/shared/src/models/local-db-rows';
+import { Observation, Trip } from '@waterways/shared/src/models/local-db-rows';
 
 export const OFFLINE_USER_ID = 'offline-user';
 
@@ -20,12 +20,9 @@ export async function updateAndSyncOfflineDataToCurrentUser(): Promise<void> {
     // We have a valid session, we can proceed with updating the offline data
     const currentUserId = data.session?.user?.id;
     console.log('[OfflineService] Converting offline data to current user ID:', currentUserId);
-    // TODO: If we have pending offline data, we should trigger a sync here before navigating to the home screen
-    const trips = await getTripsByUserId(OFFLINE_USER_ID);
-    ///////////////// Temp Block start
-    const additionalTrips = await getTripsByUserId('local-user');
-    trips.push(...additionalTrips);
-    ///////////////// Temp block end
+
+    // If we have pending offline data, we should trigger a sync here before navigating to the home screen
+    const trips: Trip[] = await getTripsByUserId(OFFLINE_USER_ID);
     if (trips.length > 0) {
       // Move offline trips to the current user's account
       for (const trip of trips) {
@@ -37,10 +34,6 @@ export async function updateAndSyncOfflineDataToCurrentUser(): Promise<void> {
     );
 
     const observations: Observation[] = await getObservationsByUserId(OFFLINE_USER_ID);
-    ///////////////// Temp Block start
-    const additionalObservations: Observation[] = await getObservationsByUserId('local-user');
-    observations.push(...additionalObservations);
-    ///////////////// Temp block end
     if (observations.length > 0) {
       // Move offline observations to the current user's account
       for (const obs of observations) {
