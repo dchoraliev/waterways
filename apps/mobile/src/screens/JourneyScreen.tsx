@@ -30,7 +30,6 @@ import {
 import { transcribeTripAudio } from '../services/TranscriptionService';
 import { showToast } from '../utils/toast';
 import { isExpoGo } from '../utils/platformDetection';
-import { JourneyGPSToggle } from '../components/JourneyGPSToggle';
 
 // expo-audio (NOT expo-av)
 import {
@@ -50,7 +49,6 @@ import type { WakeWordMatch } from '../utils/stringMatching';
 import { useTheme } from '../contexts/ThemeContext';
 import { ROUTES } from '../constants/routes';
 import { GPSQualityIndicator } from '../components/GPSQualityIndicator';
-import * as Location from 'expo-location';
 
 const ACTIVE_TRIP_KEY = '@waterways:active_trip_id';
 
@@ -144,12 +142,7 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
 
     const initLocationTracking = async () => {
       try {
-        await startLocationTracking({
-          accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 25,
-          timeInterval: 10_000,
-          enableDeadReckoning: true, // Enable dead reckoning fallback
-        });
+        await startLocationTracking();
       } catch (error) {
         console.warn('[JourneyScreen] Failed to start location tracking:', error);
       }
@@ -707,13 +700,6 @@ export default function JourneyScreen({ tripId }: JourneyScreenProps) {
               showDetails={true}
             />
           </View>
-
-          {/* GPS Toggle - Added below GPS quality indicator */}
-          <JourneyGPSToggle
-            onToggle={(enabled: boolean) => {
-              console.log('[Journey] GPS improvements:', enabled ? 'ENABLED' : 'DISABLED');
-            }}
-          />
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
