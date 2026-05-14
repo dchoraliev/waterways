@@ -22,7 +22,11 @@ import ProjectSelector from '../components/ProjectSelector';
 import { ROUTES } from '../constants/routes';
 import { useAuth } from '../hooks/useAuth';
 import { SyncStatus, syncTrip } from '../database/SyncManager';
-import { getObservationsByTripId, removeObservationById } from '../database/ObservationManager';
+import {
+  getObservationsByTripId,
+  removeObservationById,
+  updateObservationById,
+} from '../database/ObservationManager';
 import { getTripById, updateTripById, removeTripById } from '../database/TripManager';
 import { Observation as DBObservation } from '@waterways/shared/src/models/local-db-rows';
 import { showToast } from '../utils/toast';
@@ -110,6 +114,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const saveInProgressRef = useRef(false);
   const syncInProgressRef = useRef(false);
+  const categoryUpdateInProgressRef = useRef(false);
+  const skippedUnclassifiedIdsRef = useRef<Set<string>>(new Set());
   const [baseCreatedAt, setBaseCreatedAt] = useState(0);
 
   // Active trip state
@@ -162,10 +168,81 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
     }
   }, [tripId, getDraftByTripId]); // ONLY tripId and getDraftByTripId
 
+  const classifyAndUpdateMissingCategories = useCallback(async () => {
+    if (
+      tripId === 'sample-trip' ||
+      loading ||
+      categoryUpdateInProgressRef.current ||
+      dbObservations.length === 0
+    ) {
+      return;
+    }
+
+    const observationsMissingCategory = dbObservations.filter((obs) => {
+      const hasCategory = !!obs.category_id;
+      const hasText = !!obs.observation?.trim();
+      const wasAlreadySkippedAsUnclassified = skippedUnclassifiedIdsRef.current.has(obs.id);
+
+      return !hasCategory && hasText && !wasAlreadySkippedAsUnclassified;
+    });
+
+    if (observationsMissingCategory.length === 0) {
+      return;
+    }
+
+    categoryUpdateInProgressRef.current = true;
+
+    try {
+      const categoryUpdates = new Map<string, string>();
+
+      for (const obs of observationsMissingCategory) {
+        const result = classifyObservation(obs.observation || '');
+
+        if (result.category === 'Unclassified') {
+          skippedUnclassifiedIdsRef.current.add(obs.id);
+          continue;
+        }
+
+        await updateObservationById(obs.id, {
+          category_id: result.category,
+          sync_status: SyncStatus.PENDING,
+        });
+
+        categoryUpdates.set(obs.id, result.category);
+      }
+
+      if (categoryUpdates.size > 0) {
+        setDbObservations((prev) =>
+          prev.map((obs) => {
+            const categoryId = categoryUpdates.get(obs.id);
+
+            if (!categoryId) {
+              return obs;
+            }
+
+            return {
+              ...obs,
+              category_id: categoryId,
+              sync_status: SyncStatus.PENDING,
+            };
+          })
+        );
+      }
+    } catch (error) {
+      console.error('[ReviewScreen] Failed to classify/update observation categories:', error);
+    } finally {
+      categoryUpdateInProgressRef.current = false;
+    }
+  }, [tripId, loading, dbObservations]);
+
   // Load data on mount ONLY
   useEffect(() => {
     checkAndLoadData();
   }, [tripId, checkAndLoadData]); // ONLY reload when tripId changes
+
+  useEffect(() => {
+    void classifyAndUpdateMissingCategories();
+  }, [classifyAndUpdateMissingCategories]);
 
   // Reload ONLY when screen comes back into focus (not on every re-render)
   useFocusEffect(
@@ -223,6 +300,16 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({ tripId: propTripId }) => {
     return rawObservations.map((obs) => {
       if (obs.manuallyEdited) {
         return obs;
+      }
+
+      const existingCategoryFromDatabase = obs.tags?.[0];
+
+      if (existingCategoryFromDatabase) {
+        return {
+          ...obs,
+          category: existingCategoryFromDatabase,
+          keyword: undefined,
+        };
       }
 
       const result = classifyObservation(obs.description || '');
